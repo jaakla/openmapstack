@@ -28,7 +28,7 @@ shared semantic checks <------+
 user/project evidence
 ```
 
-The distinction matters: `SKILL.md` is the product being developed and evaluated. It is not the maintainer bootstrap for this repository.
+The distinction matters: skills is the product being developed and evaluated. It is not the maintainer bootstrap for this repository.
 
 ### Source-of-truth boundaries
 

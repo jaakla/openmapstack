@@ -1,19 +1,19 @@
 # openmapstack
 
-**Four AI agent skills for geospatial decisions, data discovery, spatial SQL and reproducible analysis projects.**
+**AI agent skills for geospatial decisions, data discovery, spatial SQL and reproducible analysis projects.**
 
-Install (assume you have git and nodejs with npx already installed):
+Install (assuming you have git and nodejs with npx already installed):
 ```bash
 npx skills@1.5.26 add jaakla/openmapstack-skills --skill open-map-stack -g
 ```
 
-OpenMapStack gives your favorite AI agent: Claude Code, Codex, Cursor, OpenCode, PI and 50+ other agents not just a one-off analysis, but a **production workflow** from authoritative data discovery through reusable analysis (pipeline.py) to interactive web (dashboard.html) and GIS deliverables (QGIS project). The workflow becomes **inspectable** and **repeatable** as well-defined projects, defined as a `yaml` file with pinned sources, explicit assumptions and CRS choices, deterministic processing in a python script. It allows also isolated overrides, machine-readable validation, and surfaced provenance.
+OpenMapStack gives your favorite AI agent: Claude Code, Codex, Cursor, OpenCode, PI and 50+ other agents not just a one-off analysis, but a well-defined **workflow project** (`project.yaml`) defining from data discovery through reusable analysis (`pipeline.py`) to interactive web (`dashboard.html`) and GIS deliverables (QGIS `project.qgz`). The workflow becomes **inspectable** and **repeatable** as a clearly specified project with pinned sources, explicit assumptions and CRS choices and deterministic processing in a python script. It allows also isolated overrides, machine-readable validation, and surfaced provenance.
 
-It is open-first (both data and code-wise) and cloud-native by default, built on shoulders of the awesome Open GIS stack: STAC for discovery; GeoParquet, COG, and PMTiles for storage and delivery; DuckDB and PostGIS for compute; and QGIS, MapLibre, and Martin for presentation. It also teaches to deploy GDAL/OGR, GeoPandas, xarray/rioxarray, PDAL, routing engines, spatial SQL, and pragmatic hosted services when scale or reliability requires them.
+It is open-first (both data and code-wise) and cloud-native by default, built on shoulders of the established Open GIS stack: STAC for discovery; GeoParquet, COG, and PMTiles for storage and delivery; DuckDB and PostGIS for compute; and QGIS, MapLibre, and Martin for presentation. It also teaches to deploy GDAL/OGR, GeoPandas, xarray/rioxarray, PDAL, routing engines, spatial SQL, and pragmatic hosted services when scale or reliability requires them.
 
 ## What's in this repo
 
-The 0.4.0 collection has four independently installable skills:
+The skill collection has four independently installable skills:
 
 | Skill | Use it for |
 |---|---|
