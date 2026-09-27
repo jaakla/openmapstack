@@ -20,12 +20,13 @@
 #   - Minimum parcel size >= 20,000 m2 (2.0 ha) in EPSG:3301 (L-EST97)
 #   - Land-use (siht1): Agricultural, Production, or Commercial in Tartu linn
 #   - Arterial road proximity <= 2,000 m (Põhimaantee/Tugimaantee or planned road)
-#   - Education screening proxy: <= 2,000 m straight-line distance to verified municipal facilities
+#   - Education access: overlap with 25-minute pedestrian-network catchments
 #
 # Execution: python pipeline.py (run_e2e.py is a thin wrapper)
 # =============================================================================
 
 import argparse
+import contextlib
 import datetime
 import hashlib
 import io
@@ -59,22 +60,19 @@ PROJECT = yaml.safe_load((ROOT / "project.yaml").read_text())
 
 ANALYSIS_CRS = 3301   # L-EST97 metric CRS
 STORAGE_CRS = 4326    # WGS84 for MapLibre rendering
-WALK_SPEED_M_PER_MIN = 80.0  # 4.8 km/h standard pedestrian speed (25 min = 2000 m)
 MIN_PARCEL_AREA_M2 = 20000    # accepted minimum developable parcel size
 MAX_ROAD_DISTANCE_M = 2000    # accepted highway-accessibility threshold
-CANONICAL_CATCHMENT_M = 2000  # the accepted threshold; every other radius is exploratory
-# Radii materialised so the dashboard's education-threshold control always draws a
-# real buffer computed in EPSG:3301, never a browser-side approximation of one.
-CATCHMENT_RADII_M = (1000, 1500, 2000, 2500, 3000)
+CANONICAL_WALK_MINUTES = 25
+WALK_THRESHOLDS_MINUTES = (15, 20, 25, 30, 40)
 
 # The three suitability tiers, keyed by the manifest layer group that presents
 # each one. The SQL CASE that assigns the tier, the QGIS layer subsets and the
 # QGIS legend all read these strings from here, so re-wording a tier can never
 # leave a QGIS layer filtering on a label the data stopped carrying.
 SUITABILITY_TIERS = {
-    "candidates_tier1": "Tier 1: Prime (<=2km proxy to School & Kindergarten)",
-    "candidates_tier2": "Tier 2: Good (<=2km proxy to School or Kindergarten)",
-    "candidates_highway": "Tier 3: Highway Access Only (>2km proxy to School/KG)",
+    "candidates_tier1": "Tier 1: Prime (25-minute walk catchments of School & Kindergarten)",
+    "candidates_tier2": "Tier 2: Good (25-minute walk catchment of School or Kindergarten)",
+    "candidates_highway": "Tier 3: Highway Access Only (outside 25-minute education catchments)",
 }
 
 
@@ -406,12 +404,9 @@ def fetch_and_manifest_sources(refresh: bool = False) -> tuple[Path, Path, Path,
         pois_meta_file.write_text(json.dumps(pois_meta, indent=2, ensure_ascii=False))
 
     # Inspect exact metadata from the real files
-    con = duckdb.connect()
-    con.install_extension("spatial")
-    con.load_extension("spatial")
-
-    parcels_info = con.execute(f"SELECT count(*) FROM ST_Read('{cadastre_gpkg}', layer='Tartu maakond')").fetchone()[0]
-    parcels_cols = [r[0] for r in con.execute(f"DESCRIBE SELECT * FROM ST_Read('{cadastre_gpkg}', layer='Tartu maakond')").fetchall()]
+    with contextlib.closing(sqlite3.connect(f"{cadastre_gpkg.as_uri()}?mode=ro", uri=True)) as source:
+        parcels_info = source.execute('SELECT count(*) FROM "Tartu maakond"').fetchone()[0]
+        parcels_cols = [row[1] for row in source.execute('PRAGMA table_info("Tartu maakond")')]
 
     roads_raw = json.loads(roads_geojson.read_text())
     roads_count = len(roads_raw.get("features", []))
@@ -482,6 +477,9 @@ def fetch_and_manifest_sources(refresh: bool = False) -> tuple[Path, Path, Path,
             "sha256": _sha256(pois_geojson),
         },
     ]
+    from routing import fetch_network
+
+    manifest.append(fetch_network(ROOT, PROJECT["sources"]["pedestrian_network"]))
     (SOURCE / "manifest.json").write_text(json.dumps(manifest, indent=2))
     log.info("Source manifest recorded: %d parcels, %d roads, %d education POIs", parcels_info, roads_count, pois_count)
     return cadastre_gpkg, roads_geojson, pois_geojson, manifest
@@ -566,6 +564,139 @@ def apply_attribute_overrides(source_collection: dict, source_key: str) -> tuple
     return effective, results
 
 
+def calculate_network_access(con: duckdb.DuckDBPyConnection, effective_pois: dict) -> None:
+    from routing import facility_isochrones
+
+    settings = PROJECT["processing"]["routing"]
+    if settings["minutes"] != list(WALK_THRESHOLDS_MINUTES) or settings["canonical_minutes"] != CANONICAL_WALK_MINUTES:
+        raise RuntimeError("Routing thresholds must match the published dashboard thresholds")
+    contours, evidence = facility_isochrones(ROOT, PROJECT["sources"]["pedestrian_network"], settings, effective_pois)
+    con.execute("""
+        CREATE OR REPLACE TABLE facility_isochrones
+        (source_id VARCHAR, amenity VARCHAR, active BOOLEAN, minutes INTEGER, geometry GEOMETRY)
+    """)
+    con.executemany("""
+        INSERT INTO facility_isochrones VALUES (?, ?, ?, ?, ST_GeomFromGeoJSON(?))
+    """, [(feature["properties"]["source_id"], feature["properties"]["amenity"],
+           feature["properties"]["active"], feature["properties"]["minutes"], json.dumps(feature["geometry"]))
+          for feature in contours["features"]])
+    repairs = []
+    for source_id, minutes, before_area, after_area, geometry in con.execute("""
+        SELECT source_id, minutes,
+               ST_Area(ST_Transform(geometry, 'OGC:CRS84', 'EPSG:3301', always_xy := true)),
+               ST_Area(ST_Transform(ST_CollectionExtract(ST_MakeValid(geometry), 3), 'OGC:CRS84', 'EPSG:3301', always_xy := true)),
+               ST_AsGeoJSON(ST_CollectionExtract(ST_MakeValid(geometry), 3))
+        FROM facility_isochrones WHERE NOT ST_IsValid(geometry)
+    """).fetchall():
+        if abs(before_area - after_area) > 1:
+            raise RuntimeError(f"Isochrone repair exceeds 1 m² for {source_id} at {minutes} minutes")
+        con.execute("UPDATE facility_isochrones SET geometry = ST_GeomFromGeoJSON(?) WHERE source_id = ? AND minutes = ?",
+                    [geometry, source_id, minutes])
+        for feature in contours["features"]:
+            if feature["properties"]["source_id"] == source_id and feature["properties"]["minutes"] == minutes:
+                feature["geometry"] = json.loads(geometry)
+                feature["properties"]["topology_repaired"] = True
+        repairs.append({"source_id": source_id, "minutes": minutes, "area_before_m2": before_area,
+                        "area_after_m2": after_area, "method": "ST_CollectionExtract(ST_MakeValid(geometry), 3)"})
+    evidence["topology_repairs"] = repairs
+    (DERIVED / "facility_isochrones.json").write_text(json.dumps(contours, separators=(",", ":")))
+    (VALIDATION / "routing-evidence.json").write_text(json.dumps(evidence, separators=(",", ":")))
+    con.execute("UPDATE facility_isochrones SET geometry = ST_Transform(geometry, 'OGC:CRS84', 'EPSG:3301', always_xy := true)")
+    invalid = con.execute("SELECT count(*) FROM facility_isochrones WHERE NOT ST_IsValid(geometry) OR ST_IsEmpty(geometry)").fetchone()[0]
+    if invalid:
+        raise RuntimeError(f"Valhalla returned {invalid} invalid or empty isochrones")
+    con.execute("""
+        CREATE OR REPLACE TABLE catchment_variants AS
+        SELECT amenity, minutes, variant,
+               count(*) AS facility_count,
+               ST_Union_Agg(geometry ORDER BY source_id) AS geometry
+        FROM facility_isochrones
+        CROSS JOIN (VALUES ('effective'), ('baseline')) AS variants(variant)
+        WHERE variant = 'baseline' OR active
+        GROUP BY amenity, minutes, variant
+    """)
+    con.execute("""
+        CREATE OR REPLACE TABLE parcel_network_access AS
+        SELECT parcel.cadastral_id, catchment.amenity, catchment.variant, catchment.minutes,
+               ST_Area(ST_Intersection(parcel.geometry, catchment.geometry)) > 0 AS reachable
+        FROM candidate_parcels AS parcel CROSS JOIN catchment_variants AS catchment
+    """)
+    nonmonotonic = con.execute("""
+        SELECT count(*) FROM parcel_network_access AS shorter
+        JOIN parcel_network_access AS longer USING (cadastral_id, amenity, variant)
+        WHERE shorter.minutes < longer.minutes AND shorter.reachable AND NOT longer.reachable
+    """).fetchone()[0]
+    if nonmonotonic:
+        raise RuntimeError("Isochrone parcel membership is not monotonic; cannot publish sampled accessibility thresholds")
+    for amenity, field in (("school", "school"), ("kindergarten", "kg")):
+        for variant in ("effective", "baseline"):
+            column = f"isochrone_{field}_{variant}_min"
+            con.execute(f"ALTER TABLE candidate_parcels ADD COLUMN {column} INTEGER")
+            con.execute(f"""
+                UPDATE candidate_parcels AS parcel SET {column} = access.minutes
+                FROM (
+                    SELECT cadastral_id, min(minutes) AS minutes FROM parcel_network_access
+                    WHERE amenity = ? AND variant = ? AND reachable GROUP BY cadastral_id
+                ) AS access WHERE parcel.cadastral_id = access.cadastral_id
+            """, [amenity, variant])
+    con.execute("""
+        UPDATE candidate_parcels SET suitability_tier = CASE
+            WHEN isochrone_school_effective_min <= ? AND isochrone_kg_effective_min <= ? THEN ?
+            WHEN isochrone_school_effective_min <= ? OR isochrone_kg_effective_min <= ? THEN ?
+            ELSE ? END
+    """, [CANONICAL_WALK_MINUTES, CANONICAL_WALK_MINUTES, SUITABILITY_TIERS["candidates_tier1"],
+          CANONICAL_WALK_MINUTES, CANONICAL_WALK_MINUTES, SUITABILITY_TIERS["candidates_tier2"],
+          SUITABILITY_TIERS["candidates_highway"]])
+    for amenity, table in (("school", "school_catchment"), ("kindergarten", "kg_catchment")):
+        con.execute(f"CREATE OR REPLACE TABLE {table} AS SELECT geometry FROM catchment_variants WHERE amenity = ? AND variant = 'effective' AND minutes = ?", [amenity, CANONICAL_WALK_MINUTES])
+
+
+def cadastre_wkb(geometry: bytes) -> bytes:
+    """Decode the standard GeoPackageBinary header, preserving its WKB payload."""
+    if geometry is None or len(geometry) < 8 or geometry[:3] != b"GP\x00":
+        raise ValueError("Invalid GeoPackage geometry header")
+    flags = geometry[3]
+    envelope = (flags >> 1) & 7
+    if flags & 0xF0 or envelope > 4:
+        raise ValueError("Unsupported empty, extended or reserved GeoPackage geometry")
+    byte_order = "little" if flags & 1 else "big"
+    if int.from_bytes(geometry[4:8], byte_order, signed=True) != 3301:
+        raise ValueError("Cadastre geometry must use EPSG:3301")
+    offset = 8 + (0, 32, 48, 48, 64)[envelope]
+    if len(geometry) < offset + 5:
+        raise ValueError("Truncated GeoPackage geometry")
+    return geometry[offset:]
+
+
+def load_cadastre(con: duckdb.DuckDBPyConnection, path: Path) -> None:
+    con.execute("""
+        CREATE OR REPLACE TABLE parcels_raw
+        (fid BIGINT, cadastral_id VARCHAR, address VARCHAR, municipality VARCHAR,
+         settlement VARCHAR, land_use VARCHAR, area_m2 DOUBLE, geometry GEOMETRY('EPSG:3301'))
+    """)
+    with contextlib.closing(sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)) as source:
+        metadata = source.execute("SELECT column_name, srs_id FROM gpkg_geometry_columns WHERE table_name = 'Tartu maakond'").fetchall()
+        if metadata != [("geom", 3301)]:
+            raise ValueError(f"Unexpected cadastre geometry metadata: {metadata}")
+        cursor = source.execute('SELECT fid, tunnus, l_aadress, ov_nimi, ay_nimi, siht1, pindala, geom FROM "Tartu maakond" ORDER BY fid')
+        con.execute("BEGIN TRANSACTION")
+        try:
+            while rows := cursor.fetchmany(2000):
+                fields = ("fid", "cadastral_id", "address", "municipality", "settlement", "land_use", "area_m2", "wkb")
+                batch = [dict(zip(fields, (*row[:-1], cadastre_wkb(row[-1])))) for row in rows]
+                con.execute("""
+                    INSERT INTO parcels_raw
+                    SELECT record.fid, record.cadastral_id, record.address, record.municipality,
+                           record.settlement, record.land_use, record.area_m2,
+                           ST_SetCRS(ST_GeomFromWKB(record.wkb), 'EPSG:3301')
+                    FROM unnest(?) AS records(record)
+                """, [batch])
+            con.execute("COMMIT")
+        except Exception:
+            con.execute("ROLLBACK")
+            raise
+
+
 def run_pipeline(
     con: duckdb.DuckDBPyConnection, cadastre_gpkg: Path, roads_geojson: Path, pois_geojson: Path
 ) -> list[dict]:
@@ -574,18 +705,7 @@ def run_pipeline(
     t_4326 = pyproj.Transformer.from_crs(ANALYSIS_CRS, STORAGE_CRS, always_xy=True)
 
     # STEP 1 — Load authoritative cadastral parcels from GeoPackage (EPSG:3301)
-    con.execute(f"""
-        CREATE OR REPLACE TABLE parcels_raw AS
-        SELECT fid,
-               tunnus AS cadastral_id,
-               l_aadress AS address,
-               ov_nimi AS municipality,
-               ay_nimi AS settlement,
-               siht1 AS land_use,
-               pindala AS area_m2,
-               geom AS geometry
-        FROM ST_Read('{cadastre_gpkg}', layer='Tartu maakond')
-    """)
+    load_cadastre(con, cadastre_gpkg)
 
     # STEP 2 — Size and land-use filter (area >= 20000 m2, commercial/agricultural/production, Tartu linn)
     con.execute(f"""
@@ -667,11 +787,6 @@ def run_pipeline(
 
     # STEP 6 — Multi-criteria Spatial Evaluation:
     # - Distance to highway network (<= 2000 m)
-    # - Distance to nearest school (m) and walk time (min)
-    # - Distance to nearest kindergarten (m) and walk time (min)
-    tier1_label = SUITABILITY_TIERS["candidates_tier1"]
-    tier2_label = SUITABILITY_TIERS["candidates_tier2"]
-    tier3_label = SUITABILITY_TIERS["candidates_highway"]
     con.execute(f"""
         CREATE OR REPLACE TABLE candidate_parcels AS
         WITH official_road_geom AS (SELECT ST_Union_Agg(geometry) AS u FROM official_roads),
@@ -695,15 +810,7 @@ def run_pipeline(
                round(ST_Distance(p.geometry, k.u), 1) AS dist_kg_m,
                round(ST_Distance(p.geometry, ss.u), 1) AS dist_school_baseline_m,
                round(ST_Distance(p.geometry, ks.u), 1) AS dist_kg_baseline_m,
-               round(ST_Distance(p.geometry, s.u) / 80.0, 1) AS straightline_time_school_min,
-               round(ST_Distance(p.geometry, k.u) / 80.0, 1) AS straightline_time_kg_min,
-               CASE
-                 WHEN ST_Distance(p.geometry, s.u) <= {CANONICAL_CATCHMENT_M} AND ST_Distance(p.geometry, k.u) <= {CANONICAL_CATCHMENT_M}
-                   THEN '{tier1_label}'
-                 WHEN ST_Distance(p.geometry, s.u) <= {CANONICAL_CATCHMENT_M} OR ST_Distance(p.geometry, k.u) <= {CANONICAL_CATCHMENT_M}
-                   THEN '{tier2_label}'
-                 ELSE '{tier3_label}'
-               END AS suitability_tier,
+               ''::VARCHAR AS suitability_tier,
                p.geometry
         FROM large_parcels p, official_road_geom r, scenario_road_geom sr, school_geom s, kg_geom k,
              school_src_geom ss, kg_src_geom ks
@@ -712,21 +819,7 @@ def run_pipeline(
     n_cand = con.execute("SELECT count(*) FROM candidate_parcels").fetchone()[0]
     log.info("Identified %d road-accessible candidate parcels across all suitability tiers", n_cand)
 
-    # STEP 7 — Build explicit 2 km straight-line accessibility proxies.
-    con.execute(f"""
-        CREATE OR REPLACE TABLE school_catchment AS
-        SELECT 'Municipal schools (2 km straight-line proxy)' AS name,
-               'school_catchment' AS type,
-               ST_Union_Agg(ST_Buffer(geometry, {CANONICAL_CATCHMENT_M}, 64)) AS geometry
-        FROM schools
-    """)
-    con.execute(f"""
-        CREATE OR REPLACE TABLE kg_catchment AS
-        SELECT 'Municipal kindergartens (2 km straight-line proxy)' AS name,
-               'kindergarten_catchment' AS type,
-               ST_Union_Agg(ST_Buffer(geometry, {CANONICAL_CATCHMENT_M}, 64)) AS geometry
-        FROM kindergartens
-    """)
+    calculate_network_access(con, effective_pois)
 
     # STEP 8 — Export derived outputs
     DERIVED.mkdir(parents=True, exist_ok=True)
@@ -747,7 +840,8 @@ def run_pipeline(
                area_m2, dist_main_road_m, dist_official_road_m, dist_scenario_road_m,
                nearest_road_source, dist_school_m, dist_kg_m,
                dist_school_baseline_m, dist_kg_baseline_m,
-               straightline_time_school_min, straightline_time_kg_min, suitability_tier,
+               isochrone_school_effective_min, isochrone_kg_effective_min,
+               isochrone_school_baseline_min, isochrone_kg_baseline_min, suitability_tier,
                ST_AsGeoJSON(geometry)
         FROM candidate_parcels
     """).fetchall()
@@ -755,7 +849,7 @@ def run_pipeline(
     coll = {"type": "FeatureCollection", "crs": {"type": "name", "properties": {"name": "EPSG:4326"}}, "features": []}
     for row in feats:
         (fid, addr, mun, sett, lu, area, dist_r, dist_ro, dist_rs, road_source,
-         dist_s, dist_k, dist_s_base, dist_k_base, w_s, w_k, tier, gj_str) = row
+         dist_s, dist_k, dist_s_base, dist_k_base, w_s, w_k, w_s_base, w_k_base, tier, gj_str) = row
         g = json.loads(gj_str)
         g["coordinates"] = transform_coords(g["coordinates"])
         coll["features"].append({
@@ -775,8 +869,10 @@ def run_pipeline(
                 "dist_kg_m": float(dist_k),
                 "dist_school_baseline_m": float(dist_s_base),
                 "dist_kg_baseline_m": float(dist_k_base),
-                "straightline_time_school_min": float(w_s),
-                "straightline_time_kg_min": float(w_k),
+                "isochrone_school_effective_min": w_s,
+                "isochrone_kg_effective_min": w_k,
+                "isochrone_school_baseline_min": w_s_base,
+                "isochrone_kg_baseline_min": w_k_base,
                 "suitability_tier": tier,
             },
             "geometry": g,
@@ -810,63 +906,40 @@ def run_pipeline(
         "features": [
             {
                 "type": "Feature",
-                "properties": {"name": "Municipal schools: 2 km straight-line proxy", "type": "school_catchment"},
+                "properties": {"name": "Municipal schools: 25-minute pedestrian catchment", "type": "school_catchment"},
                 "geometry": geom_to_4326(school_gj_str),
             },
             {
                 "type": "Feature",
-                "properties": {"name": "Municipal kindergartens: 2 km straight-line proxy", "type": "kindergarten_catchment"},
+                "properties": {"name": "Municipal kindergartens: 25-minute pedestrian catchment", "type": "kindergarten_catchment"},
                 "geometry": geom_to_4326(kg_gj_str),
             },
         ],
     }
     (DERIVED / "education_catchments.json").write_text(json.dumps(catchments_coll, indent=2))
 
-    # 3b. Catchment variants: the same buffer rule at every radius the dashboard's
-    # education-threshold control offers, for both the effective (overrides applied)
-    # and baseline (source as published) facility sets. Every polygon here is a real
-    # EPSG:3301 buffer, so moving the control never shows an approximated shape.
-    # `education_catchments.json` stays the canonical 2 km effective pair; this file
-    # is the exploratory companion and is never the accepted result.
-    variant_sources = {
-        ("school_catchment", "effective"): ("schools", "Municipal schools"),
-        ("kindergarten_catchment", "effective"): ("kindergartens", "Municipal kindergartens"),
-        ("school_catchment", "baseline"): ("schools_source", "Municipal schools"),
-        ("kindergarten_catchment", "baseline"): ("kindergartens_source", "Municipal kindergartens"),
-    }
-
-    def _facility_ids(table: str) -> set:
-        return {r[0] for r in con.execute(f"SELECT source_id FROM {table}").fetchall()}
-
     variant_feats = []
-    for (ctype, variant), (table, label) in variant_sources.items():
-        effective_table = variant_sources[(ctype, "effective")][0]
-        if variant == "baseline" and _facility_ids(table) == _facility_ids(effective_table):
-            # No override touches this facility class; the view reuses the effective one.
-            continue
-        for radius in CATCHMENT_RADII_M:
-            gj_str = con.execute(
-                f"SELECT ST_AsGeoJSON(ST_Union_Agg(ST_Buffer(geometry, {radius}, 32))) FROM {table}"
-            ).fetchone()[0]
-            variant_feats.append({
-                "type": "Feature",
-                "properties": {
-                    "name": f"{label}: {radius:,} m straight-line proxy",
-                    "type": ctype,
-                    "variant": variant,
-                    "radius_m": radius,
-                    "canonical": variant == "effective" and radius == CANONICAL_CATCHMENT_M,
-                    "facility_count": len(_facility_ids(table)),
-                },
-                "geometry": _round_geometry(geom_to_4326(gj_str)),
-            })
+    for amenity, minutes, variant, count, geometry in con.execute(
+        "SELECT amenity, minutes, variant, facility_count, ST_AsGeoJSON(geometry) "
+        "FROM catchment_variants ORDER BY amenity, variant, minutes"
+    ).fetchall():
+        variant_feats.append({
+            "type": "Feature",
+            "properties": {
+                "name": f"Municipal {amenity}: {minutes}-minute walk catchment",
+                "type": f"{amenity}_catchment", "variant": variant, "minutes": minutes,
+                "canonical": variant == "effective" and minutes == CANONICAL_WALK_MINUTES,
+                "facility_count": count,
+            },
+            "geometry": _round_geometry(geom_to_4326(geometry)),
+        })
     (DERIVED / "education_catchment_variants.json").write_text(
         json.dumps({"type": "FeatureCollection", "features": variant_feats}, indent=2)
     )
     log.info(
-        "Exported %d catchment variants (%d radii x facility sets)",
+        "Exported %d catchment variants (%d walking thresholds x facility sets)",
         len(variant_feats),
-        len(CATCHMENT_RADII_M),
+        len(WALK_THRESHOLDS_MINUTES),
     )
 
     # 4. Education POIs were already exported in effective (post-override) form
@@ -1032,13 +1105,13 @@ def _check_view_controls(con: duckdb.DuckDBPyConnection) -> dict:
 
     expect("min_area", "canonical", MIN_PARCEL_AREA_M2)
     expect("max_road_distance", "canonical", MAX_ROAD_DISTANCE_M)
-    expect("education_threshold", "canonical", CANONICAL_CATCHMENT_M)
+    expect("education_threshold", "canonical", CANONICAL_WALK_MINUTES)
     expect("land_use", "canonical", land_use)
 
     options = list(filters.get("education_threshold", {}).get("options", []))
-    if options != list(CATCHMENT_RADII_M):
+    if options != list(WALK_THRESHOLDS_MINUTES):
         mismatches.append(
-            f"education_threshold.options: declared {options}, materialised {list(CATCHMENT_RADII_M)}"
+            f"education_threshold.options: declared {options}, materialised {list(WALK_THRESHOLDS_MINUTES)}"
         )
     for scenario in scenarios.values():
         override_id = scenario.get("override")
@@ -1062,7 +1135,7 @@ def write_validation(con: duckdb.DuckDBPyConnection, run_id: str, override_resul
         return int(con.execute(q).fetchone()[0])
 
     n_candidates = n("SELECT COUNT(*) FROM candidate_parcels")
-    n_tier1 = n("SELECT COUNT(*) FROM candidate_parcels WHERE dist_school_m <= 2000 AND dist_kg_m <= 2000")
+    n_tier1 = n("SELECT COUNT(*) FROM candidate_parcels WHERE isochrone_school_effective_min <= 25 AND isochrone_kg_effective_min <= 25")
     bad_geom = n("SELECT COUNT(*) FROM candidate_parcels WHERE NOT ST_IsValid(geometry)")
     dup_ids = n("SELECT COUNT(*) - COUNT(DISTINCT cadastral_id) FROM candidate_parcels")
     null_ids = n("SELECT COUNT(*) FROM candidate_parcels WHERE cadastral_id IS NULL")
@@ -1180,8 +1253,12 @@ def write_validation(con: duckdb.DuckDBPyConnection, run_id: str, override_resul
         },
         {
             "id": "education_access_method",
-            "status": "warning",
-            "reason": "2 km straight-line proxy; no pedestrian-network isochrone was computed",
+            "status": "passed",
+            "reason": "Reverse Valhalla pedestrian isochrones; positive-area parcel intersection; 25-minute accepted threshold",
+            "facility_contours": n("SELECT count(*) FROM facility_isochrones"),
+            "evidence": "validation/routing-evidence.json",
+            "topology_repairs": json.loads((VALIDATION / "routing-evidence.json").read_text()).get("topology_repairs", []),
+            "limitations": "OSM completeness, approximate contour boundaries and unverified parcel/facility entrances",
         },
     ]
     expected_checks = set(PROJECT["validation"]["required"])
@@ -1239,7 +1316,7 @@ def finalize_run(report: dict, manifest: list[dict], started_at: str) -> None:
         for directory in (SOURCE, OVERRIDES)
         for path in directory.rglob("*")
         if path.is_file()
-    ] + [ROOT / "pipeline.py"]
+    ] + [ROOT / "pipeline.py", ROOT / "routing.py", ROOT / "requirements.txt"]
     output_paths = [
         DERIVED / "final-candidates.gpkg",
         DERIVED / "final-candidates.parquet",
@@ -1248,6 +1325,8 @@ def finalize_run(report: dict, manifest: list[dict], started_at: str) -> None:
         DERIVED / "education_catchment_variants.json",
         DERIVED / "education_pois.json",
         DERIVED / "main_roads.json",
+        DERIVED / "facility_isochrones.json",
+        VALIDATION / "routing-evidence.json",
         ROOT / "project.qgz",
     ]
     inputs_hash = _combined_hash(input_paths)
@@ -1271,6 +1350,7 @@ def finalize_run(report: dict, manifest: list[dict], started_at: str) -> None:
             "python": os.sys.version.split()[0],
             "duckdb": duckdb.__version__,
             "pyproj": pyproj.__version__,
+            **PROJECT["processing"]["routing"]["versions"],
         },
     }
     run_file = RUNS / f"{report['run_id']}.json"
@@ -1446,7 +1526,7 @@ def _qgis_layer_specs(
 
     specs[("catchments", "education_catchments_geojson")] = {
         "id": "education_catchments_layer",
-        "name": "Education 2 km Straight-line Proxies",
+        "name": "Education 25-minute Walking Catchments",
         "file": "data/derived/education_catchments.json",
         "uri_options": "",
         "geometry": "Polygon",
@@ -1457,7 +1537,7 @@ def _qgis_layer_specs(
             "categories": [
                 {
                     "value": "school_catchment",
-                    "label": "Municipal schools: 2 km straight-line proxy",
+                    "label": "Municipal schools: 25-minute pedestrian catchment",
                     "symbol": {
                         "kind": "fill",
                         "alpha": "0.12",
@@ -1471,7 +1551,7 @@ def _qgis_layer_specs(
                 },
                 {
                     "value": "kindergarten_catchment",
-                    "label": "Municipal kindergartens: 2 km straight-line proxy",
+                    "label": "Municipal kindergartens: 25-minute pedestrian catchment",
                     "symbol": {
                         "kind": "fill",
                         "alpha": "0.10",
@@ -2781,7 +2861,7 @@ const POIS = __POIS__;
   const state = {
     minAreaM2: C.minAreaM2,
     maxRoadM: C.maxRoadM,
-    educationM: C.educationM,
+    educationMinutes: C.educationMinutes,
     landUse: new Set(C.landUse),
     scenarioRoad: C.scenarioRoad,
     scenarioOutage: C.scenarioOutage,
@@ -2951,26 +3031,25 @@ const POIS = __POIS__;
   function isCanonical() {
     return state.minAreaM2 === C.minAreaM2
       && state.maxRoadM === C.maxRoadM
-      && state.educationM === C.educationM
+      && state.educationMinutes === C.educationMinutes
       && state.scenarioRoad === C.scenarioRoad
       && state.scenarioOutage === C.scenarioOutage
       && state.landUse.size === C.landUse.length
       && C.landUse.every((code) => state.landUse.has(code));
   }
 
-  // The whole re-derivation. Every number the browser shows comes from distances
-  // the pipeline measured in EPSG:3301 — the view re-applies the published rule to
-  // them, it never re-measures geometry or invents a value.
   function evaluate(s, assign) {
     const st = { shown: 0, area: 0, tier1: 0, tier2: 0, tier3: 0, areaTier1: 0, areaTier2: 0, areaTier3: 0 };
     for (const f of WORKING_CANDIDATES.features) {
       const p = f.properties;
       const road = s.scenarioRoad ? Math.min(p.dist_official_road_m, p.dist_scenario_road_m) : p.dist_official_road_m;
-      const ds = s.scenarioOutage ? p.dist_school_m : p.dist_school_baseline_m;
-      const dk = s.scenarioOutage ? p.dist_kg_m : p.dist_kg_baseline_m;
+      const ds = s.scenarioOutage ? p.isochrone_school_effective_min : p.isochrone_school_baseline_min;
+      const dk = s.scenarioOutage ? p.isochrone_kg_effective_min : p.isochrone_kg_baseline_min;
       const pass = !p._draftHidden && p.area_m2 >= s.minAreaM2 && road <= s.maxRoadM && s.landUse.has(p.land_use);
-      const tier = (ds <= s.educationM && dk <= s.educationM) ? "tier1"
-        : ((ds <= s.educationM || dk <= s.educationM) ? "tier2" : "tier3");
+      const school = ds != null && ds <= s.educationMinutes;
+      const kindergarten = dk != null && dk <= s.educationMinutes;
+      const tier = (school && kindergarten) ? "tier1"
+        : ((school || kindergarten) ? "tier2" : "tier3");
       if (assign) {
         p._pass = pass;
         p._tier = tier;
@@ -3056,12 +3135,12 @@ const POIS = __POIS__;
       + '<span class="hint">The run only measured parcels within ' + km(C.maxRoadM)
       + " of a highway, so this control can tighten the rule but never widen it.</span></div>"
 
-      + '<div class="field"><div class="field-head"><span class="name">Education proximity threshold</span>'
+      + '<div class="field"><div class="field-head"><span class="name">Walking time threshold</span>'
       + '<span class="value" id="valEdu"></span></div>'
-      + '<input type="range" id="ctlEdu" min="0" max="' + (VIEW.catchmentRadii.length - 1)
-      + '" step="1" value="' + VIEW.catchmentRadii.indexOf(state.educationM) + '">'
-      + '<span class="hint">Sets the tier rule and redraws the matching buffer, each one measured in '
-      + esc(VIEW.project.analysis_crs) + ". Straight-line screening distance, not a walking isochrone.</span></div>"
+      + '<input type="range" id="ctlEdu" min="0" max="' + (VIEW.catchmentMinutes.length - 1)
+      + '" step="1" value="' + VIEW.catchmentMinutes.indexOf(state.educationMinutes) + '">'
+      + '<span class="hint">Selects precomputed pedestrian-network catchments and parcel overlaps. '
+      + "Contours model walking to facilities; overlap does not establish a usable parcel entrance.</span></div>"
 
       + '<div class="field"><div class="field-head"><span class="name">Land use</span></div>'
       + '<div class="chips">' + landUse + "</div></div>";
@@ -3112,7 +3191,7 @@ const POIS = __POIS__;
       + 'style="margin-top:7px;display:block">Reset to the canonical run</button></span></div></div>'
       + acc("scenarios", "Scenario overrides", scenarioRows()
         + '<p style="font-size:11px;color:var(--text-faint)">Both overrides are hypothetical. Switching one off '
-        + "re-screens the parcels against distances the pipeline measured without it — the authoritative source "
+        + "re-screens the parcels against road distances and network catchments computed without it — the authoritative source "
         + "is never modified either way.</p>", true, String(VIEW.overrides.length))
       + acc("filters", "Filters", filterFields(), true)
       + acc("layers", "Layers & legend", layerRows(), true, String(VIEW.layerGroups.length))
@@ -3561,8 +3640,8 @@ const POIS = __POIS__;
         state.landUse.size !== C.landUse.length],
       ["Highway accessibility", "≤ " + km(state.maxRoadM) + " to a national primary or secondary road"
         + (state.scenarioRoad ? " or the scenario connector" : ""), state.maxRoadM !== C.maxRoadM],
-      ["Education proximity", "≤ " + km(state.educationM) + " straight-line to a municipal school and/or kindergarten (~"
-        + Math.round(state.educationM / VIEW.walkSpeedMPerMin) + " min-equivalent)", state.educationM !== C.educationM],
+      ["Education access", "Overlaps " + state.educationMinutes + "-minute pedestrian catchments at "
+        + VIEW.walkingSpeedKmh + " km/h", state.educationMinutes !== C.educationMinutes],
       ["OVERRIDE-002 connector road", state.scenarioRoad ? "counted as access" : "excluded",
         state.scenarioRoad !== C.scenarioRoad],
       ["OVERRIDE-001 facility outage", state.scenarioOutage ? "applied" : "not applied",
@@ -3583,10 +3662,10 @@ const POIS = __POIS__;
     const a = $("#valArea"), r = $("#valRoad"), e = $("#valEdu");
     a.textContent = ha(state.minAreaM2) + " ha";
     r.textContent = km(state.maxRoadM);
-    e.textContent = km(state.educationM);
+    e.textContent = state.educationMinutes + " min";
     flag(a, state.minAreaM2 !== C.minAreaM2);
     flag(r, state.maxRoadM !== C.maxRoadM);
-    flag(e, state.educationM !== C.educationM);
+    flag(e, state.educationMinutes !== C.educationMinutes);
     $$("[data-landuse]").forEach((btn) => {
       btn.setAttribute("aria-pressed", state.landUse.has(btn.dataset.landuse) ? "true" : "false");
     });
@@ -3667,7 +3746,7 @@ const POIS = __POIS__;
     const variant = (!state.scenarioOutage && hasBaselineCatchment.has(type)) ? "baseline" : "effective";
     return ["all",
       ["==", ["get", "type"], type],
-      ["==", ["get", "radius_m"], state.educationM],
+      ["==", ["get", "minutes"], state.educationMinutes],
       ["==", ["get", "variant"], variant]];
   }
   const tierFilter = (id) => ["all", ["==", ["get", "_pass"], true], ["==", ["get", "_tier"], id]];
@@ -3843,7 +3922,7 @@ const POIS = __POIS__;
     const t = TIER[p._tier];
     const canonicalTier = String(p.suitability_tier || "");
     const drifted = canonicalTier.indexOf(t.canonical_prefix) !== 0;
-    const minutes = (m) => Math.round(m / VIEW.walkSpeedMPerMin);
+    const contour = (value) => value == null ? "Outside sampled catchments" : "≤ " + value + " min contour";
     return '<div class="pop-badge" style="background:' + t.fill + "22;color:" + t.fill + '">'
       + esc(t.label) + "</div>"
       + '<div class="pop-title">' + esc(p.address || p.cadastral_id) + "</div>"
@@ -3853,8 +3932,8 @@ const POIS = __POIS__;
       + "<dt>Land use</dt><dd>" + esc(p.land_use) + "</dd>"
       + "<dt>Area</dt><dd>" + int(p.area_m2) + " m² (" + ha(p.area_m2) + " ha)</dd>"
       + "<dt>To highway</dt><dd>" + int(p._road) + " m · " + esc(p.nearest_road_source) + "</dd>"
-      + "<dt>To school</dt><dd>" + int(p._ds) + " m (~" + minutes(p._ds) + " min-equiv.)</dd>"
-      + "<dt>To kindergarten</dt><dd>" + int(p._dk) + " m (~" + minutes(p._dk) + " min-equiv.)</dd>"
+      + "<dt>School access</dt><dd>" + contour(p._ds) + "</dd>"
+      + "<dt>Kindergarten access</dt><dd>" + contour(p._dk) + "</dd>"
       + (drifted ? '<dt>Canonical run</dt><dd style="color:var(--warn)">' + esc(canonicalTier) + "</dd>" : "")
       + "</dl>"
       + '<div class="pop-foot"><span>' + esc(cadastreSource.provider || "") + " · "
@@ -3996,13 +4075,13 @@ const POIS = __POIS__;
   function resetToCanonical() {
     state.minAreaM2 = C.minAreaM2;
     state.maxRoadM = C.maxRoadM;
-    state.educationM = C.educationM;
+    state.educationMinutes = C.educationMinutes;
     state.landUse = new Set(C.landUse);
     state.scenarioRoad = C.scenarioRoad;
     state.scenarioOutage = C.scenarioOutage;
     $("#ctlArea").value = String(state.minAreaM2);
     $("#ctlRoad").value = String(state.maxRoadM);
-    $("#ctlEdu").value = String(VIEW.catchmentRadii.indexOf(state.educationM));
+    $("#ctlEdu").value = String(VIEW.catchmentMinutes.indexOf(state.educationMinutes));
     refresh();
   }
 
@@ -4044,7 +4123,7 @@ const POIS = __POIS__;
   $("#ctlArea").addEventListener("input", (e) => { state.minAreaM2 = Number(e.target.value); refresh(); });
   $("#ctlRoad").addEventListener("input", (e) => { state.maxRoadM = Number(e.target.value); refresh(); });
   $("#ctlEdu").addEventListener("input", (e) => {
-    state.educationM = VIEW.catchmentRadii[Number(e.target.value)];
+    state.educationMinutes = VIEW.catchmentMinutes[Number(e.target.value)];
     refresh();
   });
   $$("[data-landuse]").forEach((btn) => {
@@ -4103,8 +4182,7 @@ const POIS = __POIS__;
   });
 
   function setBasemap() {
-    map.setStyle(basemapUrl());
-    map.once("styledata", addOverlays);
+    map.setStyle(basemapUrl(), { diff: false });
   }
   $$("[data-basemap]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -4125,7 +4203,7 @@ const POIS = __POIS__;
   });
 
   rebuildDraftPreview();
-  map.on("load", () => { addOverlays(); refresh(); });
+  map.on("style.load", () => { addOverlays(); refresh(); });
   refresh();
 })();
 </script>
@@ -4198,7 +4276,7 @@ def render_dashboard(con: duckdb.DuckDBPyConnection, validation: dict, manifest:
     canonical = {
         "minAreaM2": filters["min_area"]["canonical"],
         "maxRoadM": filters["max_road_distance"]["canonical"],
-        "educationM": filters["education_threshold"]["canonical"],
+        "educationMinutes": filters["education_threshold"]["canonical"],
         "landUse": filters["land_use"]["canonical"],
     }
     for sc in scenarios.values():
@@ -4261,14 +4339,14 @@ def render_dashboard(con: duckdb.DuckDBPyConnection, validation: dict, manifest:
             {"code": code, "label": LAND_USE_LABELS.get(code, code)} for code in land_use_present
         ],
         "canonical": canonical,
-        "catchmentRadii": list(filters["education_threshold"]["options"]),
+        "catchmentMinutes": list(filters["education_threshold"]["options"]),
         "areaBounds": {
             "min": filters["min_area"]["canonical"],
             # The 90th percentile, not the maximum: a handful of 100 ha parcels
             # would otherwise make every useful slider position indistinguishable.
             "max": _area_slider_max(final_gj),
         },
-        "walkSpeedMPerMin": WALK_SPEED_M_PER_MIN,
+        "walkingSpeedKmh": PROJECT["processing"]["routing"]["walking_speed_kmh"],
         "bounds": bounds,
         "provenanceUI": pres.get("provenance_ui", {}),
         "interaction": pres["map"].get("interaction", {}),
@@ -4327,7 +4405,7 @@ def main(argv: list[str] | None = None) -> None:
         refresh=args.refresh
     )
 
-    con = duckdb.connect()
+    con = duckdb.connect(config={"threads": 1, "memory_limit": "512MB"})
     con.install_extension("spatial")
     con.load_extension("spatial")
 

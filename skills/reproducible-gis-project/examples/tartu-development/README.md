@@ -1,198 +1,139 @@
-# Tartu Development Access & Education Proxy — worked example
+# Tartu Development Access & Education — worked example
 
-A complete `openmapstack-project/v1` example for the scenario in
-[issue #4](https://github.com/jaakla/openmapstack/issues/4):
-
-> Find suitable development locations near main roads around Tartu with 25-minute
-> walking access to municipal schools and kindergartens, and make an interactive map.
-
-The requested walking criterion is explicitly represented as a **2,000 m
-straight-line screening proxy**, not a pedestrian-network isochrone. The project
-is therefore correctly reported as `warning`, with that methodological limit and
-the education source's unstated reuse license surfaced in the validation report.
-
-```text
-tartu-development/
-├── project.yaml        # canonical manifest (openmapstack-project/v1)
-├── pipeline.py         # sole processing/QGIS/dashboard implementation
-├── run_e2e.py          # thin convenience wrapper around pipeline.py
-├── dashboard.html      # generated MapLibre analytical view
-├── project.qgz         # generated QGIS desktop project
-├── data/
-│   ├── source/         # immutable authoritative snapshots + fetch metadata
-│   ├── overrides/
-│   │   └── planned-road.geojson   # hypothetical connector geometry (OVERRIDE-002)
-│   └── derived/        # candidates, proxies, effective POIs, official roads
-├── validation/latest-report.json
-└── runs/              # real per-run metadata and hashes
-```
-
-## What the corrected example demonstrates
-
-- **Semantically authoritative education data.** Schools and kindergartens come
-  from Tartu City Government ArcGIS Feature Services. Schools must satisfy
-  `Omand=1`, exclude outside-city type `Liik=5`, and be active; kindergartens
-  must satisfy `Liik=10` and be active. Missing ownership is never defaulted.
-  The current snapshot contains 26 schools and 35 kindergartens.
-- **Completeness-safe roads.** ETAK WFS filtering is performed server-side and
-  paginated until `numberReturned == numberMatched` (1,444 official primary and
-  secondary road segments across two pages).
-- **Honest method semantics.** Metric operations use EPSG:3301. Education
-  buffers and tier names say “2 km straight-line proxy”, and the derived columns
-  are `straightline_time_school_min` / `straightline_time_kg_min` — no output
-  claims a network walking time. Assumption A4 records that distances are
-  measured from the nearest parcel *edge*, so a large parcel qualifies when any
-  part of it is in range.
-- **Two verified overrides, both hypothetical and both isolated.**
-  `OVERRIDE-001` is a `modify_attribute` scenario that switches one kindergarten
-  (`Ilmatsalu Lasteaed Lepatriinu`) to inactive; the pipeline verifies that the
-  target exists and that the asserted prior value (`active = true`) matches the
-  immutable source before applying it, rejects placeholder evidence, and reports
-  the result per override. `OVERRIDE-002` adds a hypothetical connector road
-  through a separate scenario table, and never leaks into the “Official National
-  Highways (ETAK)” presentation layer. Neither override rewrites `data/source/`:
-  the effective POI layer is written to `data/derived/education_pois.json` with
-  an `override_id` and a distinct `map_class`, and both the web map and the QGIS
-  project style that class separately.
-- **One canonical implementation.** Both documented commands execute
-  `pipeline.py`; the E2E wrapper cannot drift from the plain pipeline.
-- **Validation/report parity.** All manifest-required and domain checks appear
-  in `validation/latest-report.json`, warnings propagate to project status, and
-  run IDs/hashes point to a real `runs/*.json` record. `manifest_graph_resolves`
-  additionally proves every `processing.steps` input resolves to a source key or
-  an earlier step's output, and every `outputs.*.generated_by` names a real step.
-- **A reconfigurable view that cannot misrepresent the run.** `dashboard.html`
-  organises the sidebar into three tabs (Analysis / Map / Provenance) of
-  collapsible sections, gives every layer group an on/off control, and exposes
-  the analysis parameters as live controls: minimum parcel area, highway
-  distance, education threshold, land use, and one switch per scenario override.
-  Every control re-applies the published rule to distances the pipeline already
-  measured in EPSG:3301 — the browser never re-measures geometry — and the
-  education-threshold control swaps in a precomputed buffer for the radius it
-  selects rather than approximating one. The canonical control positions come
-  from `presentation.controls` in `project.yaml`, and the moment any control
-  leaves them the view labels itself *Reconfigured view — not the accepted run*
-  and offers a reset. The `view_controls_match_pipeline` gate fails the run if
-  those declared positions ever drift from the thresholds the pipeline ran.
-- **A local-first edit mode.** The generated dashboard can select cadastral
-  parcels and education facilities, record typed attribute corrections or hide
-  operations with rationale/evidence, and draw point/line/polygon scenario,
-  annotation, or AOI geometry. Draft operations are stored in browser local
-  storage per project + base run, support undo/redo, render as distinct delta
-  overlays, and export as `openmapstack-override-bundle/v1` JSON. Parcel hide,
-  land-use, and area edits immediately re-apply the existing browser rules;
-  facility edits and drawn geometry are explicitly labelled map-only until the
-  canonical pipeline recomputes spatial measurements. No browser draft changes
-  source files, project validation, or the accepted run.
-- **QGIS as a first-class view.** `project.qgz` uses relative sources, explicit
-  scenario styling, live basemaps, and static archive/source/style validation.
-  Its layer tree is *generated from* `presentation.map.layer_groups` and
-  `presentation.map.layers`, so the desktop project cannot reorganise what the
-  manifest says the product contains: a group declared with no QGIS counterpart
-  fails the run rather than shipping. The three suitability tiers are three
-  layers filtered by OGR subsets, one per manifest group, mirroring the three
-  toggles the dashboard offers. If PyQGIS is unavailable, runtime loading is
-  reported as `not_testable`, never passed implicitly.
-- **Two backgrounds, on purpose.** The dashboard loads CARTO Positron as a
-  MapLibre vector style. QGIS cannot read one, and CARTO's raster XYZ
-  equivalent now answers unauthenticated requests with an *API KEY REQUIRED*
-  watermark, so `project.qgz` carries the Maa- ja Ruumiamet Baaskaart WMS —
-  authoritative, key-free, and served natively in EPSG:3301 — with
-  OpenStreetMap XYZ as the unchecked alternative.
-
-## Current regenerated result
-
-Both scenario overrides are in effect, so these numbers describe the scenario,
-not present-day conditions (see warning `SCENARIO-001`):
-
-- Tier 1 — road plus both municipal education proxies: **66 parcels / 849.1 ha**
-- Tier 2 — road plus either municipal education proxy: **84 parcels / 2,468.3 ha**
-- Tier 3 — road access only: **367 parcels / 6,249.4 ha**
-- Total road-accessible candidates: **517 parcels / 9,566.9 ha**
-- Candidates whose closest qualifying road is the hypothetical scenario: **59**
-- Effective education layer: **27 schools + 34 kindergartens active**, 1 switched
-  off by `OVERRIDE-001` (62 authoritative facilities in the immutable source)
-
-Removing `OVERRIDE-001` moves 63 parcels back from Tier 2 to Tier 1
-(129 / 3,181.2 ha), which is the point of the scenario: a single kindergarten
-carries most of the western cluster's Tier 1 status. That comparison is a switch
-in the dashboard's Map tab, because the pipeline exports
-`dist_school_baseline_m` / `dist_kg_baseline_m` alongside the effective
-distances — the same measurement, taken against the facility set as the
-authoritative source publishes it.
+A reproducible `openmapstack-project/v1` project that screens land near main
+roads against **25-minute pedestrian-network catchments** of municipal schools
+and kindergartens. `project.yaml` defines the analysis; `pipeline.py` produces
+the datasets, QGIS project, dashboard, validation report and run evidence.
 
 ## Run
 
-```bash
-python -m venv .e2e-venv
-./.e2e-venv/bin/pip install duckdb pyyaml pyproj
-cd examples/tartu-development
-../../.e2e-venv/bin/python pipeline.py
-```
-
-The equivalent convenience command is:
+Python **3.12+** is required for the pinned Valhalla binary wheel. From this directory:
 
 ```bash
-../../.e2e-venv/bin/python run_e2e.py
+python3.12 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python pipeline.py
 ```
 
-`data/source/` is a cache, and it never expires on its own. A re-run reuses
-whatever is there if the files are internally coherent — counts agreeing with
-their recorded metadata, ownership and active-status predicates holding — which
-establishes that the bytes are sound, not that they still match what the
-services publish. Reuse older than seven days logs a warning naming the age.
-
-**Before regenerating the committed artifacts, discard it:**
+Or with uv:
 
 ```bash
-../../.e2e-venv/bin/python pipeline.py --refresh
+uv run --python 3.12 --with-requirements requirements.txt python pipeline.py
 ```
 
-Regenerating from a stale cache produces a project that looks fine and that CI
-cannot reproduce, because CI always starts cold and fetches the current data.
-That mismatch surfaces as the `project.qgz` currency failure in
-`.github/workflows/example.yml`, a long way from its cause.
+`run_e2e.py` calls the same implementation. No Docker daemon, external routing
+API, API key or long-running service is required. The pinned `pyvalhalla`
+package contains the native graph builder and the in-process `Actor` API.
+Platforms without a compatible wheel need Valhalla's native build prerequisites;
+see the [upstream Python instructions](https://github.com/valhalla/valhalla/blob/3.9.0/src/bindings/python/README.md).
 
-Outputs include:
+The first run downloads the official cadastral/road/education data and a
+checksum-pinned Geofabrik Estonia OSM snapshot (about 117 MiB). It extracts a
+buffered Tartu network, builds routing tiles with one worker and calculates
+catchments. Subsequent runs reuse the verified graph in `data/cache/routing/`.
+That cache is disposable: removing it forces a rebuild, not a methodological
+fallback. No graph or routing failure is replaced with a circular buffer.
 
-- `data/source/Tartu_maakond_KATASTER_GPKG.gpkg` — 79,082 cadastral parcels
-- `data/source/etak_main_roads.geojson` — completeness-verified ETAK main roads
-- `data/source/tartu_municipal_education.geojson` — normalized official municipal facilities
-- `data/derived/final-candidates.gpkg`, `.parquet`, `.json`
-- `data/derived/education_catchments.json` — canonical 2 km straight-line proxy polygons (64 segments/quadrant)
-- `data/derived/education_catchment_variants.json` — the same buffer rule at every
-  radius the dashboard control offers (1–3 km), for the effective and the
-  override-free facility sets; exploratory companion, never the accepted result
-- `data/derived/education_pois.json` — effective facilities (source + overrides, `map_class` + `override_id`)
-- `data/derived/main_roads.json` — official ETAK roads only
-- `project.qgz`, `dashboard.html`, `validation/latest-report.json`, and `runs/*.json`
+Use `pipeline.py --refresh` before committing regenerated artifacts. It refreshes
+the official sources and downloads the declared OSM snapshot again, verifying
+the same SHA-256. Change that pin explicitly when updating OSM. Rerun after
+changing the implementation, dependencies or manifest so run hashes match.
 
-Set `OPENMAPSTACK_USE_QGIS_DOCKER=1` to request native project compilation with the
-pinned QGIS container. The deterministic XML generator remains the fallback;
-runtime layer validity is still reported separately. Both paths build the layer
-tree from the same manifest-derived plan, so they cannot drift apart.
+## How the network calculation works
 
-Re-running is not optional after editing `pipeline.py`: the run record hashes
-the pipeline alongside the sources, and `openmapstack validate --preflight`
-fails `runs.present_files` while the committed record describes a version of
-the code that is no longer there.
+1. `routing.fetch_network` downloads and verifies the declared OSM snapshot.
+2. `routing.prepare_graph` extracts complete ways touching the buffered study
+   bounds, their nodes and applicable restriction relations. Node tags, including
+   barriers, survive extraction. It builds Valhalla tiles and records their hashes.
+3. `routing.facility_isochrones` calls `Actor.isochrone` once per active baseline
+   facility, with `costing: pedestrian`, `reverse: true`, `polygons: true`, and
+   contours at **15, 20, 25, 30 and 40 minutes**, using **4.8 km/h** walking speed.
+   Reverse expansion models reaching the facility, rather than walking from it.
+4. `pipeline.calculate_network_access` transforms the polygons to EPSG:3301,
+   unions them by facility type/time/scenario, and calculates **positive-area
+   parcel intersections**. The accepted threshold is 25 minutes.
+5. The dashboard reads computed memberships and polygons. Changing its minute
+   control swaps the corresponding catchment; it performs no browser-side routing.
 
-## Checking it
+Versions, bounds, speed, snap limit and thresholds are in `processing.routing`.
+Raw requests/responses and snap distances are retained in
+`validation/routing-evidence.json`, alongside graph identity and tile hashes.
+The run record hashes that evidence and both implementation files.
+
+The `isochrone_school_effective_min` / `isochrone_kg_effective_min` columns contain
+the **first sampled contour that intersects the parcel**, not an exact route
+duration. Their `_baseline_min` counterparts omit the facility-outage override.
+Null means no intersection at any sampled threshold; it never means zero
+minutes. Straight-line `dist_school_m` / `dist_kg_m` remain diagnostic columns and
+do not determine tiers.
+
+## What qualifies
+
+- At least 20,000 m²; the declared agricultural, production or commercial land
+  uses; municipality `Tartu linn`.
+- Within 2,000 m of a qualifying official main road or the hypothetical connector,
+  measured from the nearest parcel edge in EPSG:3301.
+- **Tier 1:** overlaps both school and kindergarten 25-minute network catchments.
+- **Tier 2:** overlaps either catchment.
+- **Tier 3:** road proximity qualifies, but neither education catchment overlaps.
+
+The road-proximity criterion remains planar. `OVERRIDE-002` affects that criterion
+only: the hypothetical road is **not inserted into the pedestrian graph**.
+`OVERRIDE-001` switches the Ilmatsalu kindergarten off; its isochrone remains in
+the baseline comparison but is excluded from the accepted scenario's union.
+Neither scenario modifies the immutable sources.
+
+## Limits and validation
+
+These are network-derived isochrones, but still a **land-screening model**.
+Contours approximate network reachability; OSM may omit paths, gates, crossings
+or access restrictions. A parcel can overlap a contour without a usable entrance
+there. Facility points snap to nearby edges, with a checked 200 m maximum, rather
+than surveyed entrances. No elevation or time-specific opening-hours dataset is
+supplied. The pinned pedestrian costing defaults apply in addition to recorded
+options; ferry use is discouraged by that profile, not categorically prohibited.
+
+Contour topology repairs are recorded beside the untouched engine response and
+accepted only when they change area by at most 1 m²; larger repairs are rejected.
+Missing contours, engine warnings, remaining invalid geometries, excessive snapping,
+insufficient study-boundary margin or nonmonotonic parcel membership fail the run.
+Ownership/activity, pagination, overrides, manifest graph, QGIS structure,
+control defaults and report parity are also checked.
+
+The project remains `warning`: education-source reuse terms are unstated,
+hypothetical scenarios are active, and network/entrance limitations remain
+visible. OSM attribution and ODbL licensing appear in the manifest and dashboard.
+PyQGIS runtime checks report `not_testable` when PyQGIS is unavailable.
+
+After installing the repository CLI, from the repository root:
 
 ```bash
-openmapstack validate examples/tartu-development/project.yaml   # manifest + artifacts
-openmapstack verify examples/tartu-development                  # oracle-free product QA
+openmapstack validate examples/tartu-development/project.yaml --preflight
+openmapstack verify examples/tartu-development
 ```
 
-Both report `warning`, which is the honest status for this project: the
-education source publishes no reuse license, and the 25-minute walking
-criterion is met with a straight-line proxy rather than a pedestrian-network
-isochrone. The QGIS checks need PyQGIS and report `not_testable` without it;
-`.github/workflows/example.yml` regenerates the data and runs the full set.
+These checks complement rendered browser and native QGIS checks.
 
-## Editing project.yaml
+The cadastral GeoPackage is read through SQLite and its standard geometry header
+is validated before passing WKB to DuckDB. This avoids an intermittent native
+`ST_Read` failure observed with this snapshot and the pinned runtime; repeated
+reads must retain the same rows and coordinates.
 
-`pipeline.py` rewrites `project.yaml` at the end of every run (`updated_at`,
-per-source retrieval metadata, `runs.latest`) by dumping the parsed document,
-which **discards YAML comments**. Prose that has to survive a run belongs in a
-data field — `note`, `rationale`, `statement` — not in a `#` comment.
+## Artifacts
+
+- `data/source/`: official snapshots and pinned OSM PBF.
+- `data/overrides/`: explicit hypothetical connector geometry.
+- `data/cache/routing/`: disposable extract, graph, config and build log.
+- `data/derived/final-candidates.{gpkg,parquet,json}`: parcels and accessibility.
+- `data/derived/facility_isochrones.json`: per-facility network contours.
+- `data/derived/education_catchments.json`: accepted 25-minute scenario unions.
+- `data/derived/education_catchment_variants.json`: every threshold and scenario.
+- `data/derived/education_pois.json`, `main_roads.json`: effective facilities and official roads.
+- `dashboard.html`, `project.qgz`: generated web and desktop views.
+- `validation/`, `runs/`: checks, routing evidence and hashes; current counts live here.
+
+The dashboard retains layer switches, scenario comparisons, provenance and local
+draft editing. Noncanonical settings are labelled exploratory; facility edits and
+drawn geometry require a pipeline rerun to change network measurements.
+`pipeline.py` rewrites manifest run metadata using YAML serialization, so persistent
+explanations belong in data fields, not comments.

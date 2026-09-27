@@ -1,0 +1,5 @@
+duckdb==1.5.5
+PyYAML==6.0.3
+pyproj==3.7.2
+pyvalhalla==3.9.0
+osmium==4.3.1

@@ -120,6 +120,8 @@ class InstalledPayloadTests(unittest.TestCase):
                 if name in {"open-map-stack", "reproducible-gis-project"}:
                     self.assertTrue((skill / "templates/project.yaml").is_file())
                     self.assertTrue((skill / "examples/tartu-development/pipeline.py").is_file())
+                    self.assertTrue((skill / "examples/tartu-development/routing.py").is_file())
+                    self.assertTrue((skill / "examples/tartu-development/requirements.txt").is_file())
                     self.assertTrue((skill / "schemas/project-v1.schema.json").is_file())
                     self.assertTrue((skill / "references/installation.md").is_file())
                 else:

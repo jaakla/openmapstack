@@ -6,12 +6,12 @@ project:
     walking distance to city-owned kindergarten and school), and land-use criteria in Tartu, and show
     them on an interactive map with education POIs and catchment areas.
   created_at: 2026-08-25 08:15:03+03:00
-  updated_at: '2026-09-09T13:33:09.649721+00:00'
+  updated_at: '2026-09-27T08:37:32.862101+00:00'
   status: warning
 interpretation:
-  objective: "Find cadastral parcels in the Tartu region satisfying stated land-use, minimum size (>=\
-    \ 2 ha), primary road accessibility (<= 2000 m), and\n    a documented 2,000 m straight-line accessibility\
-    \ proxy to both verified\n    municipal kindergarten and school locations."
+  objective: Find cadastral parcels in Tartu satisfying stated land-use, minimum size (>= 2 ha), primary
+    road accessibility (<= 2000 m), and overlap with 25-minute pedestrian-network catchments of verified
+    municipal schools and kindergartens.
   assumptions:
   - id: A1
     statement: '"Near a main road" is interpreted as <= 2000 m planar distance to a national primary (Põhimaantee)
@@ -21,17 +21,17 @@ interpretation:
     statement: Parcel area is measured in EPSG:3301 (L-EST97).
     rationale: Metric area calculation requires a projected national CRS.
   - id: A3
-    statement: The requested "25 minutes walking access" is represented only as a 2,000 m planar straight-line
-      proxy based on 4.8 km/h (80 m/min); it is not a pedestrian-network isochrone.
-    rationale: A transparent screening proxy for this worked example. Consequential planning requires
-      a routable pedestrian network and barrier-aware isochrones. Derived columns are named straightline_time_school_min
-      / straightline_time_kg_min so no consumer reads them as walk times.
+    statement: Education accessibility uses reverse Valhalla pedestrian isochrones on a pinned OSM network,
+      at 4.8 km/h, for 15, 20, 25, 30 and 40 minutes. The accepted threshold is 25 minutes.
+    rationale: Reverse expansion models walking to the facility. Contours approximate network reachability;
+      they do not supply an exact parcel travel time. OSM access, crossings and barriers determine the
+      graph.
   - id: A4
-    statement: All distance thresholds are measured from the nearest parcel EDGE (ST_Distance on the polygon),
-      not from its centroid, so a parcel qualifies when any part of it is within range.
-    rationale: Screening for developable land asks whether the plot has access, not whether its centre
-      does; on 10-100 ha rural parcels the two rules differ by kilometres. A centroid rule would be the
-      right choice for evaluating a specific building site.
+    statement: Road distance is measured from the nearest parcel edge. Education accessibility requires
+      a positive-area intersection between the parcel and a facility's network isochrone.
+    rationale: This is land screening, not a route from a verified building entrance. Large parcels may
+      intersect a catchment without having a usable entrance there; internal paths and access rights require
+      verification.
 sources:
   cadastral_parcels:
     role: authoritative_input
@@ -41,23 +41,23 @@ sources:
     portal_page: https://geoportaal.maaruum.ee/eng/spatial-data/cadastral-data-p310.html
     access:
       method: http(s) bulk download
-      downloaded_at: '2026-09-09T13:30:40.532180+00:00'
-      retrieved_at: '2026-09-09T13:30:40.532180+00:00'
+      downloaded_at: '2026-09-27T08:03:01.089251+00:00'
+      retrieved_at: '2026-09-27T08:03:01.089251+00:00'
       file:
         archive_name: Tartu_maakond_KATASTER_GPKG.zip
         extracted_file: Tartu_maakond_KATASTER_GPKG.gpkg
         table_name: Tartu maakond
         format: GeoPackage (GPKG/SQLite)
-        size_bytes: 55762944
-        row_count: 79082
+        size_bytes: 55791616
+        row_count: 79182
         column_count: 32
       request_spec: 'Direct county GPKG zip download from Maa- ja Ruumiamet S3 storage: https://s3.pilw.io/rp-kemit-kataster/ANDMED/Tartu_maakond_KATASTER_GPKG.zip
         extracted to data/source/Tartu_maakond_KATASTER_GPKG.gpkg containing layer ''Tartu maakond'' (79,082
         parcels in EPSG:3301).'
     version:
-      published_at: '2026-09-09'
-      identifier: Tartu_maakond_KATASTER_GPKG (daily snapshot 2026-09-09)
-      etag: 5ca4142268384d1153b04d2087599c62-4
+      published_at: '2026-09-26'
+      identifier: Tartu_maakond_KATASTER_GPKG (daily snapshot 2026-09-26)
+      etag: e5037f17ed03d006b2c33baa9c7069c4-4
     selection:
       municipality: Tartu linn
       filter: pindala >= 20000 AND siht1 IN ('MAATULUNDUSMAA', 'TOOTMISMAA', 'ARIMAA')
@@ -114,13 +114,13 @@ sources:
     portal_page: https://geoportaal.maaruum.ee/est/ruumiandmed/eesti-topograafia-andmekogu/laadi-etak-andmed-alla-p609.html
     access:
       method: WFS 2.0.0 (GetFeature)
-      downloaded_at: '2026-09-09T13:31:40.365087+00:00'
-      retrieved_at: '2026-09-09T13:31:40.365087+00:00'
+      downloaded_at: '2026-09-27T08:03:13.228164+00:00'
+      retrieved_at: '2026-09-27T08:03:13.228164+00:00'
       file:
         name: etak_main_roads.geojson
         layer_name: etak:e_501_tee_j
         format: GeoJSON (FeatureCollection, EPSG:3301)
-        row_count: 1444
+        row_count: 1447
         column_count: 10
       request_spec: Paginated WFS GetFeature requests on etak:e_501_tee_j using CQL_FILTER=BBOX(shape,640000,6455000,685000,6500000,'EPSG:3301')
         AND tyyp_tekst IN ('Põhimaantee','Tugimaantee'), count=1000 and startIndex advanced until numberReturned
@@ -136,8 +136,8 @@ sources:
       - 6500000
       filter: tyyp_tekst IN ('Põhimaantee', 'Tugimaantee')
       completeness:
-        matched: 1444
-        returned: 1444
+        matched: 1447
+        returned: 1447
         page_size: 1000
         pages: 2
     license:
@@ -169,8 +169,8 @@ sources:
     portal_page: https://geohub.tartulv.ee/
     access:
       method: ArcGIS REST FeatureServer / GeoJSON
-      downloaded_at: '2026-09-09T13:31:45.425315+00:00'
-      retrieved_at: '2026-09-09T13:31:45.425315+00:00'
+      downloaded_at: '2026-09-27T08:03:18.027699+00:00'
+      retrieved_at: '2026-09-27T08:03:18.027699+00:00'
       file:
         name: tartu_municipal_education.geojson
         table_name: education_pois
@@ -213,6 +213,31 @@ sources:
       - geometry
     rationale: The municipal ownership and active-status predicates are explicit coded fields in Tartu's
       authoritative GIS services; missing ownership is never defaulted to municipal.
+  pedestrian_network:
+    role: routing_input
+    provider: OpenStreetMap contributors / Geofabrik
+    dataset: Estonia OSM network, September 2026 snapshot
+    source_url: https://download.geofabrik.de/europe/estonia-260901.osm.pbf
+    portal_page: https://download.geofabrik.de/europe/estonia.html
+    access:
+      method: http(s) bulk download
+      retrieved_at: '2026-09-27T08:09:16.480163+00:00'
+      downloaded_at: '2026-09-27T08:09:16.480163+00:00'
+    version:
+      identifier: estonia-260901.osm.pbf
+      published_at: '2026-09-04'
+    selection:
+      note: Complete ways touching the buffered Tartu bbox, their nodes and applicable restriction relations.
+    license:
+      name: Open Database License (ODbL) 1.0; © OpenStreetMap contributors
+      url: https://www.openstreetmap.org/copyright
+    pin:
+      class: local_snapshot
+      path: data/source/estonia-260901.osm.pbf
+      sha256: sha256:fe293a62a1e1d1ff713be0976bb746c3e5a8adbeae8a42fd3bf7c328ced04fbe
+      captured_at: '2026-09-27T08:09:16.480163+00:00'
+    rationale: A separate pedestrian graph is needed; the primary-road screening layer is not a walkable
+      network.
 overrides:
 - id: OVERRIDE-001
   action: modify_attribute
@@ -224,10 +249,8 @@ overrides:
     field: active
     from: true
     to: false
-  rationale: Service-resilience probe. This is the only municipal kindergarten covering the western candidate
-    cluster within the 2 km proxy, so deactivating it measures how much of the Tier 1 result depends on
-    one facility. It is a hypothetical scenario, NOT an assertion that the kindergarten is closed - the
-    authoritative source still lists it as active and is never modified.
+  rationale: 'Service-resilience probe: deactivating the Ilmatsalu kindergarten measures how much of the
+    western cluster depends on this facility.'
   evidence:
   - type: project_scenario
     value: Hypothetical single-facility outage authorized for this worked example; the source record remains
@@ -254,6 +277,27 @@ overrides:
 processing:
   analysis_crs: EPSG:3301
   storage_crs: EPSG:4326
+  routing:
+    versions:
+      pyvalhalla: 3.9.0
+      osmium: 4.3.1
+    bounds:
+    - 26.3
+    - 58.2
+    - 27.0
+    - 58.55
+    walking_speed_kmh: 4.8
+    max_snap_m: 200
+    minutes:
+    - 15
+    - 20
+    - 25
+    - 30
+    - 40
+    canonical_minutes: 25
+    direction: to_facility
+    parcel_rule: positive_area_intersection
+    scenario_road_affects: arterial proximity only; never added to the pedestrian graph
   steps:
   - id: load_parcels
     operation: read
@@ -293,12 +337,17 @@ processing:
     verify: asserted prior value must match the immutable source before the change is applied
     output: effective_education_pois, schools, kindergartens
   - id: calculate_education_catchments
-    operation: buffer_union
+    operation: reverse_pedestrian_isochrone_union
     inputs:
-    - schools
-    - kindergartens
-    distance_m: 2000
-    buffer_segments: 64
+    - pedestrian_network
+    - effective_education_pois
+    minutes:
+    - 15
+    - 20
+    - 25
+    - 30
+    - 40
+    canonical_minutes: 25
     crs: EPSG:3301
     output: education_catchments
   - id: multi_criteria_accessibility
@@ -308,10 +357,11 @@ processing:
     - all_roads
     - schools
     - kindergartens
+    - education_catchments
     crs: EPSG:3301
     distance_basis: nearest parcel edge (see assumption A4)
     max_road_dist_m: 2000
-    max_education_proxy_dist_m: 2000
+    max_education_walk_minutes: 25
     output: candidate_parcels
   - id: export_derived_datasets
     operation: export
@@ -346,9 +396,8 @@ outputs:
     format: GeoJSON (EPSG:4326)
     generated_by: calculate_education_catchments
     role: exploratory_companion
-    note: The same buffer rule at every radius the view's education-threshold control offers, for the
-      effective and the override-free facility sets. Never the accepted result - education_catchments_geojson
-      is.
+    note: Precomputed walking catchments at every offered time threshold, for effective and baseline facility
+      sets. The canonical pair remains education_catchments_geojson.
   education_pois_geojson:
     path: data/derived/education_pois.json
     format: GeoJSON (EPSG:4326)
@@ -357,6 +406,11 @@ outputs:
     path: data/derived/main_roads.json
     format: GeoJSON (EPSG:4326)
     generated_by: load_roads
+  facility_isochrones_geojson:
+    path: data/derived/facility_isochrones.json
+    format: GeoJSON (EPSG:4326)
+    generated_by: calculate_education_catchments
+    role: routing_evidence
 validation:
   required:
   - geometry_valid
@@ -371,6 +425,7 @@ validation:
   - qgis_project_static_valid
   - manifest_report_parity
   - view_controls_match_pipeline
+  - education_access_method
   domain_checks:
   - name: parcel_area_range
     expression: area_m2 >= 20000 AND area_m2 < 100000000
@@ -442,22 +497,22 @@ presentation:
       note: The run measured only parcels within the canonical distance, so this control may tighten the
         rule but never widen it.
     - id: education_threshold
-      label: Education proximity threshold
+      label: Walking time threshold
       type: choice
       fields:
-      - dist_school_m
-      - dist_kg_m
-      unit: m
-      canonical: 2000
+      - isochrone_school_effective_min
+      - isochrone_kg_effective_min
+      unit: minutes
+      canonical: 25
       options:
-      - 1000
-      - 1500
-      - 2000
-      - 2500
-      - 3000
+      - 15
+      - 20
+      - 25
+      - 30
+      - 40
       redraws: education_catchment_variants_geojson
-      note: Re-applies the tier rule to distances already measured in EPSG:3301 and swaps in the matching
-        precomputed buffer.
+      note: Re-applies positive-area parcel overlap with precomputed Valhalla pedestrian catchments; not
+        an exact route time.
     - id: land_use
       label: Land use
       type: multi_select
@@ -498,16 +553,16 @@ presentation:
         Baaskaart WMS as its default background and OpenStreetMap XYZ as the unchecked alternative.
     layer_groups:
     - id: candidates_tier1
-      title: Prime Candidates (Road + School + Kindergarten within 2 km proxy)
+      title: Prime Candidates (Road + School + Kindergarten)
       default_open: true
     - id: candidates_tier2
-      title: Secondary Candidates (Road <= 2km + School or KG within 2 km proxy)
+      title: Secondary Candidates (Road + School or Kindergarten)
       default_open: true
     - id: candidates_highway
-      title: Highway Only Candidates (> 2 km proxy to School/KG)
+      title: Road Access Only (outside education catchments)
       default_open: false
     - id: catchments
-      title: Education Accessibility Proxies (2,000 m Straight-line Buffer)
+      title: Education Walking Catchments
       default_open: true
     - id: education_pois
       title: Educational POIs (Schools & Kindergartens)
@@ -547,7 +602,8 @@ presentation:
       group: catchments
       semantic_role: constraint
       geometry: polygon
-      note: Straight-line proxy, not a walking isochrone (assumption A3).
+      note: Valhalla reverse pedestrian isochrones; positive-area parcel overlap, not verified entrances
+        (assumptions A3/A4).
       style:
         visual_priority: muted
         opacity: 0.09
@@ -676,28 +732,36 @@ warnings:
 - id: METHOD-001
   severity: medium
   layer: education_catchments
-  issue: euclidean_proxy
-  statement: The 2,000 m buffers are straight-line screening proxies, not pedestrian-network isochrones.
-  mitigation: Use a routable pedestrian network with crossings and barriers before consequential decisions.
+  issue: network_model_limitations
+  statement: Network catchments depend on OSM paths, crossings and access tags. Polygon contours approximate
+    reachability; parcel overlap and snapped facility points do not establish legal entrances. The scenario
+    connector is not part of the walking graph.
+  mitigation: Verify entrances, internal access and mapped barriers before consequential decisions. The
+    first sampled contour is not an exact route duration.
 runtime:
   implementation:
     preferred_engine: duckdb-spatial
     pipeline: pipeline.py
+    dependencies:
+    - routing.py
+    - requirements.txt
   environment:
     python: '3.12'
     duckdb: 1.5.5
     gdal: DuckDB spatial extension
     proj: pyproj 3.7.2
     qgis: 3.44.3 Docker opt-in; deterministic XML builder by default
+    pyvalhalla: 3.9.0
+    osmium: 4.3.1
 runs:
   latest:
-    id: run-20260909-133304
-    started_at: '2026-09-09T13:33:04.395938+00:00'
-    completed_at: '2026-09-09T13:33:09.649721+00:00'
+    id: run-20260927-083626
+    started_at: '2026-09-27T08:36:26.120511+00:00'
+    completed_at: '2026-09-27T08:37:32.862101+00:00'
     status: warning
-    inputs_hash: sha256:b33a5402987c8b5e737c613d2063154a2cfb5466e1c24bbf7c8162b8286e995c
-    outputs_hash: sha256:a6bb45317750bfc9c52e6eba03c3198b64e129b37a0cf175fa0a0a097ab53203
+    inputs_hash: sha256:9ac813ee6ecf5add7bdc19570bd722013477b4162196c8d9088cc038b82a0490
+    outputs_hash: sha256:e8078991f7400100be862a68fd59a2489e76deb707c8147f4ec33cb8c4618394
     record:
-      path: runs/run-20260909-133304.json
+      path: runs/run-20260927-083626.json
     validation_report:
       path: validation/latest-report.json

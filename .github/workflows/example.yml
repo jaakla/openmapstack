@@ -38,7 +38,7 @@ jobs:
       - name: Install the CLI with geodata support
         run: |
           pip install ".[geo]"
-          pip install pyproj
+          pip install -r examples/tartu-development/requirements.txt
 
       - name: Regenerate the example from its real sources
         working-directory: examples/tartu-development

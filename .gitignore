@@ -17,6 +17,8 @@ dist/
 # regenerable outputs from the example's run_e2e.py
 examples/tartu-development/data/source/
 examples/tartu-development/data/derived/
+examples/tartu-development/data/cache/
+examples/tartu-development/validation/routing-evidence.json
 *.e2e-dashboard.png
 # intermediate QGIS XML (the .qgz zip already embeds it)
 examples/tartu-development/project.qgs

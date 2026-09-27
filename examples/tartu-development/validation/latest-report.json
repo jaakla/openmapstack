@@ -1,12 +1,12 @@
 {
-  "run_id": "run-20260909-133304",
+  "run_id": "run-20260927-083626",
   "schema": "openmapstack-project/v1",
   "status": "warning",
   "checks": [
     {
       "id": "geometry_valid",
       "status": "passed",
-      "features_checked": 517,
+      "features_checked": 518,
       "invalid_count": 0
     },
     {
@@ -28,8 +28,8 @@
     {
       "id": "row_count_gt_zero",
       "status": "passed",
-      "rows": 517,
-      "prime_tier1_rows": 66
+      "rows": 518,
+      "prime_tier1_rows": 57
     },
     {
       "id": "parcel_area_range",
@@ -57,8 +57,8 @@
       "id": "source_result_complete",
       "status": "passed",
       "roads": {
-        "matched": 1444,
-        "returned": 1444
+        "matched": 1447,
+        "returned": 1447
       },
       "education": {
         "matched": 62,
@@ -99,7 +99,7 @@
       "id": "manifest_graph_resolves",
       "status": "passed",
       "steps_checked": 10,
-      "symbols_resolved": 14,
+      "symbols_resolved": 15,
       "errors": []
     },
     {
@@ -131,6 +131,7 @@
       "status": "passed",
       "expected": [
         "crs_known",
+        "education_access_method",
         "education_ownership_check",
         "geometry_valid",
         "highway_distance_check",
@@ -174,16 +175,29 @@
     },
     {
       "id": "education_access_method",
-      "status": "warning",
-      "reason": "2 km straight-line proxy; no pedestrian-network isochrone was computed"
+      "status": "passed",
+      "reason": "Reverse Valhalla pedestrian isochrones; positive-area parcel intersection; 25-minute accepted threshold",
+      "facility_contours": 310,
+      "evidence": "validation/routing-evidence.json",
+      "topology_repairs": [
+        {
+          "source_id": "school:2EDAF563-D685-4EE1-89EF-DE2A21AD5AF4",
+          "minutes": 40,
+          "area_before_m2": 18244885.93114644,
+          "area_after_m2": 18244885.931146447,
+          "method": "ST_CollectionExtract(ST_MakeValid(geometry), 3)"
+        }
+      ],
+      "limitations": "OSM completeness, approximate contour boundaries and unverified parcel/facility entrances"
     }
   ],
-  "candidate_count": 517,
-  "prime_tier1_count": 66,
+  "candidate_count": 518,
+  "prime_tier1_count": 57,
   "sources": {
     "cadastral_parcels": "https://s3.pilw.io/rp-kemit-kataster/ANDMED/Tartu_maakond_KATASTER_GPKG.zip",
     "roads": "https://gsavalik.envir.ee/geoserver/etak/wfs",
-    "education_pois": "https://gis.tartulv.ee/arcgis/rest/services/Haridus"
+    "education_pois": "https://gis.tartulv.ee/arcgis/rest/services/Haridus",
+    "pedestrian_network": "https://download.geofabrik.de/europe/estonia-260901.osm.pbf"
   },
   "overrides": [
     {
@@ -202,6 +216,6 @@
       "detail": "1 scenario road geometry loaded from data/overrides/planned-road.geojson"
     }
   ],
-  "inputs_hash": "sha256:b33a5402987c8b5e737c613d2063154a2cfb5466e1c24bbf7c8162b8286e995c",
-  "outputs_hash": "sha256:a6bb45317750bfc9c52e6eba03c3198b64e129b37a0cf175fa0a0a097ab53203"
+  "inputs_hash": "sha256:9ac813ee6ecf5add7bdc19570bd722013477b4162196c8d9088cc038b82a0490",
+  "outputs_hash": "sha256:e8078991f7400100be862a68fd59a2489e76deb707c8147f4ec33cb8c4618394"
 }
