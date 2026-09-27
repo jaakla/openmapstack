@@ -187,6 +187,30 @@ openmapstack run project.yaml --json
 openmapstack inspect project.yaml --json
 ```
 
+`run` reads Python dependencies from `runtime.environment` in `project.yaml`
+and installs them into a reusable project virtualenv, including when invoked
+through `uvx`. It warns if the CLI's Python version differs from the declared
+version: `python: '3.12'` accepts any 3.12 patch release. Select a matching
+interpreter with `uvx --python 3.12 openmapstack run project.yaml`.
+
+Native dependencies such as GDAL, PROJ, QGIS, PostgreSQL, and PostGIS require
+external setup. `run` emits installation and verification guidance for declared
+native dependencies; their availability remains **unverified**. A GDAL installation
+may need particular drivers and matching Python bindings in the pipeline's runtime.
+PostGIS must be installed on the database server and enabled in the target database;
+installing a Python client is insufficient. Use a prepared system, Conda, or container
+runtime via `runtime.implementation.command` when needed. The declaration
+`gdal: DuckDB spatial extension` does not request a system GDAL installation:
+the pipeline must install/load DuckDB's `spatial` extension. See the
+[runtime contract](skills/open-map-stack/references/project-spec.md#28-runtime-runs-warnings)
+for dependency syntax and execution behavior.
+
+Runtime advisories appear on stderr, or in the JSON `warnings` array, including
+for `--dry-run`. They are non-blocking and separate from artifact validation;
+`--strict` continues to apply to validation, not these advisories. An explicit
+launch command owns its interpreter, so the CLI does not compare that interpreter
+against its own Python version.
+
 ### Sampled runs — nail it before you scale it
 
 A wide-area analysis can run for hours before a late step fails. A sampled run

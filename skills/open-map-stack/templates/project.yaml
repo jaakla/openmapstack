@@ -280,6 +280,10 @@ runtime:
     #     sample: "26.68,58.35,26.76,58.39"
     #     binding: {argument: "--sample-area"}
   environment:
+    # `run` installs Python package pins into .openmapstack/venvs/ (gitignore it).
+    # Use packages: ["pyproj>=3.7,<4"] for explicit Python requirements.
+    # python/gdal/proj/qgis describe the native runtime; use implementation.command
+    # to select another Python version or manage a Conda/QGIS environment.
     python: "3.13"
     duckdb: TODO
     gdal: TODO

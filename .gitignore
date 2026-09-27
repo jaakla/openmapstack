@@ -13,6 +13,7 @@ dist/
 .wrangler/
 
 .e2e-venv/
+.openmapstack/venvs/
 # regenerable outputs from the example's run_e2e.py
 examples/tartu-development/data/source/
 examples/tartu-development/data/derived/

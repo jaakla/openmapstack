@@ -388,6 +388,15 @@
       "type": "object",
       "required": ["implementation"],
       "properties": {
+        "environment": {
+          "type": "object",
+          "properties": {
+            "packages": {
+              "type": "array",
+              "items": {"type": "string", "minLength": 1}
+            }
+          }
+        },
         "implementation": {
           "type": "object",
           "properties": {

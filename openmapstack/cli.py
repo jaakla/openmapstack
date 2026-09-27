@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
+from .environment import plan_python_environment, runtime_warnings
 from .project import ProjectError, get_in, load_json, load_project, project_path, step_outputs
 from .sampling import Sample, SamplingError, declared_sample, resolve_sample, run_mode, run_record_errors
 from .validation import ValidationResult, validate_project
@@ -283,6 +284,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
         project_file, project = load_project(args.project)
         sample = _requested_sample(args, project)
         command = _pipeline_command(project_file, project, args.pipeline_args)
+        python_environment = plan_python_environment(project_file, project)
+        if python_environment is not None:
+            command[0] = str(python_environment.python)
         if sample is not None:
             command = command + sample.argv
     except (ProjectError, SamplingError) as exc:
@@ -293,6 +297,10 @@ def _cmd_run(args: argparse.Namespace) -> int:
         return 2
 
     mode = "sampled" if sample is not None else "canonical"
+    warnings = runtime_warnings(project)
+    if not args.json:
+        for warning in warnings:
+            print(f"WARN  {warning['code']}: {warning['message']}", file=sys.stderr)
     display_command = shlex.join(command)
     if args.dry_run:
         payload = {
@@ -304,19 +312,51 @@ def _cmd_run(args: argparse.Namespace) -> int:
             "cwd": str(project_file.parent),
             "command": command,
             "validation": preflight.to_dict(),
+            "warnings": warnings,
         }
         if sample is not None:
             payload["sample"] = sample.to_dict()
+        if python_environment is not None:
+            payload["environment"] = python_environment.to_dict()
         if args.json:
             print(_json(payload))
         else:
             print(f"Preflight: {preflight.status}")
+            if python_environment is not None:
+                for setup_command in python_environment.commands:
+                    print(f"Would prepare environment: {shlex.join(setup_command)}")
             print(f"Would run ({mode}): {display_command}")
         return 0
 
-    environment = None
+    if python_environment is not None:
+        if not args.json:
+            print(f"Preparing Python environment: {python_environment.directory}", flush=True)
+        for setup_command in python_environment.commands:
+            try:
+                setup = subprocess.run(
+                    setup_command, cwd=project_file.parent, check=False,
+                    text=True, capture_output=True,
+                )
+            except OSError as exc:
+                setup = subprocess.CompletedProcess(setup_command, 1, "", str(exc))
+            if setup.returncode:
+                payload = {
+                    "schema": "openmapstack-run-result/v1", "status": "failed",
+                    "phase": "environment", "command": setup_command,
+                    "returncode": setup.returncode, "stdout": setup.stdout, "stderr": setup.stderr,
+                    "environment": python_environment.to_dict(),
+                    "warnings": warnings,
+                }
+                if args.json:
+                    print(_json(payload))
+                else:
+                    print("Python dependency setup failed; pipeline was not started.", file=sys.stderr)
+                    print(setup.stdout + setup.stderr, file=sys.stderr)
+                return 1
+
+    environment = python_environment.subprocess_environment() if python_environment is not None else None
     if sample is not None:
-        environment = dict(os.environ)
+        environment = environment if environment is not None else dict(os.environ)
         environment.update(sample.environment)
         environment["OPENMAPSTACK_RUN_MODE"] = "sampled"
 
@@ -340,7 +380,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         )
     except OSError as exc:
         if args.json:
-            print(_json({"schema": "openmapstack-run-result/v1", "status": "failed", "phase": "execute", "command": command, "error": str(exc)}))
+            print(_json({"schema": "openmapstack-run-result/v1", "status": "failed", "phase": "execute", "command": command, "error": str(exc), "warnings": warnings}))
         else:
             print(f"openmapstack run: could not start pipeline: {exc}", file=sys.stderr)
         return 2
@@ -355,6 +395,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
             "project_file": str(project_file),
             "command": command,
             "returncode": completed.returncode,
+            "warnings": warnings,
         }
         if args.json:
             payload["stdout"] = completed.stdout
@@ -366,7 +407,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
     if sample is not None:
         assert baseline is not None
-        return _report_sampled_run(args, project_file, command, completed, sample, baseline, preflight)
+        return _report_sampled_run(args, project_file, command, completed, sample, baseline, preflight, warnings)
 
     validation = validate_project(project_file, artifacts=True)
     payload = {
@@ -378,6 +419,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         "command": command,
         "returncode": completed.returncode,
         "validation": validation.to_dict(),
+        "warnings": warnings,
     }
     if args.json:
         payload["stdout"] = completed.stdout
@@ -484,6 +526,7 @@ def _report_sampled_run(
     sample: Sample,
     baseline: _SampledRunBaseline,
     preflight: ValidationResult,
+    warnings: list[dict[str, str]],
 ) -> int:
     """Report a sampled run, refusing to let it stand in for the canonical one.
 
@@ -589,6 +632,7 @@ def _report_sampled_run(
         "promotion_problems": problems,
         "validation": validation.to_dict(),
         "validation_phase": "preflight",
+        "warnings": warnings,
     }
     if args.json:
         payload["stdout"] = completed.stdout

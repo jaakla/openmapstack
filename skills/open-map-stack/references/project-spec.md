@@ -1074,10 +1074,34 @@ openmapstack inspect project.yaml
   `--metamorphic`; `--json` includes applicability coverage and evidence class.
 - `run` first performs preflight validation, invokes exactly the pipeline or
   shell-free command in `runtime.implementation`, and then performs the full
-  artifact validation. Python pipelines use the interpreter that installed the
-  CLI. Projects needing Conda, containers, SQL engines, or another launcher can
-  declare `runtime.implementation.command` as a string or argument list. Use
-  `--dry-run` to inspect the resolved command.
+  artifact validation. For Python pipelines, it installs the Python dependencies
+  in `runtime.environment` into a reusable `.openmapstack/venvs/` environment
+  using the CLI's Python version. Flat package versions accept exact pins,
+  `x` wildcards, and version constraints; `environment.packages` accepts a list
+  of PEP 508 requirements (including extras and markers). PyYAML is included for
+  manifest support. Setup uses `uv` when available, otherwise `venv` and `pip`;
+  failures stop execution and report JSON `phase: environment`. The `python`,
+  `gdal`, `proj`, `qgis`, `postgis`, and `postgresql` (alias `postgres`) fields
+  describe external runtimes and are not passed to a Python package installer.
+  Declare Python bindings explicitly under their distribution names (for example,
+  `packages: ["pyproj>=3.7,<4"]`). With no Python dependencies, execution uses
+  the CLI interpreter. Projects needing Conda, containers, SQL engines, another
+  Python version, or another launcher can declare `runtime.implementation.command`
+  as a string or argument list; explicit commands own their environment and bypass
+  automatic setup. Use `--dry-run` to inspect setup and execution without installing
+  anything. Exclude `.openmapstack/venvs/` from version control and run inventories.
+  Runtime advisories appear on stderr or in JSON `warnings`, including on dry runs;
+  they do not change artifact-validation status or `--strict` behavior. A Python
+  mismatch warns without blocking: a major/minor pin accepts any patch release,
+  while an exact patch pin or a version constraint is compared as declared. An
+  explicit command's Python is not inferred from the CLI interpreter. Native
+  requirements receive installation and verification guidance, with availability
+  explicitly unverified. Install GDAL and required drivers/bindings in the actual
+  pipeline runtime; a system Python binding is not automatically visible in a
+  virtualenv. Install PostGIS on the target PostgreSQL server and enable it in the
+  target database; a Python client does not provide the server extension. The
+  exact declaration `gdal: DuckDB spatial extension` requests no separate system
+  GDAL installation; the canonical pipeline must install/load `spatial` itself.
 - `inspect` is read-only. It summarizes identity, CRS, pinned sources,
   overrides, ordered steps, outputs, latest run, and current validation issues;
   `--json` emits `openmapstack-inspection/v1`.
