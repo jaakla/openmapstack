@@ -1,6 +1,6 @@
 # 0005 — Standalone skill assets and a separately pinned CLI
 
-- Status: Accepted
+- Status: Accepted (payload scope amended 2026-09-27)
 - Date: 2026-09-14
 - Related: [#34](https://github.com/jaakla/openmapstack-skills/issues/34), [#31](https://github.com/jaakla/openmapstack-skills/issues/31)
 
@@ -28,13 +28,20 @@ adds approximately 1.3 MiB without being necessary to regenerate the project.
 ## Decision
 
 Use a pinned Python package for the CLI and checked, generated local asset
-copies in each installable skill. Keep canonical templates in `templates/` and
-the canonical worked project in `examples/tartu-development/`. Export its
-README, manifest, pipeline, convenience runner and override geometry; omit
-generated dashboards, QGIS archives, run logs, validation output and source data.
-Include a local notice explaining those omissions. The real-data pipeline
-requires network access and optional GIS dependencies; a copied example is
-not advertised as an offline completed analysis.
+copies in the project-owning `open-map-stack` and `reproducible-gis-project`
+skills. Keep canonical templates in `templates/` and the canonical worked
+project in `examples/tartu-development/`. Export its README, manifest, pipeline,
+convenience runner and override geometry into those two skills; omit generated
+dashboards, QGIS archives, run logs, validation output and source data. Include
+a local notice explaining those omissions. The real-data pipeline requires
+network access and optional GIS dependencies; a copied example is not
+advertised as an offline completed analysis.
+
+The bounded `geospatial-data-discovery` and `spatial-sql` skills ship task
+guidance and only the references needed for their tasks. Standalone installation
+means they can answer those tasks without a sibling skill or CLI; it does not
+require them to carry project templates, a schema or a worked project. When the
+user asks for a full project, route to the generalist or project skill.
 
 After publication, the proposed executable install command is
 `python -m pip install 'openmapstack[geo]==0.4.0'`. Before publication, build and
@@ -50,11 +57,12 @@ with a Git revision. Release commands must be marked unavailable until the
 
 ## Consequences and verification
 
-Each skill ships reachable references, local templates/example and CLI setup
-instructions. Shared references are copied from one maintained source with a
-drift check, rather than linked across installed sibling directories. Snapshot
-v2 inventories the complete selected payload; legacy v1 inspection remains
-available without changing historical hashes or meaning.
+Each skill ships reachable local references; only the two project-owning skills
+ship templates, examples, schema and CLI setup instructions. Shared references
+are copied from one maintained source with a drift check, rather than linked
+across installed sibling directories. Snapshot v2 inventories the complete
+selected payload; legacy v1 inspection remains available without changing
+historical hashes or meaning.
 
 Verify copied single-skill installs, subset/collection snapshots, missing or
 tampered assets, package/version agreement and isolated fresh/update/removal

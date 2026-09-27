@@ -184,7 +184,9 @@ class RoutingExecutionTests(unittest.TestCase):
             self.assertEqual(manifest["schema"], "openmapstack-skill-snapshot/v2")
             self.assertEqual([s["name"] for s in manifest["skills"]], ["spatial-sql"])
             path = self.root / agent / surface["directory"] / "spatial-sql"
-            self.assertTrue((path / "examples/tartu-development/pipeline.py").is_file())
+            self.assertTrue((path / "references/spatial-sql.md").is_file())
+            self.assertFalse((path / "templates").exists())
+            self.assertFalse((path / "examples").exists())
             self.assertIn("/workspace/" + surface["directory"] + "/spatial-sql/SKILL.md", inventory)
             self.assertFalse((target / "evals").exists())
 
@@ -204,7 +206,7 @@ class RoutingExecutionTests(unittest.TestCase):
                 # Native runtimes may create their own settings outside skills.
                 (workspace / ".claude/settings.local.json").write_text("{}")
                 if defect == "mutate":
-                    (workspace / ".claude/skills/spatial-sql/templates/pipeline.py").write_text("tampered")
+                    (workspace / ".claude/skills/spatial-sql/references/spatial-sql.md").write_text("tampered")
                 events = [
                     {"type": "oms.routing.runtime", "version": "test-cli", "returncode": 0},
                     {"type": "system", "subtype": "init", "skills": [] if defect == "undiscovered" else ["spatial-sql"]},

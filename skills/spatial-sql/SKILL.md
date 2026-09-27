@@ -54,10 +54,10 @@ discussion. Compiling a material analysis belongs with the generalist or
 assumptions/evidence needed for that handoff; do not claim to have completed
 the whole analysis.
 
-Local `templates/` and `examples/tartu-development/` support project handoff;
-`references/installation.md` describes matching CLI setup. They need not be
-loaded for ordinary SQL work. Sibling skills are optional and are never
-automatically installed.
+No project template, worked example or OpenMapStack CLI is needed for a bounded
+query task. Hand off the SQL and its assumptions to an installed `open-map-stack`
+or `reproducible-gis-project` if the user also wants a full project. Sibling
+skills are optional and are never automatically installed.
 
 For optional product expertise, read `references/companion-skills.md`.
 Keep GIS correctness and the task boundaries above when using a companion.

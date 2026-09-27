@@ -47,13 +47,89 @@ Includes all the skills.
 - [templates/](templates/) — ready scaffolds (`project.yaml`, `pipeline.py`, `presentation.yaml`, `validation.yaml`) for new projects.
 
 ### Reproducible GIS project
-Well-defined GIS project manifest and pipeline skills.
+
+Use [reproducible-gis-project](skills/reproducible-gis-project/SKILL.md) when the
+analysis method and stack are chosen and another analyst needs to inspect,
+execute and verify the result without the original conversation. It guides the
+agent to produce:
+
+- A `project.yaml` manifest with pinned sources, CRS, assumptions, ordered steps
+  and outputs, so the inputs and decisions are explicit.
+- One canonical pipeline with corrections and scenarios recorded as data or
+  executable logic, so derived results can be rebuilt without manual edits.
+- Machine-readable validation and run evidence, including a clean rerun, so
+  failures and reproducibility claims can be checked.
+- QGIS and web presentation derived from the same project, so maps and reports
+  reflect the validated analysis.
+
+The skill includes its own [project templates](skills/reproducible-gis-project/templates/)
+and these local references:
+
+- [project-workflow.md](skills/reproducible-gis-project/references/project-workflow.md) — required steps and delivery rules for a material analysis.
+- [project-spec.md](skills/reproducible-gis-project/references/project-spec.md) — the `openmapstack-project/v1` manifest and artifact contract.
+- [data-sources.md](skills/reproducible-gis-project/references/data-sources.md) — public data discovery and source assessment.
+- [user-data-sources.md](skills/reproducible-gis-project/references/user-data-sources.md) — warehouse access and reproducible snapshots.
+- [formats-and-crs.md](skills/reproducible-gis-project/references/formats-and-crs.md) — format choices and coordinate-system correctness.
+- [qgis.md](skills/reproducible-gis-project/references/qgis.md) — QGIS project delivery and desktop integration.
+- [validation-and-ops.md](skills/reproducible-gis-project/references/validation-and-ops.md) — checks, provenance and operational validation.
+- [installation.md](skills/reproducible-gis-project/references/installation.md) — CLI setup and local example requirements.
+- [companion-skills.md](skills/reproducible-gis-project/references/companion-skills.md) — optional product-specific help.
+
+Installing the other skills is optional. If the source, compute or delivery
+architecture is still undecided, start with `open-map-stack`.
 
 ### Geospatial data discovery
-Geodata discovery skills - open, where possible authoritative source data for global and local coverage.
+
+Use [geospatial-data-discovery](skills/geospatial-data-discovery/SKILL.md) when
+the data requirements are known and the task is to find and assess suitable
+public datasets or the user's own geospatial data. It guides the agent to:
+
+- Match coverage, time, feature meaning, attributes and resolution to the
+  question, so a convenient dataset is not mistaken for the right one.
+- Check current provider metadata, access and license terms, so availability
+  and permission claims have evidence.
+- Assess completeness and distinguish a sample or partial catalog from a full
+  extract, so missing features are not misread as absent features.
+- Report a reproducible version or snapshot strategy, retrieval details and
+  limitations, so a later analysis can use the same source.
+
+The standalone skill includes these local references:
+
+- [data-sources.md](skills/geospatial-data-discovery/references/data-sources.md) — public data providers, catalogs and discovery methods.
+- [user-data-sources.md](skills/geospatial-data-discovery/references/user-data-sources.md) — read-only warehouse discovery and snapshot rules.
+- [formats-and-crs.md](skills/geospatial-data-discovery/references/formats-and-crs.md) — formats, coordinate systems and spatial extents.
+- [companion-skills.md](skills/geospatial-data-discovery/references/companion-skills.md) — optional product-specific help.
+
+A source assessment needs no project templates, worked example or OpenMapStack
+CLI. Use `open-map-stack` when source selection depends on unresolved compute,
+storage or delivery choices; add `reproducible-gis-project` if the user wants to
+turn a chosen analysis into a full project.
 
 ### Spatial SQL
-Geospatial SQL specific skills only.
+
+Use [spatial-sql](skills/spatial-sql/SKILL.md) to write, review, debug or
+optimize a spatial query on an already chosen engine, such as PostGIS or DuckDB
+Spatial. It guides the agent to:
+
+- Check the engine, geometry types, CRS, input grain and expected result, so
+  the query uses supported functions and returns the intended entities.
+- Choose spatial predicates and boundary behavior deliberately, including how
+  null, invalid or multiply matched geometries affect the result.
+- Use appropriate metric or geodesic operations for distances, areas and
+  buffers, so a numeric threshold has the intended units.
+- Review indexes, candidate filters and query plans, then run small controls
+  when the engine is available, so performance changes preserve the result.
+
+The standalone skill includes these local references:
+
+- [spatial-sql.md](skills/spatial-sql/references/spatial-sql.md) — engine-specific spatial SQL patterns and query review.
+- [formats-and-crs.md](skills/spatial-sql/references/formats-and-crs.md) — coordinate, unit and format semantics.
+- [companion-skills.md](skills/spatial-sql/references/companion-skills.md) — optional product-specific help.
+
+A bounded query review needs no project templates, worked example or
+OpenMapStack CLI. Use `open-map-stack` when engine selection or cross-system
+architecture is undecided; add `reproducible-gis-project` if the user wants to
+compile a chosen analysis into a full project.
 
 
 ### Additional materials:
@@ -68,8 +144,9 @@ Some my local Estonia-specific guidance (Maa- ja Ruumiamet, ETAK, EPSG:3301 / L-
 
 ## Install
 
-The 0.4.0 collection provides four independently installable skills and a
-separately installed, matching CLI. From a checkout, install the generalist:
+The 0.4.0 collection provides four independently installable skills. The
+OpenMapStack CLI is a separate installation for project execution and validation.
+From a checkout, install the generalist and CLI for project work:
 
 ```bash
 npx skills@1.5.26 add . --skill open-map-stack -a codex -y
@@ -78,11 +155,13 @@ python -m pip install '.[geo]'
 
 Use `-a claude-code` for Claude Code, `-g` for global installation and `--copy`
 for independent copies. Select additional skills by repeating `--skill NAME`;
-`--skill '*'` selects the full collection. Each skill includes local templates,
-project schema, a trimmed worked Tartu example and CLI setup instructions.
-No installed sibling is required. Generated example outputs and downloaded
-source data are omitted; its pipeline needs network access and its documented
-GIS environment.
+`--skill '*'` selects the full collection. `open-map-stack` and
+`reproducible-gis-project` include local project templates, the project schema,
+a trimmed worked Tartu example and CLI setup instructions. The two bounded
+specialists ship their task guidance and local references; they need no CLI or
+installed sibling. Generated example outputs and downloaded source data are
+omitted; the example pipeline needs network access and its documented GIS
+environment.
 
 Once the release tag and Python package are published, pin both parts of the
 coordinated release:
@@ -120,9 +199,10 @@ and scope before changing anything. Legacy `open-gis` is a different identifier:
 remove it explicitly if it is an unwanted duplicate, rather than silently
 rewriting its lock entry.
 
-The CLI is separate from skill installation. Verify `openmapstack --version`
-against the installed skill's `metadata.version`. Before publication, a wheel
-or pinned Git commit from the matching checkout is the supported alternative.
+The CLI is separate from skill installation and is needed only for project
+execution or validation. When installing it, verify `openmapstack --version`
+against the project skill's `metadata.version`. Before publication, a wheel or
+pinned Git commit from the matching checkout is the supported alternative.
 
 ## Use
 

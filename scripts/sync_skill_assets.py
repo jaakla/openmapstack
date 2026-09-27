@@ -26,13 +26,14 @@ def expected_assets(root=ROOT):
     outputs = {}
     for skill in collection["skills"]:
         target = root / skill["path"]
-        for source in (root / "templates").iterdir():
-            if source.is_file():
-                outputs[target / "templates" / source.name] = source.read_bytes()
-        for relative in EXAMPLE_FILES:
-            outputs[target / "examples/tartu-development" / relative] = (root / "examples/tartu-development" / relative).read_bytes()
-        outputs[target / "examples/tartu-development/PACKAGE-NOTES.md"] = NOTES.encode()
-        outputs[target / "schemas/project-v1.schema.json"] = (root / "openmapstack/schemas/project-v1.schema.json").read_bytes()
+        if skill.get("project_assets", False):
+            for source in (root / "templates").iterdir():
+                if source.is_file():
+                    outputs[target / "templates" / source.name] = source.read_bytes()
+            for relative in EXAMPLE_FILES:
+                outputs[target / "examples/tartu-development" / relative] = (root / "examples/tartu-development" / relative).read_bytes()
+            outputs[target / "examples/tartu-development/PACKAGE-NOTES.md"] = NOTES.encode()
+            outputs[target / "schemas/project-v1.schema.json"] = (root / "openmapstack/schemas/project-v1.schema.json").read_bytes()
         for reference in skill["shared_references"]:
             source = generalist / "references" / reference
             outputs[target / "references" / reference] = source.read_bytes()

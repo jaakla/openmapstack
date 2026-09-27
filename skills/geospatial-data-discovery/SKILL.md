@@ -59,9 +59,10 @@ team concurrency or delivery architecture, keep those coupled decisions with
 the generalist. Do not choose an engine merely because a dataset is easy to
 query with it.
 
-`references/installation.md`, `templates/` and `examples/tartu-development/`
-are locally available when preparing a handoff. Do not load them for a simple
-dataset lookup. No sibling skill or third-party installation is required.
+No project template, worked example or OpenMapStack CLI is needed for a source
+assessment. If the task expands into a project, hand off the source assessment
+to an installed `open-map-stack` or `reproducible-gis-project`. No sibling skill
+or third-party installation is required for bounded discovery.
 
 For optional product expertise, read `references/companion-skills.md`.
 Keep GIS correctness and the task boundaries above when using a companion.

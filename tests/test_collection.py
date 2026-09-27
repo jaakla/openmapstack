@@ -117,8 +117,14 @@ class InstalledPayloadTests(unittest.TestCase):
             with self.subTest(skill=name), tempfile.TemporaryDirectory() as tmp:
                 skill = Path(tmp) / name
                 shutil.copytree(source, skill)
-                self.assertTrue((skill / "templates/project.yaml").is_file())
-                self.assertTrue((skill / "examples/tartu-development/pipeline.py").is_file())
+                if name in {"open-map-stack", "reproducible-gis-project"}:
+                    self.assertTrue((skill / "templates/project.yaml").is_file())
+                    self.assertTrue((skill / "examples/tartu-development/pipeline.py").is_file())
+                    self.assertTrue((skill / "schemas/project-v1.schema.json").is_file())
+                    self.assertTrue((skill / "references/installation.md").is_file())
+                else:
+                    for absent in ("templates", "examples", "schemas", "references/installation.md"):
+                        self.assertFalse((skill / absent).exists(), f"{name}: unexpected {absent}")
                 for path in [skill / "SKILL.md", *(skill / "references").glob("*.md")]:
                     text = path.read_text()
                     for link in re.findall(r"\]\(([^)#]+)(?:#[^)]*)?\)", text):

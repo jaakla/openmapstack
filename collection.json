@@ -5,11 +5,13 @@
     {
       "name": "open-map-stack",
       "path": "skills/open-map-stack",
+      "project_assets": true,
       "shared_references": []
     },
     {
       "name": "reproducible-gis-project",
       "path": "skills/reproducible-gis-project",
+      "project_assets": true,
       "shared_references": [
         "project-workflow.md",
         "project-spec.md",
@@ -29,7 +31,6 @@
         "data-sources.md",
         "user-data-sources.md",
         "formats-and-crs.md",
-        "installation.md",
         "companion-skills.md"
       ]
     },
@@ -39,7 +40,6 @@
       "shared_references": [
         "spatial-sql.md",
         "formats-and-crs.md",
-        "installation.md",
         "companion-skills.md"
       ]
     }
