@@ -260,6 +260,11 @@ class _Validator:
             pin = assess_pin(self.root, source)
             if pin.status == "pinned":
                 self.add("source.pin", "passed", pin.reason, path=f"{base}.pin", pin_class=pin.pin_class)
+            elif not self.artifacts and pin.details.get("cause") == "snapshot_missing":
+                self.add(
+                    "source.pin", "not_testable", f"snapshot content cannot be checked before it is fetched: {pin.reason}",
+                    path=f"{base}.pin", pin_class=pin.pin_class, **pin.details,
+                )
             elif pin.status == "not_reproducible":
                 self.add("source.pin", "failed", f"not reproducible: {pin.reason}", path=f"{base}.pin", pin_class=pin.pin_class, **pin.details)
             elif pin.status == "invalid":
@@ -1002,7 +1007,13 @@ class _Validator:
 
     def _declared_status_consistency(self) -> None:
         project_status = get_in(self.project, "project", "status")
-        non_passed = [check for check in self.checks if check.status in {"warning", "not_testable"}]
+        # Preflight cannot use unavailable evidence to refute the status of a
+        # previously completed run. Its not-testable checks still make the
+        # preflight result a warning; full validation enforces the status.
+        non_passed = [
+            check for check in self.checks
+            if check.status == "warning" or (self.artifacts and check.status == "not_testable")
+        ]
         if project_status == "validated" and non_passed:
             self.add(
                 "project.status_consistency",

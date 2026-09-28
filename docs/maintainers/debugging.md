@@ -18,6 +18,8 @@ Before changing a checker because one layer is green and another red, confirm wh
 
 `openmapstack validate ... --preflight` deliberately skips checks that need produced artifacts, validation reports, and run records. It is useful before a project has run; it is not full health evidence.
 
+In a clean checkout, a gitignored `local_snapshot` source file is absent. Preflight reports its `source.pin` as `not_testable` so CI can still check committed inputs; full validation fails until the source is fetched. A present file with the wrong hash fails in either mode (see `openmapstack/validation.py` and `tests/test_sources.py`).
+
 Useful comparison:
 
 ```bash

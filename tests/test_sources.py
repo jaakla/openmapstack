@@ -219,6 +219,30 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual([c.status for c in checks], ["passed"])
         self.assertEqual(checks[0].details["pin_class"], "local_snapshot")
 
+    def test_preflight_marks_missing_snapshot_unchecked_but_rejects_changed_bytes(self) -> None:
+        workspace = make_workspace()
+        manifest = valid_manifest()
+        key = next(iter(manifest["sources"]))
+        pin = _snapshot(workspace)
+        manifest["sources"][key]["pin"] = pin
+        write_project(workspace, manifest)
+        (workspace / "pipeline.py").write_text("print('ok')\n", encoding="utf-8")
+        snapshot = workspace / pin["path"]
+        snapshot.unlink()
+
+        preflight = validate_project(workspace / "project.yaml", artifacts=False)
+        pin_check = next(check for check in preflight.checks if check.id == "source.pin")
+        self.assertEqual((pin_check.status, pin_check.details["cause"]), ("not_testable", "snapshot_missing"))
+        self.assertTrue(preflight.ok())
+        self.assertFalse(preflight.ok(strict=True))
+        full = validate_project(workspace / "project.yaml", artifacts=True)
+        self.assertEqual(next(check.status for check in full.checks if check.id == "source.pin"), "failed")
+
+        snapshot.write_bytes(b"edited")
+        changed = validate_project(workspace / "project.yaml", artifacts=False)
+        changed_pin = next(check for check in changed.checks if check.id == "source.pin")
+        self.assertEqual((changed_pin.status, changed_pin.details["cause"]), ("failed", "snapshot_hash_mismatch"))
+
 
 if __name__ == "__main__":
     unittest.main()

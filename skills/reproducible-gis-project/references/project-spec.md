@@ -1064,7 +1064,10 @@ openmapstack inspect project.yaml
   projected analysis CRS, processing graph, override provenance and referenced
   geodata, declared outputs, report parity and status propagation, override
   application results, and run-record identity/hashes. `--preflight` limits the
-  check to inputs and declarations before the first run. `--json` emits
+  check to inputs and declarations before the first run. A missing
+  `local_snapshot` file is `not_testable` in preflight, since generated source
+  data may be absent in a clean checkout; a present file with the wrong hash
+  fails, and full validation still fails when the file is missing. `--json` emits
   `openmapstack-validation-result/v1`; `--strict` treats warnings as a failing exit.
 - `verify` derives an applicable check plan from the manifest and inspects the
   produced artifacts without requiring a repository-owned golden answer. It
