@@ -6,7 +6,7 @@ project:
     fleet and hub coverage and account demand, and show ranked candidate zones on an interactive map while
     respecting all database access restrictions.
   created_at: '2026-09-17T00:00:00Z'
-  updated_at: '2026-09-28T11:30:40.406587+00:00'
+  updated_at: '2026-09-28T20:54:12.330626+00:00'
   status: validated
 interpretation:
   objective: Rank NYC H3 resolution-8 cells for tenant alpha using pinned read-only captures of the provisioned
@@ -554,14 +554,14 @@ validation:
     expression: trips_total >= 30 AND hub_distance_m >= 1500 AND fleet_present <= 6
 runs:
   latest:
-    id: run-20260928-113040
-    started_at: '2026-09-28T11:30:39.879833+00:00'
-    completed_at: '2026-09-28T11:30:40.406587+00:00'
+    id: run-20260928-205412
+    started_at: '2026-09-28T20:54:11.774888+00:00'
+    completed_at: '2026-09-28T20:54:12.330626+00:00'
     status: passed
-    inputs_hash: sha256:dc2b0cfd5315bd82a7334b7ea4ec92d0764d83b64a2800a58f49f597cb1ea232
-    outputs_hash: sha256:cd9d6178850c18be68560c20107a0637e01d05bfa94ce917feca9bfd20476ed6
+    inputs_hash: sha256:7f7b6a7a3138ddae6e4c117b5149d9858b22d2407a52e3b0deb8aea7ca62f727
+    outputs_hash: sha256:772c13d70ef74567ec4b6158f1fcb728cd495c8085c11786abca8e320d3eb42e
     record:
-      path: runs/run-20260928-113040.json
+      path: runs/run-20260928-205412.json
     validation_report:
       path: validation/latest-report.json
 runtime:

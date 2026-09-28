@@ -2576,7 +2576,21 @@ input[type="range"]::-moz-range-thumb {
 .layer-row .txt .t { font-size: 12px; }
 .layer-row .txt .d { font-size: 10.5px; color: var(--text-faint); }
 .layer-row .n { font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
-.layer-row.is-off .txt, .layer-row.is-off .n { opacity: 0.45; }
+.layer-row.is-off .txt .t, .layer-row.is-off .n { opacity: 0.45; }
+.layer-item { border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.layer-item:last-child { border-bottom: 0; }
+.layer-lineage { margin: 0 8px 5px 52px; }
+.layer-lineage summary { color: var(--accent-text); cursor: pointer; font-size: 11px; line-height: 1.4; }
+.layer-lineage summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lineage-flow { margin-top: 7px; border-left: 2px solid var(--border-strong); padding-left: 11px; }
+.lineage-stage { position: relative; padding: 0 0 13px; }
+.lineage-stage:last-child { padding-bottom: 2px; }
+.lineage-stage:not(:last-child)::after { content: "↓"; position: absolute; bottom: -2px; left: 0; color: var(--text-muted); }
+.lineage-stage .stage-name { color: var(--text-muted); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.lineage-stage ul { margin: 3px 0 0; padding-left: 16px; color: var(--text); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.lineage-stage li + li { margin-top: 2px; }
+#basemapLineage { margin: 8px 0 0; }
+#basemapSource { overflow-wrap: anywhere; }
 
 .sw-fill { width: 15px; height: 12px; border-radius: 3px; border: 1.5px solid; }
 .sw-line { width: 17px; height: 0; border-top-width: 3px; border-top-style: solid; border-radius: 2px; }
@@ -3169,14 +3183,70 @@ const POIS = __POIS__;
     return '<span class="sw-line" style="border-top-color:' + PALETTE.road + '"></span>';
   }
 
+  // Keys and pipeline steps mirror project.yaml; output paths and source cards come from VIEW.
+  const CANDIDATE_LINEAGE = {
+    sources: ["cadastral_parcels", "roads", "education_pois", "pedestrian_network"],
+    scenario: ["project.yaml OVERRIDE-001 (facility outage, when enabled)",
+      "project.yaml OVERRIDE-002 + data/overrides/planned-road.geojson (hypothetical road, when enabled)"],
+    steps: [{ name: "Prepared inputs", items: ["large_parcels + official_roads + scenario_roads", "effective_education_pois + pedestrian-network catchments"] },
+      { name: "Screening", items: ["candidate_parcels: parcel area, road distance and catchment overlap screening"] }],
+    output: "candidate_parcels_geojson",
+  };
+  const LAYER_LINEAGE = {
+    candidates_tier1: { ...CANDIDATE_LINEAGE, subset: "Prime candidate tier" },
+    candidates_tier2: { ...CANDIDATE_LINEAGE, subset: "Secondary candidate tier" },
+    candidates_highway: { ...CANDIDATE_LINEAGE, subset: "Road-access-only tier" },
+    catchments: { sources: ["education_pois", "pedestrian_network"],
+      scenario: ["project.yaml OVERRIDE-001 (facility outage, when enabled)"],
+      steps: [{ name: "Isochrones", items: ["effective_education_pois", "facility_isochrones.json (reverse pedestrian isochrones)"] },
+        { name: "Catchment unions", items: ["education_catchments: unions at offered walking times"] }],
+      output: "education_catchment_variants_geojson" },
+    education_pois: { sources: ["education_pois"],
+      scenario: ["project.yaml OVERRIDE-001 (facility outage, when enabled)"],
+      steps: [{ name: "Scenario application", items: ["effective_education_pois: verified municipal facilities with scenario status"] }],
+      output: "education_pois_geojson" },
+    infrastructure: { sources: ["roads"], steps: [{ name: "Road filter", items: ["official_roads: primary and secondary ETAK roads"] }],
+      output: "main_roads_geojson" },
+    user_overrides: { sourceItems: ["project.yaml OVERRIDE-001 (facility outage)",
+      "project.yaml OVERRIDE-002 + data/overrides/planned-road.geojson (hypothetical road)",
+      "Local browser draft annotations"],
+      finalItems: ["Scenario road, affected facility and draft overlays shown on this map"] },
+  };
+  function lineageHtml(stages) {
+    return '<div class="lineage-flow">' + stages.map((stage) => (
+      '<div class="lineage-stage"><div class="stage-name">' + esc(stage.name) + '</div><ul>'
+      + stage.items.map((item) => '<li>' + esc(item) + '</li>').join("") + '</ul></div>'
+    )).join("") + '</div>';
+  }
+  function layerLineage(group) {
+    const binding = LAYER_LINEAGE[group.id];
+    if (!binding) return lineageHtml([{ name: "Source", items: ["See Sources & runtime manifest in the Provenance tab"] }]);
+    const keys = binding.sources || [];
+    const sources = keys.map((key) => {
+      const item = sourceMeta(key);
+      return item.provider + " · " + item.table;
+    }).concat(binding.scenario || [], binding.sourceItems || []);
+    const stages = [{ name: "Source", items: sources }];
+    if (keys.length) stages.push({ name: "Snapshots", items: keys.map((key) => sourceMeta(key).file) });
+    (binding.steps || []).forEach((step) => stages.push(step));
+    const output = VIEW.outputs.find((item) => item.key === binding.output);
+    stages.push({ name: "Final", items: output
+      ? [output.path + (binding.subset ? " · " + binding.subset : "")]
+      : binding.finalItems });
+    return lineageHtml(stages);
+  }
+
   function layerRows() {
     return VIEW.layerGroups.map((g) => (
-      '<label class="layer-row' + (state.layers[g.id] ? "" : " is-off") + '" data-layerrow="' + esc(g.id) + '">'
+      '<div class="layer-item"><label class="layer-row' + (state.layers[g.id] ? "" : " is-off")
+      + '" data-layerrow="' + esc(g.id) + '">'
       + '<input type="checkbox" data-layer="' + esc(g.id) + '"' + (state.layers[g.id] ? " checked" : "") + ">"
       + '<span class="box">' + TICK + "</span>"
       + '<span class="swatch">' + swatch(g.swatch) + "</span>"
       + '<span class="txt"><span class="t">' + esc(g.title) + "</span></span>"
       + '<span class="n" data-count="' + esc(g.count || "") + '"></span></label>'
+      + '<details class="layer-lineage" data-lineage="' + esc(g.id) + '"><summary>View lineage</summary>'
+      + layerLineage(g) + '</details></div>'
     )).join("");
   }
 
@@ -3195,7 +3265,10 @@ const POIS = __POIS__;
         + "is never modified either way.</p>", true, String(VIEW.overrides.length))
       + acc("filters", "Filters", filterFields(), true)
       + acc("layers", "Layers & legend", layerRows(), true, String(VIEW.layerGroups.length))
-      + acc("basemap", "Basemap", '<div class="chips">' + basemaps + "</div>", false);
+      + acc("basemap", "Basemap", '<div class="chips">' + basemaps
+        + '</div><details class="layer-lineage" id="basemapLineage"><summary>View lineage</summary>'
+        + lineageHtml([{ name: "Source", items: ["CARTO / OpenStreetMap basemap"] }])
+        + '</details>', false);
   }
 
   // ----------------------------------------------------------- panel: edit --
@@ -4181,7 +4254,14 @@ const POIS = __POIS__;
     if (e.key === "Escape" && state.drawMode) cancelDrawing();
   });
 
+  function updateBasemapSource() {
+    const selected = state.basemap === "auto" ? currentTheme() : state.basemap;
+    $("#basemapLineage .lineage-stage li").textContent = "CARTO "
+      + (selected === "dark" ? "Dark Matter" : "Positron")
+      + " · © OpenStreetMap contributors, © CARTO · " + BASEMAPS[selected];
+  }
   function setBasemap() {
+    updateBasemapSource();
     map.setStyle(basemapUrl(), { diff: false });
   }
   $$("[data-basemap]").forEach((btn) => {
@@ -4195,6 +4275,7 @@ const POIS = __POIS__;
   let storedTheme = null;
   try { storedTheme = window.localStorage.getItem("openmapstack-theme"); } catch (err) { storedTheme = null; }
   if (storedTheme) document.documentElement.setAttribute("data-theme", storedTheme);
+  updateBasemapSource();
   $("#themeToggle").addEventListener("click", () => {
     const next = currentTheme() === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", next);

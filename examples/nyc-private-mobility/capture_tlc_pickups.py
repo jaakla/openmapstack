@@ -17,7 +17,6 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 import h3
-import requests
 
 ROOT = Path(__file__).resolve().parent
 OUTPUT = ROOT / "data/source/tlc-2016-pickups.json"
@@ -50,6 +49,8 @@ def select_points(rows: list[dict], cells: set[str]) -> list[dict]:
 
 
 def main() -> None:
+    import requests
+
     if OUTPUT.exists():
         raise SystemExit(f"refusing to overwrite pinned TLC sample: {OUTPUT}")
     url = API + "?" + urlencode(QUERY)

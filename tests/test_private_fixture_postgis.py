@@ -18,6 +18,10 @@ import importlib.util
 import json
 import os
 import re
+import shutil
+import subprocess
+import sys
+import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -225,28 +229,47 @@ class MiniFixtureContractTests(unittest.TestCase):
         self.assertTrue(all(item["score"] < best for item in ranking[1:]))  # unambiguous winner
 
     def test_regeneration_is_deterministic(self) -> None:
-        import hashlib
-        import subprocess
-        import sys
+        with tempfile.TemporaryDirectory() as temporary:
+            regenerated = Path(temporary) / MINI.name
+            shutil.copytree(MINI, regenerated, ignore=shutil.ignore_patterns("__pycache__"))
+            result = subprocess.run(
+                [sys.executable, str(regenerated / "gen.py")],
+                capture_output=True,
+                cwd=regenerated,
+                env={**os.environ, "OPENMAPSTACK_SPATIAL_EXTENSION_DIR": os.environ.get("OPENMAPSTACK_SPATIAL_EXTENSION_DIR", "")},
+            )
+            self.assertEqual(result.returncode, 0, result.stderr.decode()[-500:])
+            originals = {path.name for path in MINI.iterdir() if path.is_file() and path.name != "gen.py"}
+            outputs = {path.name for path in regenerated.iterdir() if path.is_file() and path.name != "gen.py"}
+            self.assertEqual(originals, outputs)
+            for name in sorted(originals):
+                if name.endswith(".parquet"):
+                    self.assert_parquet_equal(MINI / name, regenerated / name)
+                else:
+                    self.assertEqual((MINI / name).read_bytes(), (regenerated / name).read_bytes(), name)
 
-        gen = MINI / "gen.py"
+    def assert_parquet_equal(self, expected: Path, actual: Path) -> None:
+        schema = lambda path: self.duck.execute("DESCRIBE SELECT * FROM read_parquet(?)", [str(path)]).fetchall()
+        self.assertEqual(schema(expected), schema(actual), expected.name)
+        for left, right in ((expected, actual), (actual, expected)):
+            differences = self.duck.execute(
+                "SELECT count(*) FROM (SELECT * FROM read_parquet(?) EXCEPT ALL SELECT * FROM read_parquet(?))",
+                [str(left), str(right)],
+            ).fetchone()[0]
+            self.assertEqual(differences, 0, expected.name)
 
-        def digests() -> dict[str, str]:
-            return {
-                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-                for path in sorted(MINI.glob("*"))
-                if path.name not in {"gen.py", "__pycache__"} and path.is_file()
-            }
-
-        before = digests()
-        result = subprocess.run(
-            [sys.executable, str(gen)],
-            capture_output=True,
-            cwd=MINI,
-            env={**os.environ, "OPENMAPSTACK_SPATIAL_EXTENSION_DIR": os.environ.get("OPENMAPSTACK_SPATIAL_EXTENSION_DIR", "")},
-        )
-        self.assertEqual(result.returncode, 0, result.stderr.decode()[-500:])
-        self.assertEqual(before, digests(), "regeneration must be byte-identical (seed 20260917)")
+    def test_parquet_comparison_detects_changed_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            first = Path(temporary) / "first.parquet"
+            second = Path(temporary) / "second.parquet"
+            self.duck.execute("CREATE OR REPLACE TABLE comparison AS SELECT 1 AS id, 'same' AS value")
+            self.duck.execute("COPY comparison TO ? (FORMAT PARQUET)", [str(first)])
+            self.duck.execute("COPY comparison TO ? (FORMAT PARQUET)", [str(second)])
+            self.assert_parquet_equal(first, second)
+            self.duck.execute("UPDATE comparison SET value = 'changed'")
+            self.duck.execute("COPY comparison TO ? (FORMAT PARQUET)", [str(second)])
+            with self.assertRaises(AssertionError):
+                self.assert_parquet_equal(first, second)
 
 
 @unittest.skipUnless(ADMIN_DSN, "OPENMAPSTACK_TEST_PRIVATE_POSTGIS_ADMIN_DSN is not set")

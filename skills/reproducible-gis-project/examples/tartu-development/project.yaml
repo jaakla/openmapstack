@@ -6,7 +6,7 @@ project:
     walking distance to city-owned kindergarten and school), and land-use criteria in Tartu, and show
     them on an interactive map with education POIs and catchment areas.
   created_at: 2026-08-25 08:15:03+03:00
-  updated_at: '2026-09-27T08:37:32.862101+00:00'
+  updated_at: '2026-09-28T20:57:04.069801+00:00'
   status: warning
 interpretation:
   objective: Find cadastral parcels in Tartu satisfying stated land-use, minimum size (>= 2 ha), primary
@@ -41,8 +41,8 @@ sources:
     portal_page: https://geoportaal.maaruum.ee/eng/spatial-data/cadastral-data-p310.html
     access:
       method: http(s) bulk download
-      downloaded_at: '2026-09-27T08:03:01.089251+00:00'
-      retrieved_at: '2026-09-27T08:03:01.089251+00:00'
+      downloaded_at: '2026-09-28T20:55:21.976024+00:00'
+      retrieved_at: '2026-09-28T20:55:21.976024+00:00'
       file:
         archive_name: Tartu_maakond_KATASTER_GPKG.zip
         extracted_file: Tartu_maakond_KATASTER_GPKG.gpkg
@@ -55,9 +55,9 @@ sources:
         extracted to data/source/Tartu_maakond_KATASTER_GPKG.gpkg containing layer ''Tartu maakond'' (79,082
         parcels in EPSG:3301).'
     version:
-      published_at: '2026-09-26'
-      identifier: Tartu_maakond_KATASTER_GPKG (daily snapshot 2026-09-26)
-      etag: e5037f17ed03d006b2c33baa9c7069c4-4
+      published_at: '2026-09-28'
+      identifier: Tartu_maakond_KATASTER_GPKG (daily snapshot 2026-09-28)
+      etag: 2e36bb4d8b2a94996ee668c378f475ed-4
     selection:
       municipality: Tartu linn
       filter: pindala >= 20000 AND siht1 IN ('MAATULUNDUSMAA', 'TOOTMISMAA', 'ARIMAA')
@@ -114,8 +114,8 @@ sources:
     portal_page: https://geoportaal.maaruum.ee/est/ruumiandmed/eesti-topograafia-andmekogu/laadi-etak-andmed-alla-p609.html
     access:
       method: WFS 2.0.0 (GetFeature)
-      downloaded_at: '2026-09-27T08:03:13.228164+00:00'
-      retrieved_at: '2026-09-27T08:03:13.228164+00:00'
+      downloaded_at: '2026-09-28T20:55:37.511054+00:00'
+      retrieved_at: '2026-09-28T20:55:37.511054+00:00'
       file:
         name: etak_main_roads.geojson
         layer_name: etak:e_501_tee_j
@@ -169,8 +169,8 @@ sources:
     portal_page: https://geohub.tartulv.ee/
     access:
       method: ArcGIS REST FeatureServer / GeoJSON
-      downloaded_at: '2026-09-27T08:03:18.027699+00:00'
-      retrieved_at: '2026-09-27T08:03:18.027699+00:00'
+      downloaded_at: '2026-09-28T20:55:42.406623+00:00'
+      retrieved_at: '2026-09-28T20:55:42.406623+00:00'
       file:
         name: tartu_municipal_education.geojson
         table_name: education_pois
@@ -221,8 +221,8 @@ sources:
     portal_page: https://download.geofabrik.de/europe/estonia.html
     access:
       method: http(s) bulk download
-      retrieved_at: '2026-09-27T08:09:16.480163+00:00'
-      downloaded_at: '2026-09-27T08:09:16.480163+00:00'
+      retrieved_at: '2026-09-28T20:56:04.044855+00:00'
+      downloaded_at: '2026-09-28T20:56:04.044855+00:00'
     version:
       identifier: estonia-260901.osm.pbf
       published_at: '2026-09-04'
@@ -755,13 +755,13 @@ runtime:
     osmium: 4.3.1
 runs:
   latest:
-    id: run-20260927-083626
-    started_at: '2026-09-27T08:36:26.120511+00:00'
-    completed_at: '2026-09-27T08:37:32.862101+00:00'
+    id: run-20260928-205521
+    started_at: '2026-09-28T20:55:21.438817+00:00'
+    completed_at: '2026-09-28T20:57:04.069801+00:00'
     status: warning
-    inputs_hash: sha256:9ac813ee6ecf5add7bdc19570bd722013477b4162196c8d9088cc038b82a0490
-    outputs_hash: sha256:e8078991f7400100be862a68fd59a2489e76deb707c8147f4ec33cb8c4618394
+    inputs_hash: sha256:a32c8758adbf5b77c00ee5d5d6b71159a69fd7b7eeb1dc83ecad57fbcf502471
+    outputs_hash: sha256:9a7dc21e8e6ab6efb2d739cdc0f73e25aeca0a6e07db6c60dc22dc1197c3ba22
     record:
-      path: runs/run-20260927-083626.json
+      path: runs/run-20260928-205521.json
     validation_report:
       path: validation/latest-report.json
