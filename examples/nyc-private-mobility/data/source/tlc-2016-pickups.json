@@ -1,0 +1,1699 @@
+{
+  "schema": "northstar-tlc-pickup-coordinate-seed/v1",
+  "source_page": "https://data.cityofnewyork.us/Transportation/2016-Yellow-Taxi-Trip-Data/uacg-pexx",
+  "api_url": "https://data.cityofnewyork.us/resource/uacg-pexx.json?%24select=tpep_pickup_datetime%2Cpickup_longitude%2Cpickup_latitude&%24limit=10000",
+  "retrieved_at": "2026-09-28T11:18:58.202123+00:00",
+  "response_sha256": "sha256:6fb287fb8c5ef8b1e2fffac3fc63a600e3d55bf6da1aed86f3e3f1bed86c12c9",
+  "response_rows": 10000,
+  "selection": "Valid pickup coordinates within pinned H3 study cells; first five by timestamp and coordinate per cell from the bounded API response. This is not a representative or current fleet sample.",
+  "selected_rows": 281,
+  "study_cells": 68,
+  "records": [
+    {
+      "pickup_datetime": "2016-02-01T08:41:20.000",
+      "longitude": -73.95367431640625,
+      "latitude": 40.77512741088867,
+      "h3_cell": "882a100893fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T09:09:42.000",
+      "longitude": -73.95880126953125,
+      "latitude": 40.76905822753906,
+      "h3_cell": "882a100893fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T09:42:22.000",
+      "longitude": -73.96080017089844,
+      "latitude": 40.77503967285156,
+      "h3_cell": "882a100893fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T10:29:36.000",
+      "longitude": -73.95537567138672,
+      "latitude": 40.77359390258789,
+      "h3_cell": "882a100893fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T16:02:38.000",
+      "longitude": -73.95831298828125,
+      "latitude": 40.773590087890625,
+      "h3_cell": "882a100893fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T07:56:58.000",
+      "longitude": -73.96631622314453,
+      "latitude": 40.770652770996094,
+      "h3_cell": "882a100897fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T08:03:26.000",
+      "longitude": -73.9627914428711,
+      "latitude": 40.775428771972656,
+      "h3_cell": "882a100897fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T13:06:11.000",
+      "longitude": -73.96529388427734,
+      "latitude": 40.7718620300293,
+      "h3_cell": "882a100897fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T08:13:33.000",
+      "longitude": -73.96356964111328,
+      "latitude": 40.77521896362305,
+      "h3_cell": "882a100897fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T09:34:47.000",
+      "longitude": -73.9628677368164,
+      "latitude": 40.773155212402344,
+      "h3_cell": "882a100897fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T07:24:47.000",
+      "longitude": -73.9812240600586,
+      "latitude": 40.77102279663086,
+      "h3_cell": "882a1008b3fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T13:24:18.000",
+      "longitude": -73.99073791503906,
+      "latitude": 40.77006149291992,
+      "h3_cell": "882a1008b3fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T18:43:19.000",
+      "longitude": -73.98185729980469,
+      "latitude": 40.77300262451172,
+      "h3_cell": "882a1008b3fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T19:23:44.000",
+      "longitude": -73.98384857177734,
+      "latitude": 40.770591735839844,
+      "h3_cell": "882a1008b3fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T19:50:05.000",
+      "longitude": -73.98612976074219,
+      "latitude": 40.767478942871094,
+      "h3_cell": "882a1008b3fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-18T21:57:30.000",
+      "longitude": -73.95329284667969,
+      "latitude": 40.74504852294922,
+      "h3_cell": "882a100d01fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-25T10:23:38.000",
+      "longitude": -73.95231628417969,
+      "latitude": 40.741519927978516,
+      "h3_cell": "882a100d01fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-29T21:46:43.000",
+      "longitude": -73.95387268066406,
+      "latitude": 40.74345779418945,
+      "h3_cell": "882a100d01fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-15T19:04:02.000",
+      "longitude": -73.95465850830078,
+      "latitude": 40.73225784301758,
+      "h3_cell": "882a100d03fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-18T04:49:21.000",
+      "longitude": -73.95297241210938,
+      "latitude": 40.735321044921875,
+      "h3_cell": "882a100d03fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-26T23:04:02.000",
+      "longitude": -73.95498657226562,
+      "latitude": 40.73418045043945,
+      "h3_cell": "882a100d03fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-11T22:37:46.000",
+      "longitude": -73.9526138305664,
+      "latitude": 40.74706268310547,
+      "h3_cell": "882a100d09fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-26T13:07:42.000",
+      "longitude": -73.9522705078125,
+      "latitude": 40.74924087524414,
+      "h3_cell": "882a100d09fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-06T11:58:12.000",
+      "longitude": -73.95691680908203,
+      "latitude": 40.7479362487793,
+      "h3_cell": "882a100d0dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-10T21:00:00.000",
+      "longitude": -73.94486236572266,
+      "latitude": 40.727294921875,
+      "h3_cell": "882a100d11fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-06T18:20:28.000",
+      "longitude": -73.9573974609375,
+      "latitude": 40.72853469848633,
+      "h3_cell": "882a100d15fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T22:45:13.000",
+      "longitude": -73.95020294189453,
+      "latitude": 40.72795867919922,
+      "h3_cell": "882a100d15fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-12T17:56:19.000",
+      "longitude": -73.95280456542969,
+      "latitude": 40.72716522216797,
+      "h3_cell": "882a100d15fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-12T23:40:31.000",
+      "longitude": -73.9498519897461,
+      "latitude": 40.722259521484375,
+      "h3_cell": "882a100d17fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-20T04:40:30.000",
+      "longitude": -73.95230102539062,
+      "latitude": 40.717140197753906,
+      "h3_cell": "882a100d17fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-21T01:08:16.000",
+      "longitude": -73.95475006103516,
+      "latitude": 40.71868133544922,
+      "h3_cell": "882a100d17fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-21T22:04:36.000",
+      "longitude": -73.95516967773438,
+      "latitude": 40.71818161010742,
+      "h3_cell": "882a100d17fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T00:46:37.000",
+      "longitude": -73.99122619628906,
+      "latitude": 40.73921585083008,
+      "h3_cell": "882a100d21fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T06:50:23.000",
+      "longitude": -73.98594665527344,
+      "latitude": 40.74051284790039,
+      "h3_cell": "882a100d21fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T07:42:07.000",
+      "longitude": -73.9928207397461,
+      "latitude": 40.74284362792969,
+      "h3_cell": "882a100d21fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T09:03:36.000",
+      "longitude": -73.98980712890625,
+      "latitude": 40.74340057373047,
+      "h3_cell": "882a100d21fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T09:40:28.000",
+      "longitude": -73.98464965820312,
+      "latitude": 40.74551010131836,
+      "h3_cell": "882a100d21fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T06:16:34.000",
+      "longitude": -73.98420715332031,
+      "latitude": 40.73291015625,
+      "h3_cell": "882a100d23fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T09:03:37.000",
+      "longitude": -73.98599243164062,
+      "latitude": 40.7347526550293,
+      "h3_cell": "882a100d23fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T17:43:48.000",
+      "longitude": -73.98367309570312,
+      "latitude": 40.73424530029297,
+      "h3_cell": "882a100d23fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T00:39:47.000",
+      "longitude": -73.98957061767578,
+      "latitude": 40.734378814697266,
+      "h3_cell": "882a100d23fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T01:44:51.000",
+      "longitude": -73.98483276367188,
+      "latitude": 40.73671340942383,
+      "h3_cell": "882a100d23fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T01:03:54.000",
+      "longitude": -73.99364471435547,
+      "latitude": 40.74168014526367,
+      "h3_cell": "882a100d25fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T04:34:16.000",
+      "longitude": -73.99354553222656,
+      "latitude": 40.741912841796875,
+      "h3_cell": "882a100d25fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T07:01:16.000",
+      "longitude": -73.99663543701172,
+      "latitude": 40.74277877807617,
+      "h3_cell": "882a100d25fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T07:27:12.000",
+      "longitude": -74.00137329101562,
+      "latitude": 40.74142074584961,
+      "h3_cell": "882a100d25fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T08:55:51.000",
+      "longitude": -73.99385833740234,
+      "latitude": 40.74124526977539,
+      "h3_cell": "882a100d25fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T08:15:35.000",
+      "longitude": -73.99259185791016,
+      "latitude": 40.737308502197266,
+      "h3_cell": "882a100d27fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T08:58:42.000",
+      "longitude": -74.00027465820312,
+      "latitude": 40.73775863647461,
+      "h3_cell": "882a100d27fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T12:39:08.000",
+      "longitude": -73.99254608154297,
+      "latitude": 40.7372932434082,
+      "h3_cell": "882a100d27fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T13:13:29.000",
+      "longitude": -73.99894714355469,
+      "latitude": 40.734493255615234,
+      "h3_cell": "882a100d27fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T16:19:07.000",
+      "longitude": -73.99340057373047,
+      "latitude": 40.73335266113281,
+      "h3_cell": "882a100d27fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T09:38:03.000",
+      "longitude": -73.9829330444336,
+      "latitude": 40.750301361083984,
+      "h3_cell": "882a100d29fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T10:28:44.000",
+      "longitude": -73.97692108154297,
+      "latitude": 40.749088287353516,
+      "h3_cell": "882a100d29fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T11:40:21.000",
+      "longitude": -73.98465728759766,
+      "latitude": 40.7484016418457,
+      "h3_cell": "882a100d29fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T13:26:09.000",
+      "longitude": -73.9781494140625,
+      "latitude": 40.74903869628906,
+      "h3_cell": "882a100d29fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T14:19:12.000",
+      "longitude": -73.98175811767578,
+      "latitude": 40.74930953979492,
+      "h3_cell": "882a100d29fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T04:43:43.000",
+      "longitude": -73.98027801513672,
+      "latitude": 40.73871994018555,
+      "h3_cell": "882a100d2bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T08:30:50.000",
+      "longitude": -73.98158264160156,
+      "latitude": 40.740821838378906,
+      "h3_cell": "882a100d2bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T11:42:59.000",
+      "longitude": -73.98135375976562,
+      "latitude": 40.7410888671875,
+      "h3_cell": "882a100d2bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T15:19:54.000",
+      "longitude": -73.97775268554688,
+      "latitude": 40.737998962402344,
+      "h3_cell": "882a100d2bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T16:31:49.000",
+      "longitude": -73.98017883300781,
+      "latitude": 40.74303436279297,
+      "h3_cell": "882a100d2bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T06:40:53.000",
+      "longitude": -73.99400329589844,
+      "latitude": 40.7517204284668,
+      "h3_cell": "882a100d2dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T08:13:50.000",
+      "longitude": -73.9940185546875,
+      "latitude": 40.75124740600586,
+      "h3_cell": "882a100d2dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T08:57:13.000",
+      "longitude": -73.99176025390625,
+      "latitude": 40.74916458129883,
+      "h3_cell": "882a100d2dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T09:14:48.000",
+      "longitude": -73.99409484863281,
+      "latitude": 40.751182556152344,
+      "h3_cell": "882a100d2dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T09:27:58.000",
+      "longitude": -73.99435424804688,
+      "latitude": 40.750850677490234,
+      "h3_cell": "882a100d2dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T03:53:59.000",
+      "longitude": -73.98040008544922,
+      "latitude": 40.73025894165039,
+      "h3_cell": "882a100d35fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T09:40:11.000",
+      "longitude": -73.9826431274414,
+      "latitude": 40.72417449951172,
+      "h3_cell": "882a100d35fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T18:52:57.000",
+      "longitude": -73.982177734375,
+      "latitude": 40.723819732666016,
+      "h3_cell": "882a100d35fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T22:25:36.000",
+      "longitude": -73.97904205322266,
+      "latitude": 40.72796630859375,
+      "h3_cell": "882a100d35fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T01:36:01.000",
+      "longitude": -73.9830551147461,
+      "latitude": 40.72675704956055,
+      "h3_cell": "882a100d35fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T12:39:15.000",
+      "longitude": -73.97931671142578,
+      "latitude": 40.72023010253906,
+      "h3_cell": "882a100d37fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T15:33:21.000",
+      "longitude": -73.98281860351562,
+      "latitude": 40.7196044921875,
+      "h3_cell": "882a100d37fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T01:49:58.000",
+      "longitude": -73.9853744506836,
+      "latitude": 40.717864990234375,
+      "h3_cell": "882a100d37fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T18:54:58.000",
+      "longitude": -73.98101043701172,
+      "latitude": 40.72121047973633,
+      "h3_cell": "882a100d37fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-08T02:03:12.000",
+      "longitude": -73.98429870605469,
+      "latitude": 40.720489501953125,
+      "h3_cell": "882a100d37fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T02:56:55.000",
+      "longitude": -73.9581298828125,
+      "latitude": 40.7216796875,
+      "h3_cell": "882a100d3bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-15T21:47:00.000",
+      "longitude": -73.96098327636719,
+      "latitude": 40.719051361083984,
+      "h3_cell": "882a100d3bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-18T23:28:14.000",
+      "longitude": -73.96257781982422,
+      "latitude": 40.71950912475586,
+      "h3_cell": "882a100d3bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-20T02:53:38.000",
+      "longitude": -73.95761108398438,
+      "latitude": 40.71798324584961,
+      "h3_cell": "882a100d3bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-25T22:52:05.000",
+      "longitude": -73.96025848388672,
+      "latitude": 40.719730377197266,
+      "h3_cell": "882a100d3bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-04T09:09:16.000",
+      "longitude": -73.9745101928711,
+      "latitude": 40.73310470581055,
+      "h3_cell": "882a100d3dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T01:23:09.000",
+      "longitude": -73.97797393798828,
+      "latitude": 40.7293586730957,
+      "h3_cell": "882a100d3dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-08T06:51:55.000",
+      "longitude": -73.97757720947266,
+      "latitude": 40.72938919067383,
+      "h3_cell": "882a100d3dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-08T11:49:25.000",
+      "longitude": -73.97622680664062,
+      "latitude": 40.733428955078125,
+      "h3_cell": "882a100d3dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-08T17:13:17.000",
+      "longitude": -73.97543334960938,
+      "latitude": 40.73337936401367,
+      "h3_cell": "882a100d3dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-12T00:56:40.000",
+      "longitude": -73.94733428955078,
+      "latitude": 40.76469421386719,
+      "h3_cell": "882a100d41fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-05T19:35:52.000",
+      "longitude": -73.93984985351562,
+      "latitude": 40.75056076049805,
+      "h3_cell": "882a100d43fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T04:45:04.000",
+      "longitude": -73.9422836303711,
+      "latitude": 40.75430679321289,
+      "h3_cell": "882a100d43fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-10T11:42:41.000",
+      "longitude": -73.94559478759766,
+      "latitude": 40.751556396484375,
+      "h3_cell": "882a100d43fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-10T18:19:36.000",
+      "longitude": -73.94171142578125,
+      "latitude": 40.75154113769531,
+      "h3_cell": "882a100d43fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-13T10:40:12.000",
+      "longitude": -73.94550323486328,
+      "latitude": 40.75167465209961,
+      "h3_cell": "882a100d43fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T07:31:10.000",
+      "longitude": -73.95380401611328,
+      "latitude": 40.7669563293457,
+      "h3_cell": "882a100d45fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T08:27:19.000",
+      "longitude": -73.95484924316406,
+      "latitude": 40.766151428222656,
+      "h3_cell": "882a100d45fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T10:08:21.000",
+      "longitude": -73.95755767822266,
+      "latitude": 40.765743255615234,
+      "h3_cell": "882a100d45fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T11:54:46.000",
+      "longitude": -73.95524597167969,
+      "latitude": 40.76495361328125,
+      "h3_cell": "882a100d45fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T12:40:57.000",
+      "longitude": -73.95582580566406,
+      "latitude": 40.76408004760742,
+      "h3_cell": "882a100d45fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-15T04:31:16.000",
+      "longitude": -73.93717956542969,
+      "latitude": 40.76473617553711,
+      "h3_cell": "882a100d49fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-16T21:17:12.000",
+      "longitude": -73.93695831298828,
+      "latitude": 40.76448059082031,
+      "h3_cell": "882a100d49fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-21T10:26:10.000",
+      "longitude": -73.93250274658203,
+      "latitude": 40.764549255371094,
+      "h3_cell": "882a100d49fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-04T06:50:06.000",
+      "longitude": -73.93038177490234,
+      "latitude": 40.76142120361328,
+      "h3_cell": "882a100d4bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-11T15:20:20.000",
+      "longitude": -73.93661499023438,
+      "latitude": 40.75995635986328,
+      "h3_cell": "882a100d4bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-18T10:27:03.000",
+      "longitude": -73.93409729003906,
+      "latitude": 40.762779235839844,
+      "h3_cell": "882a100d4bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-19T07:38:43.000",
+      "longitude": -73.93049621582031,
+      "latitude": 40.75553512573242,
+      "h3_cell": "882a100d4bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T07:17:05.000",
+      "longitude": -73.92317199707031,
+      "latitude": 40.7438850402832,
+      "h3_cell": "882a100d51fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-11T06:07:57.000",
+      "longitude": -73.92601776123047,
+      "latitude": 40.74424743652344,
+      "h3_cell": "882a100d51fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-26T08:48:37.000",
+      "longitude": -73.92423248291016,
+      "latitude": 40.74398422241211,
+      "h3_cell": "882a100d51fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-27T17:03:04.000",
+      "longitude": -73.92469024658203,
+      "latitude": 40.74404525756836,
+      "h3_cell": "882a100d51fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T15:13:06.000",
+      "longitude": -73.93769836425781,
+      "latitude": 40.748924255371094,
+      "h3_cell": "882a100d55fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T16:39:24.000",
+      "longitude": -73.93684387207031,
+      "latitude": 40.74858474731445,
+      "h3_cell": "882a100d55fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-14T09:22:51.000",
+      "longitude": -73.93717193603516,
+      "latitude": 40.74882125854492,
+      "h3_cell": "882a100d55fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-26T05:24:43.000",
+      "longitude": -73.94123077392578,
+      "latitude": 40.748985290527344,
+      "h3_cell": "882a100d55fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-17T10:04:18.000",
+      "longitude": -73.91786193847656,
+      "latitude": 40.74650573730469,
+      "h3_cell": "882a100d59fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-13T08:52:54.000",
+      "longitude": -73.91845703125,
+      "latitude": 40.74332046508789,
+      "h3_cell": "882a100d5bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-14T16:21:05.000",
+      "longitude": -73.92028045654297,
+      "latitude": 40.74361038208008,
+      "h3_cell": "882a100d5bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-28T09:05:08.000",
+      "longitude": -73.91850280761719,
+      "latitude": 40.744293212890625,
+      "h3_cell": "882a100d5bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T15:24:17.000",
+      "longitude": -73.92984771728516,
+      "latitude": 40.75209045410156,
+      "h3_cell": "882a100d5dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-28T04:52:53.000",
+      "longitude": -73.92898559570312,
+      "latitude": 40.75373458862305,
+      "h3_cell": "882a100d5dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T05:39:42.000",
+      "longitude": -73.9765853881836,
+      "latitude": 40.76385498046875,
+      "h3_cell": "882a100d61fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T08:46:23.000",
+      "longitude": -73.9738540649414,
+      "latitude": 40.75984191894531,
+      "h3_cell": "882a100d61fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T12:05:27.000",
+      "longitude": -73.97709655761719,
+      "latitude": 40.76396942138672,
+      "h3_cell": "882a100d61fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T16:14:19.000",
+      "longitude": -73.97186279296875,
+      "latitude": 40.76292419433594,
+      "h3_cell": "882a100d61fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T19:06:42.000",
+      "longitude": -73.96965026855469,
+      "latitude": 40.761192321777344,
+      "h3_cell": "882a100d61fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T08:20:57.000",
+      "longitude": -73.96610260009766,
+      "latitude": 40.75389099121094,
+      "h3_cell": "882a100d63fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T13:45:16.000",
+      "longitude": -73.97570037841797,
+      "latitude": 40.75496292114258,
+      "h3_cell": "882a100d63fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T14:28:24.000",
+      "longitude": -73.97508239746094,
+      "latitude": 40.75608825683594,
+      "h3_cell": "882a100d63fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T19:27:45.000",
+      "longitude": -73.97563934326172,
+      "latitude": 40.75178146362305,
+      "h3_cell": "882a100d63fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T20:51:06.000",
+      "longitude": -73.97138977050781,
+      "latitude": 40.750431060791016,
+      "h3_cell": "882a100d63fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T00:51:30.000",
+      "longitude": -73.98428344726562,
+      "latitude": 40.7607536315918,
+      "h3_cell": "882a100d65fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T06:25:29.000",
+      "longitude": -73.98329162597656,
+      "latitude": 40.76647186279297,
+      "h3_cell": "882a100d65fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T07:32:22.000",
+      "longitude": -73.9878921508789,
+      "latitude": 40.76481246948242,
+      "h3_cell": "882a100d65fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T08:20:49.000",
+      "longitude": -73.98583984375,
+      "latitude": 40.7598876953125,
+      "h3_cell": "882a100d65fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T08:31:33.000",
+      "longitude": -73.98235321044922,
+      "latitude": 40.76422119140625,
+      "h3_cell": "882a100d65fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T03:04:56.000",
+      "longitude": -73.98153686523438,
+      "latitude": 40.75904846191406,
+      "h3_cell": "882a100d67fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T11:03:46.000",
+      "longitude": -73.97856140136719,
+      "latitude": 40.752323150634766,
+      "h3_cell": "882a100d67fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T13:31:10.000",
+      "longitude": -73.97865295410156,
+      "latitude": 40.75663757324219,
+      "h3_cell": "882a100d67fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T13:32:54.000",
+      "longitude": -73.98423767089844,
+      "latitude": 40.75486373901367,
+      "h3_cell": "882a100d67fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T16:00:56.000",
+      "longitude": -73.9780502319336,
+      "latitude": 40.75739288330078,
+      "h3_cell": "882a100d67fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T07:51:50.000",
+      "longitude": -73.96661376953125,
+      "latitude": 40.765708923339844,
+      "h3_cell": "882a100d69fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T08:36:51.000",
+      "longitude": -73.9640884399414,
+      "latitude": 40.76548385620117,
+      "h3_cell": "882a100d69fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T10:52:32.000",
+      "longitude": -73.96739196777344,
+      "latitude": 40.76682662963867,
+      "h3_cell": "882a100d69fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T14:10:26.000",
+      "longitude": -73.96089935302734,
+      "latitude": 40.76582336425781,
+      "h3_cell": "882a100d69fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T14:28:25.000",
+      "longitude": -73.96471405029297,
+      "latitude": 40.76966857910156,
+      "h3_cell": "882a100d69fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T08:21:16.000",
+      "longitude": -73.96369171142578,
+      "latitude": 40.75737762451172,
+      "h3_cell": "882a100d6bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T13:34:19.000",
+      "longitude": -73.95870971679688,
+      "latitude": 40.76006317138672,
+      "h3_cell": "882a100d6bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T13:58:16.000",
+      "longitude": -73.96312713623047,
+      "latitude": 40.76249313354492,
+      "h3_cell": "882a100d6bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T17:09:21.000",
+      "longitude": -73.96585083007812,
+      "latitude": 40.75844955444336,
+      "h3_cell": "882a100d6bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T18:00:43.000",
+      "longitude": -73.9610595703125,
+      "latitude": 40.76039123535156,
+      "h3_cell": "882a100d6bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T07:47:15.000",
+      "longitude": -73.97936248779297,
+      "latitude": 40.76655960083008,
+      "h3_cell": "882a100d6dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T07:26:23.000",
+      "longitude": -73.97882843017578,
+      "latitude": 40.765380859375,
+      "h3_cell": "882a100d6dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T10:21:02.000",
+      "longitude": -73.9783706665039,
+      "latitude": 40.76673126220703,
+      "h3_cell": "882a100d6dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T13:45:50.000",
+      "longitude": -73.97846221923828,
+      "latitude": 40.76651382446289,
+      "h3_cell": "882a100d6dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T17:04:23.000",
+      "longitude": -73.98013305664062,
+      "latitude": 40.77054977416992,
+      "h3_cell": "882a100d6dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-04T02:26:22.000",
+      "longitude": -73.93948364257812,
+      "latitude": 40.706031799316406,
+      "h3_cell": "882a100dc5fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-15T23:55:45.000",
+      "longitude": -73.93830871582031,
+      "latitude": 40.712581634521484,
+      "h3_cell": "882a100dc5fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-26T03:10:54.000",
+      "longitude": -73.93975067138672,
+      "latitude": 40.707401275634766,
+      "h3_cell": "882a100dc5fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T00:23:17.000",
+      "longitude": -73.93260955810547,
+      "latitude": 40.70322036743164,
+      "h3_cell": "882a100dc7fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-13T22:29:07.000",
+      "longitude": -73.93412017822266,
+      "latitude": 40.69844436645508,
+      "h3_cell": "882a100dc7fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-19T03:55:46.000",
+      "longitude": -73.93209838867188,
+      "latitude": 40.697391510009766,
+      "h3_cell": "882a100dc7fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-20T01:51:25.000",
+      "longitude": -73.93985748291016,
+      "latitude": 40.701175689697266,
+      "h3_cell": "882a100dc7fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-21T05:58:20.000",
+      "longitude": -73.93553161621094,
+      "latitude": 40.69689178466797,
+      "h3_cell": "882a100dc7fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T03:04:10.000",
+      "longitude": -73.95797729492188,
+      "latitude": 40.708534240722656,
+      "h3_cell": "882a100de1fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-05T00:54:29.000",
+      "longitude": -73.9549331665039,
+      "latitude": 40.70750045776367,
+      "h3_cell": "882a100de1fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-08T22:49:51.000",
+      "longitude": -73.95391845703125,
+      "latitude": 40.707096099853516,
+      "h3_cell": "882a100de1fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-10T23:58:53.000",
+      "longitude": -73.95626068115234,
+      "latitude": 40.70789337158203,
+      "h3_cell": "882a100de1fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-21T01:28:17.000",
+      "longitude": -73.95909881591797,
+      "latitude": 40.70906448364258,
+      "h3_cell": "882a100de1fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-15T02:10:46.000",
+      "longitude": -73.96356964111328,
+      "latitude": 40.710330963134766,
+      "h3_cell": "882a100de5fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-18T22:23:13.000",
+      "longitude": -73.9623031616211,
+      "latitude": 40.709938049316406,
+      "h3_cell": "882a100de5fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T21:00:26.000",
+      "longitude": -73.96171569824219,
+      "latitude": 40.698612213134766,
+      "h3_cell": "882a100de7fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-14T22:12:40.000",
+      "longitude": -73.944580078125,
+      "latitude": 40.71445083618164,
+      "h3_cell": "882a100de9fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-15T00:41:41.000",
+      "longitude": -73.94402313232422,
+      "latitude": 40.71168518066406,
+      "h3_cell": "882a100de9fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-15T12:19:08.000",
+      "longitude": -73.94532012939453,
+      "latitude": 40.70943832397461,
+      "h3_cell": "882a100de9fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-18T01:26:47.000",
+      "longitude": -73.9446792602539,
+      "latitude": 40.711578369140625,
+      "h3_cell": "882a100de9fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-20T01:38:29.000",
+      "longitude": -73.947509765625,
+      "latitude": 40.711238861083984,
+      "h3_cell": "882a100de9fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-24T08:01:53.000",
+      "longitude": -73.94218444824219,
+      "latitude": 40.700828552246094,
+      "h3_cell": "882a100debfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T00:56:00.000",
+      "longitude": -73.95668029785156,
+      "latitude": 40.716796875,
+      "h3_cell": "882a100dedfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T13:37:08.000",
+      "longitude": -73.95893859863281,
+      "latitude": 40.71494674682617,
+      "h3_cell": "882a100dedfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T23:25:48.000",
+      "longitude": -73.96055603027344,
+      "latitude": 40.71522903442383,
+      "h3_cell": "882a100dedfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-09T23:36:05.000",
+      "longitude": -73.9529037475586,
+      "latitude": 40.713897705078125,
+      "h3_cell": "882a100dedfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-12T05:38:16.000",
+      "longitude": -73.95978546142578,
+      "latitude": 40.71096420288086,
+      "h3_cell": "882a100dedfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-11T23:32:21.000",
+      "longitude": -73.92544555664062,
+      "latitude": 40.76885223388672,
+      "h3_cell": "882a100f23fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-16T06:04:37.000",
+      "longitude": -73.93048858642578,
+      "latitude": 40.77021026611328,
+      "h3_cell": "882a100f23fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-16T08:17:38.000",
+      "longitude": -73.92863464355469,
+      "latitude": 40.769039154052734,
+      "h3_cell": "882a100f23fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-17T13:09:29.000",
+      "longitude": -73.93048095703125,
+      "latitude": 40.771141052246094,
+      "h3_cell": "882a100f23fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-19T06:53:32.000",
+      "longitude": -73.92073059082031,
+      "latitude": 40.77306365966797,
+      "h3_cell": "882a100f23fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T23:06:37.000",
+      "longitude": -73.91473388671875,
+      "latitude": 40.76380157470703,
+      "h3_cell": "882a100f31fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-08T22:54:07.000",
+      "longitude": -73.91413879394531,
+      "latitude": 40.76486587524414,
+      "h3_cell": "882a100f31fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-13T03:51:39.000",
+      "longitude": -73.91416931152344,
+      "latitude": 40.76493453979492,
+      "h3_cell": "882a100f31fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-18T15:18:22.000",
+      "longitude": -73.91039276123047,
+      "latitude": 40.76393508911133,
+      "h3_cell": "882a100f31fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-27T01:44:01.000",
+      "longitude": -73.91726684570312,
+      "latitude": 40.76119613647461,
+      "h3_cell": "882a100f31fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-08T13:41:09.000",
+      "longitude": -73.91255950927734,
+      "latitude": 40.75617980957031,
+      "h3_cell": "882a100f33fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T19:50:35.000",
+      "longitude": -73.92652130126953,
+      "latitude": 40.76567459106445,
+      "h3_cell": "882a100f35fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T01:13:12.000",
+      "longitude": -73.92552947998047,
+      "latitude": 40.761837005615234,
+      "h3_cell": "882a100f35fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T01:15:21.000",
+      "longitude": -73.92400360107422,
+      "latitude": 40.76361846923828,
+      "h3_cell": "882a100f35fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-04T08:12:17.000",
+      "longitude": -73.92814636230469,
+      "latitude": 40.76365280151367,
+      "h3_cell": "882a100f35fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-06T05:23:22.000",
+      "longitude": -73.92671966552734,
+      "latitude": 40.76521301269531,
+      "h3_cell": "882a100f35fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-14T11:36:04.000",
+      "longitude": -73.9193115234375,
+      "latitude": 40.759159088134766,
+      "h3_cell": "882a100f37fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-20T08:57:09.000",
+      "longitude": -73.9216537475586,
+      "latitude": 40.76024627685547,
+      "h3_cell": "882a100f37fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-27T14:36:22.000",
+      "longitude": -73.9220962524414,
+      "latitude": 40.75518035888672,
+      "h3_cell": "882a100f37fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T12:48:35.000",
+      "longitude": -73.91796112060547,
+      "latitude": 40.771400451660156,
+      "h3_cell": "882a100f3dfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T14:30:13.000",
+      "longitude": -74.00484466552734,
+      "latitude": 40.74814224243164,
+      "h3_cell": "882a107219fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T11:15:47.000",
+      "longitude": -74.00640869140625,
+      "latitude": 40.74464416503906,
+      "h3_cell": "882a107219fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T20:08:49.000",
+      "longitude": -74.00413513183594,
+      "latitude": 40.747703552246094,
+      "h3_cell": "882a107219fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T21:21:37.000",
+      "longitude": -74.0075912475586,
+      "latitude": 40.74290084838867,
+      "h3_cell": "882a107219fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T03:08:44.000",
+      "longitude": -74.006591796875,
+      "latitude": 40.744117736816406,
+      "h3_cell": "882a107219fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T07:31:47.000",
+      "longitude": -74.00550079345703,
+      "latitude": 40.74105453491211,
+      "h3_cell": "882a10721bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T10:03:46.000",
+      "longitude": -74.00557708740234,
+      "latitude": 40.736873626708984,
+      "h3_cell": "882a10721bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T18:04:54.000",
+      "longitude": -74.0083236694336,
+      "latitude": 40.737815856933594,
+      "h3_cell": "882a10721bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T23:58:24.000",
+      "longitude": -74.00471496582031,
+      "latitude": 40.74178695678711,
+      "h3_cell": "882a10721bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T07:42:32.000",
+      "longitude": -74.00824737548828,
+      "latitude": 40.7387580871582,
+      "h3_cell": "882a10721bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T19:03:59.000",
+      "longitude": -73.99844360351562,
+      "latitude": 40.760948181152344,
+      "h3_cell": "882a107251fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T19:37:48.000",
+      "longitude": -74.00297546386719,
+      "latitude": 40.7605094909668,
+      "h3_cell": "882a107251fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T09:17:42.000",
+      "longitude": -74.00286102294922,
+      "latitude": 40.76047134399414,
+      "h3_cell": "882a107251fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T10:32:13.000",
+      "longitude": -73.99803924560547,
+      "latitude": 40.76075744628906,
+      "h3_cell": "882a107251fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T13:44:27.000",
+      "longitude": -74.00074005126953,
+      "latitude": 40.757755279541016,
+      "h3_cell": "882a107251fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T00:36:40.000",
+      "longitude": -74.00235748291016,
+      "latitude": 40.75049591064453,
+      "h3_cell": "882a107253fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T09:40:13.000",
+      "longitude": -74.00297546386719,
+      "latitude": 40.74819564819336,
+      "h3_cell": "882a107253fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T12:38:32.000",
+      "longitude": -74.00648498535156,
+      "latitude": 40.75127410888672,
+      "h3_cell": "882a107253fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T15:51:43.000",
+      "longitude": -73.99990844726562,
+      "latitude": 40.75431442260742,
+      "h3_cell": "882a107253fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T22:29:31.000",
+      "longitude": -74.00353240966797,
+      "latitude": 40.748409271240234,
+      "h3_cell": "882a107253fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T17:11:16.000",
+      "longitude": -73.9955825805664,
+      "latitude": 40.76450729370117,
+      "h3_cell": "882a107259fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T17:48:17.000",
+      "longitude": -73.99329376220703,
+      "latitude": 40.76262664794922,
+      "h3_cell": "882a107259fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T20:10:57.000",
+      "longitude": -73.99552154541016,
+      "latitude": 40.764408111572266,
+      "h3_cell": "882a107259fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T15:12:21.000",
+      "longitude": -73.99687194824219,
+      "latitude": 40.762916564941406,
+      "h3_cell": "882a107259fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T17:59:51.000",
+      "longitude": -73.99394989013672,
+      "latitude": 40.76696014404297,
+      "h3_cell": "882a107259fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T05:30:22.000",
+      "longitude": -73.99007415771484,
+      "latitude": 40.75706100463867,
+      "h3_cell": "882a10725bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T07:00:47.000",
+      "longitude": -73.99759674072266,
+      "latitude": 40.75672912597656,
+      "h3_cell": "882a10725bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T07:57:53.000",
+      "longitude": -73.9900894165039,
+      "latitude": 40.75664138793945,
+      "h3_cell": "882a10725bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T10:02:33.000",
+      "longitude": -73.98969268798828,
+      "latitude": 40.757118225097656,
+      "h3_cell": "882a10725bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T11:49:11.000",
+      "longitude": -73.9892578125,
+      "latitude": 40.758758544921875,
+      "h3_cell": "882a10725bfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T00:32:14.000",
+      "longitude": -74.01454162597656,
+      "latitude": 40.70473098754883,
+      "h3_cell": "882a107281fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T19:52:38.000",
+      "longitude": -74.01252746582031,
+      "latitude": 40.702598571777344,
+      "h3_cell": "882a107281fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T05:57:58.000",
+      "longitude": -74.01207733154297,
+      "latitude": 40.701416015625,
+      "h3_cell": "882a107281fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T11:50:52.000",
+      "longitude": -74.01275634765625,
+      "latitude": 40.702430725097656,
+      "h3_cell": "882a107281fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T19:12:39.000",
+      "longitude": -74.01276397705078,
+      "latitude": 40.70686721801758,
+      "h3_cell": "882a107281fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T21:29:26.000",
+      "longitude": -74.00992584228516,
+      "latitude": 40.71269226074219,
+      "h3_cell": "882a107289fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T23:50:16.000",
+      "longitude": -74.00912475585938,
+      "latitude": 40.710777282714844,
+      "h3_cell": "882a107289fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T00:08:53.000",
+      "longitude": -74.00930786132812,
+      "latitude": 40.711002349853516,
+      "h3_cell": "882a107289fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T06:56:02.000",
+      "longitude": -74.00959777832031,
+      "latitude": 40.70656967163086,
+      "h3_cell": "882a107289fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T08:09:33.000",
+      "longitude": -74.01058197021484,
+      "latitude": 40.70896530151367,
+      "h3_cell": "882a107289fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T00:02:25.000",
+      "longitude": -73.99824523925781,
+      "latitude": 40.722965240478516,
+      "h3_cell": "882a1072c1fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T03:49:42.000",
+      "longitude": -74.00447082519531,
+      "latitude": 40.721229553222656,
+      "h3_cell": "882a1072c1fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T16:00:39.000",
+      "longitude": -74.00347900390625,
+      "latitude": 40.72053909301758,
+      "h3_cell": "882a1072c1fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T16:50:28.000",
+      "longitude": -74.00575256347656,
+      "latitude": 40.72529983520508,
+      "h3_cell": "882a1072c1fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T19:10:09.000",
+      "longitude": -73.9963607788086,
+      "latitude": 40.7238883972168,
+      "h3_cell": "882a1072c1fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T19:53:47.000",
+      "longitude": -73.99779510498047,
+      "latitude": 40.71693801879883,
+      "h3_cell": "882a1072c3fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-04T23:53:04.000",
+      "longitude": -74.00064086914062,
+      "latitude": 40.71841049194336,
+      "h3_cell": "882a1072c3fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-05T02:39:14.000",
+      "longitude": -74.00119018554688,
+      "latitude": 40.71773147583008,
+      "h3_cell": "882a1072c3fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-05T15:18:27.000",
+      "longitude": -73.99669647216797,
+      "latitude": 40.71480178833008,
+      "h3_cell": "882a1072c3fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-05T21:49:12.000",
+      "longitude": -73.99856567382812,
+      "latitude": 40.71702575683594,
+      "h3_cell": "882a1072c3fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T17:15:45.000",
+      "longitude": -74.005859375,
+      "latitude": 40.71767807006836,
+      "h3_cell": "882a1072c7fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T19:11:41.000",
+      "longitude": -74.008056640625,
+      "latitude": 40.7148551940918,
+      "h3_cell": "882a1072c7fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T20:55:32.000",
+      "longitude": -74.00856018066406,
+      "latitude": 40.719970703125,
+      "h3_cell": "882a1072c7fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T22:25:28.000",
+      "longitude": -74.00991821289062,
+      "latitude": 40.72121810913086,
+      "h3_cell": "882a1072c7fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T09:51:26.000",
+      "longitude": -74.0117416381836,
+      "latitude": 40.71450424194336,
+      "h3_cell": "882a1072c7fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T00:30:19.000",
+      "longitude": -73.99919891357422,
+      "latitude": 40.72798538208008,
+      "h3_cell": "882a1072c9fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T05:46:20.000",
+      "longitude": -73.9942398071289,
+      "latitude": 40.72843551635742,
+      "h3_cell": "882a1072c9fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T06:50:31.000",
+      "longitude": -73.99420928955078,
+      "latitude": 40.724769592285156,
+      "h3_cell": "882a1072c9fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T09:38:17.000",
+      "longitude": -73.99596405029297,
+      "latitude": 40.72541427612305,
+      "h3_cell": "882a1072c9fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T11:57:46.000",
+      "longitude": -73.99565887451172,
+      "latitude": 40.72513961791992,
+      "h3_cell": "882a1072c9fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T14:41:46.000",
+      "longitude": -73.98764038085938,
+      "latitude": 40.72173309326172,
+      "h3_cell": "882a1072cbfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T00:25:33.000",
+      "longitude": -73.9883804321289,
+      "latitude": 40.718448638916016,
+      "h3_cell": "882a1072cbfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T04:47:03.000",
+      "longitude": -73.98639678955078,
+      "latitude": 40.7224006652832,
+      "h3_cell": "882a1072cbfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T12:00:22.000",
+      "longitude": -73.98948669433594,
+      "latitude": 40.72057342529297,
+      "h3_cell": "882a1072cbfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T00:02:34.000",
+      "longitude": -73.98619079589844,
+      "latitude": 40.722476959228516,
+      "h3_cell": "882a1072cbfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T00:10:59.000",
+      "longitude": -74.00000762939453,
+      "latitude": 40.728431701660156,
+      "h3_cell": "882a1072cdfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T01:33:29.000",
+      "longitude": -74.00086212158203,
+      "latitude": 40.731685638427734,
+      "h3_cell": "882a1072cdfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T22:24:00.000",
+      "longitude": -74.00196838378906,
+      "latitude": 40.729488372802734,
+      "h3_cell": "882a1072cdfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-01T23:20:56.000",
+      "longitude": -74.00287628173828,
+      "latitude": 40.72819900512695,
+      "h3_cell": "882a1072cdfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-02T13:04:30.000",
+      "longitude": -74.00680541992188,
+      "latitude": 40.73045349121094,
+      "h3_cell": "882a1072cdfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-03T06:48:12.000",
+      "longitude": -73.98950958251953,
+      "latitude": 40.70183181762695,
+      "h3_cell": "882a1072d1fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-06T18:42:29.000",
+      "longitude": -73.98680114746094,
+      "latitude": 40.70158004760742,
+      "h3_cell": "882a1072d1fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T16:30:37.000",
+      "longitude": -73.98989868164062,
+      "latitude": 40.70578384399414,
+      "h3_cell": "882a1072d1fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-21T19:22:20.000",
+      "longitude": -73.9881820678711,
+      "latitude": 40.700687408447266,
+      "h3_cell": "882a1072d1fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-22T11:30:26.000",
+      "longitude": -73.9894027709961,
+      "latitude": 40.702449798583984,
+      "h3_cell": "882a1072d1fffff"
+    },
+    {
+      "pickup_datetime": "2016-02-04T09:35:03.000",
+      "longitude": -73.99239349365234,
+      "latitude": 40.713382720947266,
+      "h3_cell": "882a1072ddfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-05T07:22:25.000",
+      "longitude": -73.9932632446289,
+      "latitude": 40.71392059326172,
+      "h3_cell": "882a1072ddfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T03:11:38.000",
+      "longitude": -73.99315643310547,
+      "latitude": 40.71527862548828,
+      "h3_cell": "882a1072ddfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T03:46:04.000",
+      "longitude": -73.99291229248047,
+      "latitude": 40.71384048461914,
+      "h3_cell": "882a1072ddfffff"
+    },
+    {
+      "pickup_datetime": "2016-02-07T04:41:47.000",
+      "longitude": -73.98992919921875,
+      "latitude": 40.715328216552734,
+      "h3_cell": "882a1072ddfffff"
+    }
+  ]
+}

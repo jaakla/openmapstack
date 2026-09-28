@@ -16,9 +16,15 @@
 --   python provision.py motherduck
 --
 -- taxi_zone_id is the same stable join key the PostGIS and BigQuery fixtures
--- use (zones 101..160); geometry is EPSG:4326 throughout.
+-- use (zones 101..183); geometry is EPSG:4326 throughout.
 
 CREATE SCHEMA IF NOT EXISTS market;
+
+CREATE TABLE IF NOT EXISTS market.fixture_zones (
+    zone_id INTEGER PRIMARY KEY, h3_cell VARCHAR UNIQUE NOT NULL,
+    borough VARCHAR, zone_name VARCHAR, zone_source VARCHAR,
+    geom GEOMETRY, latitude DOUBLE, longitude DOUBLE
+);
 
 -- Per-zone market attractiveness. Public-origin inputs (POI density,
 -- transit access) combined with Northstar's own competitor intelligence.

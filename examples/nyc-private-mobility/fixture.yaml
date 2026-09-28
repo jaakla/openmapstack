@@ -1,5 +1,7 @@
-# Northstar Mobility private-database fixture: what provision.py creates,
-# and what actually enforces each restriction.
+# Northstar Mobility private-database fixture: what provision.py can create,
+# and what actually enforces each restriction. The active analysis pins live
+# reader captures in project.yaml; its older BigQuery/MotherDuck source tables
+# retain legacy source-zone IDs and are spatially attributed to PostGIS H3.
 #
 # This file is documentation with a schema, not an input to the pipeline. It
 # exists so a reviewer can see, in one place, which parts of the security
@@ -13,11 +15,20 @@
 schema: openmapstack-private-fixture/v1
 name: northstar-mobility-nyc
 seed: "20260917"
+profile: h3-r8-v1
+h3_resolution: 8
+catalogue: setup/h3/cells.json
+active_capture:
+  path: data/source/live-20260928-tlc-v1
+  record: data/source/live-20260928-tlc-v1/capture-records.json
+  public_coordinate_seed: data/source/tlc-2016-pickups.json
+  security_evidence: reader-visible captures; backend permissions require separate provision.py verify
 tenant_under_analysis: alpha
 other_tenants: [beta, gamma]
 join_keys:
   tenant_id: drives every row-level restriction
-  taxi_zone_id: stable integer key (101..160) shared by all three backends
+  h3_cell: canonical resolution-8 cell identity in PostGIS and derived outputs
+  taxi_zone_id: PostGIS compatibility integer alias (101..183); legacy BigQuery and MotherDuck zone IDs are separate
 
 identities:
   provisioning:
@@ -32,12 +43,12 @@ identities:
 backends:
   postgis:
     database: northstar_ops
-    setup: setup/postgis/{schema,seed,security}.sql
+    setup: setup/postgis/{schema,zones,seed,security}.sql
     reader: oms_alpha_reader
     relations:
-      - {name: ops.taxi_zones, origin: public, visibility: full}
+      - {name: ops.taxi_zones, origin: h3_reference, visibility: full}
       - {name: ops.hubs, origin: private, visibility: tenant_alpha_rows}
-      - {name: ops.fleet_positions, origin: private, visibility: tenant_alpha_rows}
+      - {name: ops.fleet_positions, origin: synthetic_private_with_pinned_public_tlc_location_seed, visibility: tenant_alpha_rows}
       - {name: ops.service_areas, origin: private, visibility: tenant_alpha_rows}
       - {name: ops.customer_accounts, origin: private, visibility: tenant_alpha_rows_permitted_columns}
       - {name: hr.driver_private, origin: private, visibility: none}
@@ -49,9 +60,9 @@ backends:
   bigquery:
     project: env OMS_DEMO_BIGQUERY_PROJECT
     datasets: {analysis: northstar_analytics, restricted: northstar_analytics_restricted}
-    setup: setup/bigquery/{schema,seed,security}.sql
+    setup: setup/bigquery/{schema,zones,seed,security}.sql
     relations:
-      - {name: taxi_zones, origin: public, visibility: full}
+      - {name: taxi_zones, origin: h3_reference, visibility: full}
       - {name: trip_events, origin: mixed, visibility: tenant_alpha_rows}
       - {name: zone_daily_demand, origin: mixed, visibility: tenant_alpha_rows}
       - {name: vehicle_daily_metrics, origin: private, visibility: tenant_alpha_rows}
@@ -78,7 +89,7 @@ backends:
 
   motherduck:
     database: northstar_market
-    setup: setup/motherduck/{schema,seed,security}.sql
+    setup: setup/motherduck/{schema,zones,seed,security}.sql
     relations:
       - {name: market.zone_market_scores, origin: mixed, visibility: full}
       - {name: market.relevant_pois, origin: mixed, visibility: full}

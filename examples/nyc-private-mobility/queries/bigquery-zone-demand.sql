@@ -19,11 +19,14 @@
 
 SELECT
     taxi_zone_id,
+    z.h3_cell,
     SUM(trips) AS trips_total,
     MAX(trips) AS trips_peak_day,
     ROUND(AVG(trips), 3) AS trips_mean_day,
     ROUND(COALESCE(STDDEV_SAMP(trips), 0), 3) AS trips_stddev_day,
     COUNT(DISTINCT demand_date) AS active_days,
     ROUND(AVG(mean_trip_km), 3) AS mean_trip_km
-FROM northstar_analytics.zone_daily_demand
-GROUP BY taxi_zone_id
+FROM northstar_analytics.zone_daily_demand AS demand
+JOIN northstar_analytics.taxi_zones AS z ON z.zone_id = demand.taxi_zone_id
+GROUP BY taxi_zone_id, z.h3_cell
+ORDER BY taxi_zone_id

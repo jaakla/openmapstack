@@ -4,6 +4,7 @@
 
 SELECT
     zone_id,
+    h3_cell,
     borough,
     zone_name,
     zone_source,

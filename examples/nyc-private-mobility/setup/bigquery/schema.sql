@@ -12,7 +12,7 @@
 --   :restricted_dataset  -- never granted to the reader, at all
 --
 -- Tables carry a default expiry so an abandoned demo fixture ages out instead
--- of billing indefinitely. taxi_zone_id (101..160) is the same stable join key
+-- of billing indefinitely. taxi_zone_id (101..183) is the same stable join key
 -- the PostGIS and MotherDuck fixtures use; GEOGRAPHY is WGS84 by definition.
 
 CREATE SCHEMA IF NOT EXISTS `:project`.`:dataset`
@@ -38,12 +38,19 @@ OPTIONS (
 -- withholds that estimate for any table under a row access policy.
 CREATE TABLE IF NOT EXISTS `:project`.`:dataset`.taxi_zones (
     zone_id     INT64 NOT NULL,
+    h3_cell STRING NOT NULL,
+    latitude FLOAT64 NOT NULL,
+    longitude FLOAT64 NOT NULL,
     borough     STRING NOT NULL,
     zone_name   STRING NOT NULL,
     zone_source STRING NOT NULL,
     zone_area   GEOGRAPHY NOT NULL
 )
 OPTIONS (description = 'Public-origin zone reference geometry; no tenant, no row access policy.');
+
+ALTER TABLE `:project`.`:dataset`.taxi_zones ADD COLUMN IF NOT EXISTS h3_cell STRING;
+ALTER TABLE `:project`.`:dataset`.taxi_zones ADD COLUMN IF NOT EXISTS latitude FLOAT64;
+ALTER TABLE `:project`.`:dataset`.taxi_zones ADD COLUMN IF NOT EXISTS longitude FLOAT64;
 
 -- Historical trips. internal_cost and rider_reference are the protected
 -- columns: the analysis must never publish them, and column-level security

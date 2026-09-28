@@ -57,7 +57,7 @@ def _load_provision():
 
 
 def _rendered(name: str) -> str:
-    return _load_provision().substitute_variables((BIGQUERY / name).read_text(encoding="utf-8"), BIGQUERY_PARAMS)
+    return _load_provision().substitute_variables(_load_provision().fixture_sql(BIGQUERY / name), BIGQUERY_PARAMS)
 
 
 def _code(sql: str) -> str:
@@ -81,7 +81,7 @@ class MotherDuckFixtureExecutionTests(unittest.TestCase):
         connection.execute("ATTACH ':memory:' AS northstar_market")
         connection.execute("USE northstar_market")
         for name in names or ("schema.sql", "seed.sql", "security.sql"):
-            connection.execute((MOTHERDUCK / name).read_text(encoding="utf-8"))
+            connection.execute(_load_provision().fixture_sql(MOTHERDUCK / name))
         return connection
 
     def test_the_fixture_applies_and_holds_its_declared_volumes(self) -> None:
@@ -90,10 +90,10 @@ class MotherDuckFixtureExecutionTests(unittest.TestCase):
             table: connection.execute(f"SELECT count(*) FROM market.{table}").fetchone()[0]
             for table in ("zone_market_scores", "relevant_pois", "analyst_annotations")
         }
-        self.assertEqual(counts, {"zone_market_scores": 60, "relevant_pois": 240, "analyst_annotations": 24})
+        self.assertEqual(counts, {"zone_market_scores": 83, "relevant_pois": 240, "analyst_annotations": 24})
         low, high = connection.execute("SELECT min(taxi_zone_id), max(taxi_zone_id) FROM market.relevant_pois").fetchone()
         self.assertGreaterEqual(low, 101)
-        self.assertLessEqual(high, 160)
+        self.assertLessEqual(high, 183)
         self.assertEqual(
             connection.execute("SELECT count(*) FROM market.relevant_pois WHERE geom IS NULL").fetchone()[0], 0
         )
@@ -112,7 +112,7 @@ class MotherDuckFixtureExecutionTests(unittest.TestCase):
         second_connection = self._apply()
         before_rerun = digest(second_connection)
         # Re-applying must land on the same rows, not double them.
-        second_connection.execute((MOTHERDUCK / "seed.sql").read_text(encoding="utf-8"))
+        second_connection.execute(_load_provision().fixture_sql(MOTHERDUCK / "seed.sql"))
         self.assertEqual(first, before_rerun)
         self.assertEqual(digest(second_connection), first)
         self.assertEqual(
@@ -287,7 +287,7 @@ class BigQueryFixtureContractTests(unittest.TestCase):
     def test_the_seed_is_deterministic_and_idempotent(self) -> None:
         body = _code(_rendered("seed.sql"))
         self.assertIn("20260917", body)
-        self.assertIn("FARM_FINGERPRINT", body)
+        self.assertIn("MD5(", body)
         for forbidden in ("RAND()", "CURRENT_TIMESTAMP()", "CURRENT_DATE()", "GENERATE_UUID()"):
             self.assertNotIn(forbidden, body, forbidden)
         self.assertEqual(body.count("TRUNCATE TABLE"), 5)
@@ -353,7 +353,13 @@ class FixtureManifestTests(unittest.TestCase):
         project = yaml.safe_load((EXAMPLE / "project.yaml").read_text(encoding="utf-8"))
         referenced = {
             source["access"]["connection"]["ref"].split(":", 1)[1] for source in project["sources"].values()
+            if source["access"].get("connection")
         }
+        for source in project["sources"].values():
+            if not source["access"].get("connection"):
+                self.assertEqual(source["origin"], "locally_generated_synthetic")
+                self.assertEqual(source["access"]["method"], "local_synthetic_fixture")
+                self.assertIn("NOT TESTED", source["selection"]["security_note"])
         self.assertTrue(referenced.issubset(set(identities["analysis"]["credentials"])), referenced)
         self.assertFalse(referenced & set(identities["provisioning"]["credentials"]))
 

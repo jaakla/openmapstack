@@ -1,14 +1,14 @@
 -- Northstar Mobility PostGIS fixture: deterministic seed
 --
--- Every row is derived from md5('northstar|20260917|' || label) so the
--- fixture is byte-reproducible on any server version: no random(), no
--- wall-clock values. Re-running is idempotent (tables are truncated first).
+-- Synthetic tenant rows use md5('northstar|20260917|' || label); H3 geometry
+-- comes from pinned cell IDs through h3-pg. There is no random() or
+-- wall-clock input. Re-running is idempotent (tables are truncated first).
 --
 --   psql "$OMS_DEMO_POSTGIS_ADMIN_DSN" -v ON_ERROR_STOP=1 -f seed.sql
 --   (run after schema.sql)
 --
 -- Volumes follow the issue-43 sizing for the worked example:
---   taxi_zones 60, hubs 4, fleet_positions 480, service_areas 16,
+--   taxi_zones 83, hubs 4, fleet_positions 480, service_areas 16,
 --   customer_accounts 3600, driver_private 960.
 -- Tenants alpha/beta/gamma all exist; only alpha is RLS-visible to the
 -- restricted reader created by security.sql.
@@ -22,20 +22,8 @@ RETURNS integer LANGUAGE sql IMMUTABLE AS $$
     SELECT ((('x' || substr(md5('northstar|20260917|' || label), 1, 8))::bit(32)::bigint % modulus) + modulus) % modulus
 $$;
 
--- -- 60 synthetic grid zones over the NYC study bbox (EPSG:4326) -------------
-INSERT INTO ops.taxi_zones (zone_id, borough, zone_name, zone_source, geom)
-SELECT
-    101 + g,
-    'Manhattan',
-    'Grid Zone ' || (101 + g),
-    'synthetic-grid',
-    ST_MakeEnvelope(
-        -74.030 + (g % 12) * 0.010,
-        40.700 + (g / 12) * 0.015,
-        -74.030 + (g % 12) * 0.010 + 0.010,
-        40.700 + (g / 12) * 0.015 + 0.015,
-        4326)
-FROM generate_series(0, 59) AS g;
+-- -- Pinned H3 resolution-8 cell IDs; h3_postgis generates boundaries and centres --
+__H3_ZONES__
 
 -- -- 4 existing hubs for tenant alpha, at zone centroids --------------------
 INSERT INTO ops.hubs (hub_id, tenant_id, taxi_zone_id, name, capacity, activated_on, geom)
@@ -46,11 +34,11 @@ SELECT
     'Northstar Hub ' || g,
     20 + ops.fixture_rand('hub-cap-' || g, 31),
     date '2026-03-01' + ops.fixture_rand('hub-day-' || g, 180),
-    ST_Centroid(zone.geom)
+    ST_SetSRID(ST_MakePoint(zone.longitude, zone.latitude), 4326)
 FROM generate_series(1, 4) AS g
 JOIN LATERAL (
-    SELECT zone_id, geom FROM ops.taxi_zones
-    ORDER BY zone_id OFFSET (g - 1) * 14 LIMIT 1
+    SELECT * FROM ops.taxi_zones
+    ORDER BY zone_id OFFSET (g - 1) * ((SELECT count(*) FROM ops.taxi_zones) / 4) LIMIT 1
 ) zone ON true;
 
 -- -- 480 fleet positions, ~80% alpha ----------------------------------------
@@ -63,19 +51,12 @@ SELECT
     timestamptz '2026-09-01 06:00:00+00'
         + make_interval(hours => ops.fixture_rand('fleet-hour-' || g, 17),
                         mins => ops.fixture_rand('fleet-min-' || g, 60)),
-    ST_SetSRID(ST_MakePoint(
-        -74.030 + zone.col * 0.010 + (0.1 + 0.8 * ops.fixture_rand('fleet-fx-' || g, 10000) / 10000.0) * 0.010,
-        40.700 + zone.row * 0.015 + (0.1 + 0.8 * ops.fixture_rand('fleet-fy-' || g, 10000) / 10000.0) * 0.015
-    ), 4326)
+    ST_SetSRID(ST_MakePoint(zone.longitude, zone.latitude), 4326)
 FROM generate_series(1, 480) AS g
 JOIN LATERAL (
-    SELECT
-        zone_id, geom,
-        (zone_id - 101) % 12 AS col,
-        (zone_id - 101) / 12 AS row
-    FROM ops.taxi_zones
+    SELECT * FROM ops.taxi_zones
     ORDER BY zone_id
-    OFFSET ops.fixture_rand('fleet-zone-' || g, 60) LIMIT 1
+    OFFSET ops.fixture_rand('fleet-zone-' || g, (SELECT count(*)::integer FROM ops.taxi_zones)) LIMIT 1
 ) zone ON true;
 
 -- -- 16 service areas, ~2/3 alpha -------------------------------------------
@@ -88,9 +69,9 @@ SELECT
     ST_Buffer(zone.geom::geography, 500 + ops.fixture_rand('sa-radius-' || g, 400))::geometry
 FROM generate_series(1, 16) AS g
 JOIN LATERAL (
-    SELECT zone_id, geom FROM ops.taxi_zones
+    SELECT * FROM ops.taxi_zones
     ORDER BY zone_id
-    OFFSET ops.fixture_rand('sa-zone-' || g, 60) LIMIT 1
+    OFFSET ops.fixture_rand('sa-zone-' || g, (SELECT count(*)::integer FROM ops.taxi_zones)) LIMIT 1
 ) zone ON true;
 
 -- -- 3600 customer accounts: alpha ~60%, beta ~30%, gamma ~10% ---------------
@@ -102,7 +83,7 @@ SELECT
         WHEN ops.fixture_rand('ca-tenant-' || g, 10) < 9 THEN 'beta'
         ELSE 'gamma'
     END,
-    101 + ops.fixture_rand('ca-zone-' || g, 60),
+    101 + ops.fixture_rand('ca-zone-' || g, (SELECT count(*)::integer FROM ops.taxi_zones)),
     'Account ' || lpad(g::text, 5, '0'),
     'Contact ' || lpad(g::text, 5, '0'),
     'contact' || lpad(g::text, 5, '0') || '@accounts.example.invalid',
@@ -123,7 +104,7 @@ SELECT
     '+1-212-' || lpad((200 + ops.fixture_rand('drv-ph-' || g, 799))::text, 3, '0') || '-'
         || lpad(ops.fixture_rand('drv-ph2-' || g, 10000)::text, 4, '0'),
     'DL-' || upper(substr(md5('northstar|20260917|drv-lic-' || g), 1, 10)),
-    101 + ops.fixture_rand('drv-zone-' || g, 60)
+    101 + ops.fixture_rand('drv-zone-' || g, (SELECT count(*)::integer FROM ops.taxi_zones))
 FROM generate_series(1, 960) AS g;
 
 DROP FUNCTION ops.fixture_rand(text, integer);

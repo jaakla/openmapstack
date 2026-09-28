@@ -6,275 +6,374 @@ project:
     fleet and hub coverage and account demand, and show ranked candidate zones on an interactive map while
     respecting all database access restrictions.
   created_at: '2026-09-17T00:00:00Z'
-  updated_at: '2026-09-24T13:19:46.187630+00:00'
+  updated_at: '2026-09-28T11:30:40.406587+00:00'
   status: validated
 interpretation:
-  objective: Rank NYC taxi zones as operations/charging-hub candidates for tenant alpha by combining three
-    private backends — historical trip demand from the BigQuery warehouse, fleet and hub coverage from
-    the operational PostGIS database, and market/POI context from the MotherDuck overlay — under each
-    backend's enforced security model (row-level security and row access policies, withheld columns, inaccessible
-    relations).
+  objective: Rank NYC H3 resolution-8 cells for tenant alpha using pinned read-only captures of the provisioned
+    PostGIS, BigQuery and MotherDuck demo databases. Spatially assign BigQuery trip pickups and MotherDuck
+    POIs to PostGIS H3 cells; attribute MotherDuck source-zone scores through BigQuery reference polygons.
   assumptions:
   - id: A1
-    statement: 'Every private snapshot was retrieved through that backend''s restricted analysis identity,
-      so the rows in it are the rows those identities may see: PostGIS row-level security and the BigQuery
-      row access policy both confine the data to tenant_id = ''alpha'', protected columns (contact_name,
-      contact_email, contract_value) are withheld by column grants, and hr.driver_private and the restricted
-      BigQuery dataset are inaccessible.'
-    rationale: The fixture's security boundary is backend-enforced, never filtered in the pipeline; a
-      WHERE clause here would hide whether the boundary works.
+    statement: Business observations are synthetic demo data captured from live services. Some synthetic
+      fleet point locations reuse actual 2016 NYC TLC trip pickup coordinates; they are not tracked vehicles.
+    rationale: The PostGIS fleet seed generates vehicle IDs, statuses and 2026 timestamps for 281 pinned
+      TLC pickup coordinates. The coordinates are historical public trip data, not current fleet evidence.
   - id: A2
-    statement: Historical demand is the tenant-alpha trip total per zone over the 30 days in the BigQuery
-      warehouse (trips_total), with trips_peak_day and trips_stddev_day carried alongside as the peak
-      and variability evidence.
-    rationale: Demand over time is the one input the operational database cannot answer; active account
-      counts describe today and are kept as a separate column, not as the demand signal.
+    statement: Demand is the number of reader-visible tenant-alpha BigQuery trip pickups spatially contained
+      in each PostGIS H3 cell, over the dates present in the captured trip table. Peak day, variability,
+      active days and mean distance are retained.
+    rationale: The live BigQuery table retains legacy source zones. Point-based aggregation avoids claiming
+      those rectangular zones are H3 cells; trips outside the study grid are excluded.
   - id: A3
     statement: Distance to the closest existing hub is measured from the zone centroid in EPSG:32618 (UTM
       18N, metres).
-    rationale: A metric, area-true CRS for NYC; centroid-level screening is appropriate for zone-level
-      siting.
+    rationale: A local metric CRS for NYC; centroid-level screening is appropriate for zone-level siting.
   - id: A4
-    statement: 'Market context combines Northstar''s own per-zone score with what is physically in the
-      zone: amenities (charging, parking, transit) help and competitors do not, saturating at 6 amenity
-      POIs and 3 competitor POIs respectively.'
-    rationale: The saturation points keep one dense zone from dominating the component, and every input
-      is stored in zone-metrics.parquet so the market score can be recomputed and disagreed with.
+    statement: Market context combines MotherDuck source-zone scores attributed by H3 cell centre through
+      BigQuery reference polygons with POIs counted directly inside H3 cells.
+    rationale: Every H3 centre must match exactly one reference polygon and a reader-visible score. POI
+      counts and raw market score are stored in zone-metrics.parquet.
   - id: A5
-    statement: Zone geometries are the fixture's deterministic synthetic grid stand-in (zone_source =
-      'synthetic-grid') for real NYC TLC taxi-zone polygons.
-    rationale: Keeps the fixture fully reproducible; replacing the zone geometry must not change any other
-      table.
+    statement: PostGIS supplies genuine H3 resolution-8 geometries for a land-centred study grid. Integer
+      zone IDs are compatibility aliases, not NYC TLC identifiers.
+    rationale: The PostGIS seed derives polygon geometry from pinned H3 cell IDs using h3-pg functions;
+      the live reader capture is the analysis input.
+  - id: A6
+    statement: Fleet presence counts each synthetic vehicle once using its latest recorded_at observation.
+      The expanded demo seed includes 281 synthetic tenant-alpha vehicles located at pinned 2016 TLC pickup
+      coordinates.
+    rationale: The public coordinates are location seeds only. No TLC vehicle identity or live telemetry
+      is represented; position_id breaks timestamp ties.
+  - id: A7
+    statement: The three provisioned services contain seeded synthetic business data. TLC 2016 pickup
+      coordinates were separately captured as historical public source geography and reused to enrich
+      the synthetic PostGIS fleet seed.
+    rationale: The analysis uses the reader-visible PostGIS fleet capture after the enrichment; the original
+      TLC sample and its source hash remain pinned for provenance.
 sources:
   taxi_zones:
-    provider: Northstar Mobility fixture (issue 43)
-    dataset: NYC taxi zone reference geometry (synthetic grid)
-    source_url: https://github.com/jaakla/openmapstack-skills/issues/43
+    provider: Neon PostGIS
+    dataset: H3 resolution-8 study cells
+    source_url: https://console.neon.tech/app/projects/plain-cloud-15815892
     access:
       method: postgis
       connection:
         ref: env:OMS_DEMO_POSTGIS_DSN
-      retrieved_at: '2026-09-17T12:51:33.486230Z'
-      downloaded_at: '2026-09-17T12:51:33.486230Z'
+      retrieved_at: '2026-09-28T09:00:00.622830Z'
+      downloaded_at: '2026-09-28T09:00:00.622830Z'
       file:
         name: taxi_zones.parquet
         format: GeoParquet
-        row_count: 60
-        size_bytes: 3051
+        row_count: 83
+        size_bytes: 7549
     version:
-      identifier: northstar_ops.ops.taxi_zones seed 20260917
-      published_at: '2026-09-17'
+      identifier: live-20260928
+      published_at: '2026-09-28'
     warehouse:
       backend: postgis
-      database: northstar_ops
+      database: neondb
       schema: ops
       table: taxi_zones
-      query_sha256: sha256:b651e4b1a4eec91c398f1889ce81f76b96db870dce1419ab67b6213beba830e1
-      schema_sha256: sha256:13dbf87a6b596a4cca6bf9610133df4112368d430fec2d013fd19f6c560424b0
+      query_sha256: sha256:ebb6acb95d692e0239e8bb73588fabea45eda84eaa07080ba30cb6032f8b19cd
+      schema_sha256: sha256:1a6e17154808327e17f925cad402ebf0ad2c4d9995d4c27837b59debed2522b5
     selection:
-      filter: public-origin reference data; no tenant restriction applies
-      security_note: readable in full by the restricted reader
+      filter: Approved read-only SELECT through restricted reader identity; see capture-records.json for
+        query and schema hashes
+      security_note: The capture reflects the reader-visible rows and columns; backend permission checks
+        are separate.
     license:
       name: Synthetic fixture data (CC0-1.0)
       url: https://github.com/jaakla/openmapstack-skills/issues/43
-    rationale: Stable join key (zone_id) and the geometry every spatial metric needs.
+    rationale: PostGIS H3 geometries and borough labels for the analysis grid.
     pin:
       class: local_snapshot
-      path: data/source/taxi_zones.parquet
-      sha256: sha256:ec256ae4435f1a9013d2589bc0befda6a93b36a238371ac936cf84720aa678ef
-      captured_at: '2026-09-17T12:51:33.486230Z'
+      path: data/source/live-20260928/taxi_zones.parquet
+      sha256: sha256:98d0e43d69f6950570d365ddd5219dd2674ce1cb3d6ebdf202ea009f6d016fe5
+      captured_at: '2026-09-28T09:00:00.622830Z'
+    origin: live_backend_capture_of_seeded_demo_data
   hubs:
-    provider: Northstar Mobility fixture (issue 43)
-    dataset: Existing operations/charging hubs
-    source_url: https://github.com/jaakla/openmapstack-skills/issues/43
+    provider: Neon PostGIS
+    dataset: Existing operations and charging hubs
+    source_url: https://console.neon.tech/app/projects/plain-cloud-15815892
     access:
       method: postgis
       connection:
         ref: env:OMS_DEMO_POSTGIS_DSN
-      retrieved_at: '2026-09-17T12:51:34.019068Z'
-      downloaded_at: '2026-09-17T12:51:34.019068Z'
+      retrieved_at: '2026-09-28T09:00:01.577554Z'
+      downloaded_at: '2026-09-28T09:00:01.577554Z'
       file:
         name: hubs.parquet
         format: GeoParquet
         row_count: 4
-        size_bytes: 1232
+        size_bytes: 1450
     version:
-      identifier: northstar_ops.ops.hubs seed 20260917
-      published_at: '2026-09-17'
+      identifier: live-20260928
+      published_at: '2026-09-28'
     warehouse:
       backend: postgis
-      database: northstar_ops
+      database: neondb
       schema: ops
       table: hubs
-      query_sha256: sha256:f4e89f2f3a1f1fa7869281524327ebebe222bf854a538f1892391579a628874d
-      schema_sha256: sha256:676c038cc3646e4f3a964f21d393294a71a6e3ca077b33088e64252b4f4a66a4
+      query_sha256: sha256:89cba038f773958b69ddf9fa4a0b1ec6c673dc7c87e7ad18458490e8d5dfbdd0
+      schema_sha256: sha256:c812b10b3a37b6fc291ac4e6611ad9836aa0e2f30eac4dee360baa767a64a980
     selection:
-      filter: row-level security oms_alpha_reader -> tenant_id = 'alpha'
-      security_note: RLS-limited source; contains only tenant alpha rows
+      filter: Approved read-only SELECT through restricted reader identity; see capture-records.json for
+        query and schema hashes
+      security_note: The capture reflects the reader-visible rows and columns; backend permission checks
+        are separate.
     license:
       name: Synthetic fixture data (CC0-1.0)
       url: https://github.com/jaakla/openmapstack-skills/issues/43
-    rationale: Existing coverage that new candidates must not duplicate.
+    rationale: Existing hub locations used for coverage distance.
     pin:
       class: local_snapshot
-      path: data/source/hubs.parquet
-      sha256: sha256:066404da3f49be4c20b925d26a06a80c017cbe786341f93d6861b7d12070d74c
-      captured_at: '2026-09-17T12:51:34.019068Z'
+      path: data/source/live-20260928/hubs.parquet
+      sha256: sha256:45bae1809d2866367c9476a585ecaa645fcb2001509d90ab64ebb149fc11b510
+      captured_at: '2026-09-28T09:00:01.577554Z'
+    origin: live_backend_capture_of_seeded_demo_data
   fleet_positions:
-    provider: Northstar Mobility fixture (issue 43)
-    dataset: Current fleet positions
-    source_url: https://github.com/jaakla/openmapstack-skills/issues/43
+    provider: Neon PostGIS
+    dataset: Synthetic fleet observations, including points placed at historical TLC trip pickup coordinates
+    source_url: https://console.neon.tech/app/projects/plain-cloud-15815892
     access:
       method: postgis
       connection:
         ref: env:OMS_DEMO_POSTGIS_DSN
-      retrieved_at: '2026-09-17T12:51:35.106089Z'
-      downloaded_at: '2026-09-17T12:51:35.106089Z'
+      retrieved_at: '2026-09-28T11:20:31.462958Z'
+      downloaded_at: '2026-09-28T11:20:31.462958Z'
       file:
         name: fleet_positions.parquet
         format: GeoParquet
-        row_count: 389
-        size_bytes: 14577
+        row_count: 670
+        size_bytes: 19313
     version:
-      identifier: northstar_ops.ops.fleet_positions seed 20260917
-      published_at: '2026-09-17'
+      identifier: live-20260928-tlc-v1
+      published_at: '2026-09-28'
     warehouse:
       backend: postgis
-      database: northstar_ops
+      database: neondb
       schema: ops
       table: fleet_positions
-      query_sha256: sha256:05f24719f64bb4c8c8cab52a0a842d1ce4016ea68763b113a68bd9daffa89b00
-      schema_sha256: sha256:baad4c757e8b2703fb5c11171fb7a04a676fb276e4b7557c13046d9133674ce3
+      query_sha256: sha256:162fe5f8e62f7b2ff5f5f74d293838e50122a83a57299da780f73da61bdfd4a9
+      schema_sha256: sha256:9e408a41929af0925bff5150e044c0ffad9ef0d6c8b58c22b96f894137f891ee
     selection:
-      filter: row-level security oms_alpha_reader -> tenant_id = 'alpha'; located rows only
-      security_note: RLS-limited source; contains only tenant alpha rows
+      filter: Approved read-only SELECT through tenant-alpha PostGIS reader; includes idempotently inserted
+        TLC-coordinate demo vehicles
+      security_note: The capture reflects the reader-visible rows and columns; backend permission checks
+        are separate.
     license:
       name: Synthetic fixture data (CC0-1.0)
       url: https://github.com/jaakla/openmapstack-skills/issues/43
-    rationale: Fleet presence measures how saturated a zone already is.
+    rationale: Latest demo vehicle locations supply fleet presence and the dashboard point layer. The
+      TLC-derived locations are historical pickup coordinates reused for synthetic vehicle IDs, statuses
+      and timestamps.
     pin:
       class: local_snapshot
-      path: data/source/fleet_positions.parquet
-      sha256: sha256:7e28b17fc10f273c50b838d1fa31232453477b9f6ba972a3eb54c1e73f75fb74
-      captured_at: '2026-09-17T12:51:35.106089Z'
+      path: data/source/live-20260928-tlc-v1/fleet_positions.parquet
+      sha256: sha256:d3c14e1fd1c4868a9c3c48946ec6769b02a6e0b705ab2b35edae1b3f5f9a8a5a
+      captured_at: '2026-09-28T11:20:31.462958Z'
+    origin: live_backend_capture_of_seeded_demo_data_with_tlc_pickup_geography
   customer_accounts:
-    provider: Northstar Mobility fixture (issue 43)
-    dataset: Customer accounts (column-restricted)
-    source_url: https://github.com/jaakla/openmapstack-skills/issues/43
+    provider: Neon PostGIS
+    dataset: Active and inactive customer accounts
+    source_url: https://console.neon.tech/app/projects/plain-cloud-15815892
     access:
       method: postgis
       connection:
         ref: env:OMS_DEMO_POSTGIS_DSN
-      retrieved_at: '2026-09-17T12:51:38.624109Z'
-      downloaded_at: '2026-09-17T12:51:38.624109Z'
+      retrieved_at: '2026-09-28T09:00:06.074844Z'
+      downloaded_at: '2026-09-28T09:00:06.074844Z'
       file:
         name: customer_accounts.parquet
-        format: GeoParquet
+        format: Parquet
         row_count: 2181
-        size_bytes: 22991
+        size_bytes: 26235
     version:
-      identifier: northstar_ops.ops.customer_accounts seed 20260917
-      published_at: '2026-09-17'
+      identifier: live-20260928
+      published_at: '2026-09-28'
     warehouse:
       backend: postgis
-      database: northstar_ops
+      database: neondb
       schema: ops
       table: customer_accounts
-      query_sha256: sha256:8bace377f5c678396fd6c6ec8532da326b3a46a36265e7fc53ac85ac82a415de
-      schema_sha256: sha256:ead633aa390de2df5b9bec917bf51aabde630c0d697fc3f5ee95e899f6ef01c7
+      query_sha256: sha256:ed5c66ba236ee6fb700a22d46940b6486af0691091a197441751ea0192f84bea
+      schema_sha256: sha256:9766a95dea4a5e55d0e139a2269cdf47aba5b88c0d30680bc222e39e03ed5135
     selection:
-      filter: row-level security oms_alpha_reader -> tenant_id = 'alpha'; contact_name, contact_email
-        and contract_value withheld by column grants
-      security_note: RLS-limited and column-limited source
+      filter: Approved read-only SELECT through restricted reader identity; see capture-records.json for
+        query and schema hashes
+      security_note: The capture reflects the reader-visible rows and columns; backend permission checks
+        are separate.
     license:
       name: Synthetic fixture data (CC0-1.0)
       url: https://github.com/jaakla/openmapstack-skills/issues/43
-    rationale: Active account density is the skeleton-stage demand proxy (A2).
+    rationale: Account density is a separate operational context metric.
     pin:
       class: local_snapshot
-      path: data/source/customer_accounts.parquet
-      sha256: sha256:37f44517f293541b116cf09e4cf2e1dd30ef3abdea6579b93b3cab97b2607424
-      captured_at: '2026-09-17T12:51:38.624109Z'
-  zone_demand:
-    provider: Northstar Mobility fixture (issue 43)
-    dataset: Historical trip demand per taxi zone (BigQuery warehouse)
-    source_url: https://github.com/jaakla/openmapstack-skills/issues/43
+      path: data/source/live-20260928/customer_accounts.parquet
+      sha256: sha256:4795ce2163d31a2a43399a450b3777ed81e31014441d5204c67256b062f4adfe
+      captured_at: '2026-09-28T09:00:06.074844Z'
+    origin: live_backend_capture_of_seeded_demo_data
+  trip_events:
+    provider: BigQuery
+    dataset: Tenant-alpha historical trip pickups
+    source_url: https://console.cloud.google.com/bigquery?project=northstar-demo-001
     access:
       method: bigquery
       connection:
         ref: env:GOOGLE_APPLICATION_CREDENTIALS
-      retrieved_at: '2026-09-22T19:33:34.212228Z'
-      downloaded_at: '2026-09-22T19:33:34.212228Z'
+      retrieved_at: '2026-09-28T09:00:12.935392Z'
+      downloaded_at: '2026-09-28T09:00:12.935392Z'
       file:
-        name: zone_demand.parquet
+        name: trip_events.parquet
         format: GeoParquet
-        row_count: 60
-        size_bytes: 2979
+        row_count: 2917
+        size_bytes: 75641
     version:
-      identifier: northstar_analytics.zone_daily_demand seed 20260917
-      published_at: '2026-09-22'
+      identifier: live-20260928
+      published_at: '2026-09-28'
     warehouse:
       backend: bigquery
       dataset: northstar_analytics
-      table: zone_daily_demand
-      query_sha256: sha256:76586fe231945d39000295b544b8df2e4afc5cb9ff9f8efa9eaf7c738f17e5ba
-      schema_sha256: sha256:bcf79947c5d00b00a96b9aa86c29369ccbf54103f23c4327a8a54f257196fea1
+      table: trip_events
       project: northstar-demo-001
+      query_sha256: sha256:15837069a5a5df3c84206743bdbc8aeb8e27b39c7d433389292c7d501a8fd46d
+      schema_sha256: sha256:de0b614a4c38dc0c5df157ae5553734b6b2c4efd662f336a1e313b9b6e218242
     selection:
-      filter: aggregated per taxi_zone_id; the query applies no tenant filter of its own
-      security_note: a BigQuery row access policy confines the restricted reader to tenant_id = 'alpha',
-        so these totals are tenant-alpha demand; Table.num_rows would report every tenant's rows and is
-        not what this snapshot counts
+      filter: Approved read-only SELECT through restricted reader identity; see capture-records.json for
+        query and schema hashes
+      security_note: The capture reflects the reader-visible rows and columns; backend permission checks
+        are separate.
     license:
       name: Synthetic fixture data (CC0-1.0)
       url: https://github.com/jaakla/openmapstack-skills/issues/43
-    rationale: Demand over time is the one input the operational database cannot answer; account counts
-      describe today, not history.
+    rationale: Pickup points are spatially assigned to the PostGIS H3 grid.
     pin:
       class: local_snapshot
-      path: data/source/zone_demand.parquet
-      sha256: sha256:cf16348825701064de41b0290ba98da362b7e0e6b50089e96af428e713ca695b
-      captured_at: '2026-09-22T19:33:34.212228Z'
-  zone_market:
-    provider: Northstar Mobility fixture (issue 43)
-    dataset: Private market and POI context per taxi zone (MotherDuck)
-    source_url: https://github.com/jaakla/openmapstack-skills/issues/43
+      path: data/source/live-20260928/trip_events.parquet
+      sha256: sha256:dfe1a0a571015aee62983ed5c099b7d12ae62271851141697a632a920e5f0a01
+      captured_at: '2026-09-28T09:00:12.935392Z'
+    origin: live_backend_capture_of_seeded_demo_data
+  market_reference_zones:
+    provider: BigQuery
+    dataset: Legacy market-reference polygons
+    source_url: https://console.cloud.google.com/bigquery?project=northstar-demo-001
+    access:
+      method: bigquery
+      connection:
+        ref: env:GOOGLE_APPLICATION_CREDENTIALS
+      retrieved_at: '2026-09-28T09:05:25.485359Z'
+      downloaded_at: '2026-09-28T09:05:25.485359Z'
+      file:
+        name: market_reference_zones.parquet
+        format: GeoParquet
+        row_count: 60
+        size_bytes: 2852
+    version:
+      identifier: live-20260928
+      published_at: '2026-09-28'
+    warehouse:
+      backend: bigquery
+      dataset: northstar_analytics
+      table: taxi_zones
+      project: northstar-demo-001
+      query_sha256: sha256:38709f9808965b1a2e463323c4d93f17ce4206c9335317e0157e0340d531bea9
+      schema_sha256: sha256:a15f33a7ec8c13797488425d26d45f3ae2dc6030a1f5ccb35be877d4bf69a0e4
+    selection:
+      filter: Approved read-only SELECT through restricted reader identity; see capture-records.json for
+        query and schema hashes
+      security_note: The capture reflects the reader-visible rows and columns; backend permission checks
+        are separate.
+    license:
+      name: Synthetic fixture data (CC0-1.0)
+      url: https://github.com/jaakla/openmapstack-skills/issues/43
+    rationale: These source-zone polygons map MotherDuck zone scores to H3 cell centres; they are not
+      the analysis grid.
+    pin:
+      class: local_snapshot
+      path: data/source/live-20260928/market_reference_zones.parquet
+      sha256: sha256:c7b5ea0500e58bdafdeebada8246f9e4b4e9a46b073a2f11860c74fb6a0eea9b
+      captured_at: '2026-09-28T09:05:25.485359Z'
+    origin: live_backend_capture_of_seeded_demo_data
+  market_scores:
+    provider: MotherDuck
+    dataset: Source-zone market scores
+    source_url: https://app.motherduck.com/
     access:
       method: motherduck
       connection:
         ref: env:MOTHERDUCK_TOKEN
-      retrieved_at: '2026-09-22T19:33:38.455304Z'
-      downloaded_at: '2026-09-22T19:33:38.455304Z'
+      retrieved_at: '2026-09-28T09:20:06.250022Z'
+      downloaded_at: '2026-09-28T09:20:06.250022Z'
       file:
-        name: zone_market.parquet
-        format: GeoParquet
+        name: market_scores.parquet
+        format: Parquet
         row_count: 60
-        size_bytes: 3717
+        size_bytes: 2555
     version:
-      identifier: northstar_market.market analysis views seed 20260917
-      published_at: '2026-09-22'
+      identifier: live-20260928
+      published_at: '2026-09-28'
     warehouse:
       backend: motherduck
       database: northstar_market
       schema: market
-      table: analysis_zone_scores + analysis_zone_poi_counts
-      query_sha256: sha256:fe8e947504fc3dd3d6251f426bb5acc0e963a42fdefa7434c5c7872d9a8e69da
-      schema_sha256: sha256:17569e0ae07d07170240e57d8e2440fcb1c2c6527ea115c042651dbf60311b67
+      table: analysis_zone_scores
+      query_sha256: sha256:77c7b717e0ba23c4d9748360391affe00a53be54135a8a4b6e2263bbed4cde89
+      schema_sha256: sha256:544870da84244ca67d5a92216a1d4c8b3b1f3372ffe82e05e614feee55a205f5
     selection:
-      filter: analysis views only; market.analyst_annotations is never read
-      security_note: 'private market intelligence: public-origin POI geometry combined with Northstar''s
-        own enrichment. The analyst notes behind the scores are not republished -- a convention this analysis
-        honours, not a grant the backend enforces (see fixture.yaml)'
+      filter: Approved single SELECT through read-only MotherDuck attachment; see capture-records.json
+        for query and schema hashes
+      security_note: Captured through a read-only MotherDuck connector session. The token can write outside
+        that session, so identity-level read-only access is not configured.
     license:
       name: Synthetic fixture data (CC0-1.0)
       url: https://github.com/jaakla/openmapstack-skills/issues/43
-    rationale: Amenity and competitor context a zone's own operational data cannot show; it is what separates
-      two zones with equal demand.
+    rationale: Market scores are attributed from legacy source zones to H3 cell centres.
     pin:
       class: local_snapshot
-      path: data/source/zone_market.parquet
-      sha256: sha256:527a8876161554a3d2162cedc5173af60996d3290ce7fb7887344df537dc13a4
-      captured_at: '2026-09-22T19:33:38.455304Z'
+      path: data/source/live-20260928/market_scores.parquet
+      sha256: sha256:7286cc561ec36209ec180335b1659ec2ba97756f66f155e17089221d0aa9be17
+      captured_at: '2026-09-28T09:20:06.250022Z'
+    origin: live_backend_capture_of_seeded_demo_data
+  market_pois:
+    provider: MotherDuck
+    dataset: Market point observations
+    source_url: https://app.motherduck.com/
+    access:
+      method: motherduck
+      connection:
+        ref: env:MOTHERDUCK_TOKEN
+      retrieved_at: '2026-09-28T09:20:09.971693Z'
+      downloaded_at: '2026-09-28T09:20:09.971693Z'
+      file:
+        name: market_pois.parquet
+        format: GeoParquet
+        row_count: 240
+        size_bytes: 6922
+    version:
+      identifier: live-20260928
+      published_at: '2026-09-28'
+    warehouse:
+      backend: motherduck
+      database: northstar_market
+      schema: market
+      table: analysis_pois
+      query_sha256: sha256:f40da990d678987fb6e61bce649139c98468c60773754d99a4a65ca564da1615
+      schema_sha256: sha256:21de37936cceb97482f873afee5c75f94e664286cd15e1e15bc689b9e85bac92
+    selection:
+      filter: Approved single SELECT through read-only MotherDuck attachment; see capture-records.json
+        for query and schema hashes
+      security_note: Captured through a read-only MotherDuck connector session. The token can write outside
+        that session, so identity-level read-only access is not configured.
+    license:
+      name: Synthetic fixture data (CC0-1.0)
+      url: https://github.com/jaakla/openmapstack-skills/issues/43
+    rationale: POI points are counted directly within PostGIS H3 cells.
+    pin:
+      class: local_snapshot
+      path: data/source/live-20260928/market_pois.parquet
+      sha256: sha256:e4775d03557b341a6dbfc5aff324eb6e41544a6140e4f6c5035b872dc7621a85
+      captured_at: '2026-09-28T09:20:09.971693Z'
+    origin: live_backend_capture_of_seeded_demo_data
 overrides: []
 processing:
   analysis_crs: EPSG:32618
@@ -300,14 +399,39 @@ processing:
     output: accounts_raw
   - id: load_demand
     operation: read
-    source: zone_demand
-    expression: pinned BigQuery snapshot; rows already confined to tenant alpha by the row access policy
-    output: zone_demand_raw
+    source: trip_events
+    expression: Pinned BigQuery trip points; tenant alpha visible to reader
+    output: trip_events_raw
   - id: load_market
     operation: read
-    source: zone_market
-    expression: pinned MotherDuck snapshot; analysis views only, never the analyst notes
-    output: zone_market_raw
+    source: market_scores
+    expression: Pinned MotherDuck market scores keyed to source zone IDs
+    output: market_scores_raw
+  - id: load_market_reference_zones
+    operation: read
+    source: market_reference_zones
+    output: market_reference_zones_raw
+  - id: load_market_pois
+    operation: read
+    source: market_pois
+    output: market_pois_raw
+  - id: aggregate_trips_to_h3
+    operation: spatial_join
+    inputs:
+    - zones_raw
+    - trip_events_raw
+    expression: ST_Contains(H3 polygon, pickup_point), grouped by H3 cell and date
+    output: zone_demand_h3
+  - id: attribute_market_to_h3
+    operation: spatial_join
+    inputs:
+    - zones_raw
+    - market_reference_zones_raw
+    - market_scores_raw
+    - market_pois_raw
+    expression: Unique reference polygon containing H3 centroid determines score; count POI points contained
+      in H3 polygon
+    output: zone_market_h3
   - id: project_zones
     operation: project
     input: zones_raw
@@ -324,13 +448,18 @@ processing:
   - id: fleet_by_zone
     operation: aggregate
     input: fleet_raw
-    expression: count(*) grouped by taxi_zone_id
+    expression: latest recorded_at per tenant_id and vehicle_id, position_id tie-break; count by h3_cell
     output: zone_fleet_counts
   - id: accounts_by_zone
     operation: aggregate
     input: accounts_raw
-    expression: count(*) grouped by taxi_zone_id (active accounts present today)
+    expression: count(*) grouped by h3_cell (active accounts present today)
     output: zone_accounts
+  - id: export_fleet_points
+    operation: export
+    input: fleet_raw
+    expression: Latest located observation per synthetic vehicle, preserving location-basis label
+    output: fleet_positions_geojson
   - id: combine_metrics
     operation: join
     inputs:
@@ -338,13 +467,13 @@ processing:
     - zone_hub_distance
     - zone_fleet_counts
     - zone_accounts
-    - zone_demand_raw
-    - zone_market_raw
+    - zone_demand_h3
+    - zone_market_h3
     output: zone_metrics
   - id: eligible_zones
     operation: filter
     input: zone_metrics
-    expression: trips_total >= 45 AND hub_distance_m >= 1500 AND fleet_present <= 6
+    expression: trips_total >= 30 AND hub_distance_m >= 1500 AND fleet_present <= 6
     output: eligible_candidates
   - id: score_candidates
     operation: score
@@ -373,10 +502,14 @@ scoring:
   final_score: 100 * sum(weight * component), rounded to 2 decimals; every input is stored beside the
     score, so it is recomputable from data/derived/zone-metrics.parquet alone
   eligibility:
-    trips_total_min: 45
+    trips_total_min: 30
     hub_distance_m_min: 1500
     fleet_present_max: 6
 outputs:
+  existing_hubs_geojson:
+    path: data/derived/existing-hubs.geojson
+    format: GeoJSON (EPSG:4326)
+    generated_by: combine_metrics
   zone_metrics_parquet:
     path: data/derived/zone-metrics.parquet
     format: GeoParquet (EPSG:4326)
@@ -397,6 +530,10 @@ outputs:
     path: project.qgz
     format: QGIS project archive (EPSG:4326)
     generated_by: export_candidates
+  fleet_positions_geojson:
+    path: data/derived/fleet-positions.geojson
+    format: GeoJSON (EPSG:4326)
+    generated_by: export_fleet_points
 validation:
   required:
   - geometry_valid
@@ -407,34 +544,91 @@ validation:
   - protected_columns_absent
   - score_components_complete
   - qgis_project_static_valid
+  - fleet_latest_observation
+  - h3_grid_valid
+  - h3_references_consistent
   domain_checks:
   - name: score_range
     expression: final_score >= 0 AND final_score <= 100
   - name: eligibility_thresholds
-    expression: demand_accounts >= 40 AND hub_distance_m >= 1500 AND fleet_present <= 6
+    expression: trips_total >= 30 AND hub_distance_m >= 1500 AND fleet_present <= 6
 runs:
   latest:
-    id: run-20260924-131946
-    started_at: '2026-09-24T13:19:45.507789+00:00'
-    completed_at: '2026-09-24T13:19:46.187630+00:00'
+    id: run-20260928-113040
+    started_at: '2026-09-28T11:30:39.879833+00:00'
+    completed_at: '2026-09-28T11:30:40.406587+00:00'
     status: passed
-    inputs_hash: sha256:1cf94f739ac93ee4f3f7924fd01770f8774f57af391ac3ce289da8420cef7933
-    outputs_hash: sha256:650b1e04e0cdc5c16c79647e96eef675914f06930420fc1401c99f397d56f0e6
+    inputs_hash: sha256:dc2b0cfd5315bd82a7334b7ea4ec92d0764d83b64a2800a58f49f597cb1ea232
+    outputs_hash: sha256:cd9d6178850c18be68560c20107a0637e01d05bfa94ce917feca9bfd20476ed6
     record:
-      path: runs/run-20260924-131946.json
+      path: runs/run-20260928-113040.json
     validation_report:
       path: validation/latest-report.json
 runtime:
   implementation:
     pipeline: pipeline.py
     preferred_engine: duckdb-spatial
+    dependencies:
+    - dashboard-template.html
+    - queries/postgis-customer-accounts.sql
+    - queries/postgis-fleet.sql
+    - queries/postgis-hubs.sql
+    - queries/postgis-taxi-zones.sql
+    - setup/bigquery/column-security.sql
+    - setup/bigquery/schema.sql
+    - setup/bigquery/security.sql
+    - setup/bigquery/seed.sql
+    - setup/bigquery/zones.sql
+    - setup/motherduck/schema.sql
+    - setup/motherduck/security.sql
+    - setup/motherduck/seed.sql
+    - setup/motherduck/zones.sql
+    - setup/postgis/schema.sql
+    - setup/postgis/security.sql
+    - setup/postgis/seed.sql
+    - setup/postgis/zones.sql
+    - data/source/live-20260928-tlc-v1/manifest.json
+    - data/source/live-20260928-tlc-v1/capture-records.json
+    - queries/bigquery-trip-events.sql
+    - queries/bigquery-market-reference-zones.sql
+    - queries/motherduck-market-scores.sql
+    - queries/motherduck-market-pois.sql
+    - data/source/tlc-2016-pickups.json
+    - capture_tlc_pickups.py
   environment:
     python: '3.12'
     duckdb: 1.5.5
+    h3: 4.5.0
     gdal: DuckDB spatial extension
+  fixture:
+    profile: live-seeded-demo-tlc-v1
+    h3_resolution: 8
+    source_manifest: data/source/live-20260928-tlc-v1/manifest.json
 presentation:
   layout:
     type: map_with_sidebar
+    sidebar:
+      position: left
+      organization: tabs
+      tabs:
+      - id: analysis
+        title: Analysis
+      - id: map
+        title: Map
+      - id: data
+        title: Provenance
+  dashboard:
+    template: dashboard-template.html
+    context: existing_hubs_geojson
+    filters:
+    - zone_search
+    - borough
+    - eligibility
+    - minimum_score
+    selection: Linked grid-cell map, ranked list and score explanation
+    state: URL fragment; filters only narrow fixed run scores, never recalculate them
+    caveat: Live captures of synthetic business data over real H3 cells. Some synthetic fleet locations
+      reuse historical 2016 TLC taxi pickup coordinates; the point layer is not live tracking.
   map:
     basemap:
       id: cartodb-positron
@@ -454,16 +648,17 @@ presentation:
       title: Basemap Context
   provenance_ui:
     distinctions:
-    - public-origin reference geometry (taxi_zones; synthetic grid stand-in, assumption A5)
-    - private operational snapshots, PostGIS (hubs, fleet_positions, customer_accounts)
-    - 'private warehouse snapshot, BigQuery (zone_demand: historical trip demand)'
-    - 'private market overlay, MotherDuck (zone_market: POI and competitor context)'
-    - 'RLS-limited sources: hubs, fleet_positions, customer_accounts (PostGIS row-level security) and
-      zone_demand (BigQuery row access policy) — all confined to tenant alpha'
-    - 'column-protected source: customer_accounts (contact_name, contact_email, contract_value withheld
-      by column grants)'
-    - 'never republished: market.analyst_annotations informs the MotherDuck scores and is not exported'
-    - synthetic business attributes (all fixture tables, seed 20260917)
-    - analysis assumptions (A1-A5)
+    - PostGIS supplies H3 resolution-8 study cells; integer aliases are not NYC TLC zone IDs.
+    - BigQuery trip pickup points are spatially assigned to PostGIS H3 cells; its legacy taxi_zones table
+      only maps market-reference polygons.
+    - MotherDuck zone scores are attributed by H3 centroid through BigQuery reference polygons; MotherDuck
+      POIs are counted directly in H3 cells.
+    - All business data is synthetic demo seed data captured from live provisioned services on 2026-09-28.
+    - The fleet point layer combines the seeded PostGIS fleet with 281 synthetic vehicles placed at pinned
+      2016 TLC taxi pickup coordinates. Vehicle IDs, statuses and 2026 timestamps are generated demo attributes.
+    - Captures used restricted PostGIS and BigQuery readers and a read-only MotherDuck connector session;
+      the MotherDuck token itself remains writable outside that session.
+    - The pipeline consumes pinned local captures and works with service credentials unset.
+    - No raw vehicle or customer records appear in the dashboard; only aggregate analysis evidence.
   intent: analytical_workspace
   primary_view: map

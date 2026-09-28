@@ -1,0 +1,593 @@
+{
+  "schema": "openmapstack-live-capture-records/v1",
+  "records": {
+    "taxi_zones": {
+      "schema": "openmapstack-source-snapshot/v1",
+      "source": "taxi_zones",
+      "backend": "postgis",
+      "destination": "data/source/live-20260928/taxi_zones.parquet",
+      "approved": true,
+      "materialized": true,
+      "plan": {
+        "columns": [
+          {
+            "name": "zone_id",
+            "type": "int4"
+          },
+          {
+            "name": "h3_cell",
+            "type": "text"
+          },
+          {
+            "name": "borough",
+            "type": "text"
+          },
+          {
+            "name": "zone_name",
+            "type": "text"
+          },
+          {
+            "name": "zone_source",
+            "type": "text"
+          },
+          {
+            "name": "geom",
+            "type": "geometry"
+          }
+        ],
+        "row_count": 83,
+        "query_sha256": "sha256:ebb6acb95d692e0239e8bb73588fabea45eda84eaa07080ba30cb6032f8b19cd",
+        "schema_sha256": "sha256:1a6e17154808327e17f925cad402ebf0ad2c4d9995d4c27837b59debed2522b5",
+        "backend_snapshot": {
+          "kind": "pg_current_snapshot",
+          "value": "2057:2057:",
+          "durable": false,
+          "note": "PostgreSQL keeps no durable time travel; the pin is the local snapshot"
+        },
+        "scan_bytes": null,
+        "scan_estimated": null
+      },
+      "limits": {
+        "timeout_s": 60.0,
+        "max_rows": 100000,
+        "max_bytes": 268435456
+      },
+      "rows": 83,
+      "bytes": 7549,
+      "sha256": "sha256:98d0e43d69f6950570d365ddd5219dd2674ce1cb3d6ebdf202ea009f6d016fe5",
+      "pin": {
+        "class": "local_snapshot",
+        "path": "data/source/live-20260928/taxi_zones.parquet",
+        "sha256": "sha256:98d0e43d69f6950570d365ddd5219dd2674ce1cb3d6ebdf202ea009f6d016fe5",
+        "captured_at": "2026-09-28T09:00:00.622830Z"
+      },
+      "warehouse": {
+        "backend": "postgis",
+        "database": "neondb",
+        "schema": "ops",
+        "table": "taxi_zones",
+        "query_sha256": "sha256:ebb6acb95d692e0239e8bb73588fabea45eda84eaa07080ba30cb6032f8b19cd",
+        "schema_sha256": "sha256:1a6e17154808327e17f925cad402ebf0ad2c4d9995d4c27837b59debed2522b5"
+      },
+      "access": {
+        "retrieved_at": "2026-09-28T09:00:00.622830Z",
+        "downloaded_at": "2026-09-28T09:00:00.622830Z"
+      },
+      "backend_snapshot": {
+        "kind": "pg_current_snapshot",
+        "value": "2057:2057:",
+        "durable": false,
+        "note": "PostgreSQL keeps no durable time travel; the pin is the local snapshot"
+      }
+    },
+    "hubs": {
+      "schema": "openmapstack-source-snapshot/v1",
+      "source": "hubs",
+      "backend": "postgis",
+      "destination": "data/source/live-20260928/hubs.parquet",
+      "approved": true,
+      "materialized": true,
+      "plan": {
+        "columns": [
+          {
+            "name": "h3_cell",
+            "type": "text"
+          },
+          {
+            "name": "hub_id",
+            "type": "text"
+          },
+          {
+            "name": "tenant_id",
+            "type": "text"
+          },
+          {
+            "name": "taxi_zone_id",
+            "type": "int4"
+          },
+          {
+            "name": "name",
+            "type": "text"
+          },
+          {
+            "name": "capacity",
+            "type": "int4"
+          },
+          {
+            "name": "activated_on",
+            "type": "date"
+          },
+          {
+            "name": "geom",
+            "type": "geometry"
+          }
+        ],
+        "row_count": 4,
+        "query_sha256": "sha256:89cba038f773958b69ddf9fa4a0b1ec6c673dc7c87e7ad18458490e8d5dfbdd0",
+        "schema_sha256": "sha256:c812b10b3a37b6fc291ac4e6611ad9836aa0e2f30eac4dee360baa767a64a980",
+        "backend_snapshot": {
+          "kind": "pg_current_snapshot",
+          "value": "2057:2057:",
+          "durable": false,
+          "note": "PostgreSQL keeps no durable time travel; the pin is the local snapshot"
+        },
+        "scan_bytes": null,
+        "scan_estimated": null
+      },
+      "limits": {
+        "timeout_s": 60.0,
+        "max_rows": 100000,
+        "max_bytes": 268435456
+      },
+      "rows": 4,
+      "bytes": 1450,
+      "sha256": "sha256:45bae1809d2866367c9476a585ecaa645fcb2001509d90ab64ebb149fc11b510",
+      "pin": {
+        "class": "local_snapshot",
+        "path": "data/source/live-20260928/hubs.parquet",
+        "sha256": "sha256:45bae1809d2866367c9476a585ecaa645fcb2001509d90ab64ebb149fc11b510",
+        "captured_at": "2026-09-28T09:00:01.577554Z"
+      },
+      "warehouse": {
+        "backend": "postgis",
+        "database": "neondb",
+        "schema": "ops",
+        "table": "hubs",
+        "query_sha256": "sha256:89cba038f773958b69ddf9fa4a0b1ec6c673dc7c87e7ad18458490e8d5dfbdd0",
+        "schema_sha256": "sha256:c812b10b3a37b6fc291ac4e6611ad9836aa0e2f30eac4dee360baa767a64a980"
+      },
+      "access": {
+        "retrieved_at": "2026-09-28T09:00:01.577554Z",
+        "downloaded_at": "2026-09-28T09:00:01.577554Z"
+      },
+      "backend_snapshot": {
+        "kind": "pg_current_snapshot",
+        "value": "2057:2057:",
+        "durable": false,
+        "note": "PostgreSQL keeps no durable time travel; the pin is the local snapshot"
+      }
+    },
+    "fleet_positions": {
+      "schema": "openmapstack-source-snapshot/v1",
+      "source": "fleet_positions",
+      "backend": "postgis",
+      "destination": "data/source/live-20260928/fleet_positions.parquet",
+      "approved": true,
+      "materialized": true,
+      "plan": {
+        "columns": [
+          {
+            "name": "h3_cell",
+            "type": "text"
+          },
+          {
+            "name": "position_id",
+            "type": "int8"
+          },
+          {
+            "name": "tenant_id",
+            "type": "text"
+          },
+          {
+            "name": "vehicle_id",
+            "type": "text"
+          },
+          {
+            "name": "taxi_zone_id",
+            "type": "int4"
+          },
+          {
+            "name": "status",
+            "type": "text"
+          },
+          {
+            "name": "recorded_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "geom",
+            "type": "geometry"
+          }
+        ],
+        "row_count": 389,
+        "query_sha256": "sha256:162fe5f8e62f7b2ff5f5f74d293838e50122a83a57299da780f73da61bdfd4a9",
+        "schema_sha256": "sha256:9e408a41929af0925bff5150e044c0ffad9ef0d6c8b58c22b96f894137f891ee",
+        "backend_snapshot": {
+          "kind": "pg_current_snapshot",
+          "value": "2057:2057:",
+          "durable": false,
+          "note": "PostgreSQL keeps no durable time travel; the pin is the local snapshot"
+        },
+        "scan_bytes": null,
+        "scan_estimated": null
+      },
+      "limits": {
+        "timeout_s": 60.0,
+        "max_rows": 100000,
+        "max_bytes": 268435456
+      },
+      "rows": 389,
+      "bytes": 12099,
+      "sha256": "sha256:2d560213f3c74cfca1c44b42556d96e66a03de365a1534d71da721192cc62fbc",
+      "pin": {
+        "class": "local_snapshot",
+        "path": "data/source/live-20260928/fleet_positions.parquet",
+        "sha256": "sha256:2d560213f3c74cfca1c44b42556d96e66a03de365a1534d71da721192cc62fbc",
+        "captured_at": "2026-09-28T09:00:03.039432Z"
+      },
+      "warehouse": {
+        "backend": "postgis",
+        "database": "neondb",
+        "schema": "ops",
+        "table": "fleet_positions",
+        "query_sha256": "sha256:162fe5f8e62f7b2ff5f5f74d293838e50122a83a57299da780f73da61bdfd4a9",
+        "schema_sha256": "sha256:9e408a41929af0925bff5150e044c0ffad9ef0d6c8b58c22b96f894137f891ee"
+      },
+      "access": {
+        "retrieved_at": "2026-09-28T09:00:03.039432Z",
+        "downloaded_at": "2026-09-28T09:00:03.039432Z"
+      },
+      "backend_snapshot": {
+        "kind": "pg_current_snapshot",
+        "value": "2057:2057:",
+        "durable": false,
+        "note": "PostgreSQL keeps no durable time travel; the pin is the local snapshot"
+      }
+    },
+    "customer_accounts": {
+      "schema": "openmapstack-source-snapshot/v1",
+      "source": "customer_accounts",
+      "backend": "postgis",
+      "destination": "data/source/live-20260928/customer_accounts.parquet",
+      "approved": true,
+      "materialized": true,
+      "plan": {
+        "columns": [
+          {
+            "name": "h3_cell",
+            "type": "text"
+          },
+          {
+            "name": "account_id",
+            "type": "int8"
+          },
+          {
+            "name": "tenant_id",
+            "type": "text"
+          },
+          {
+            "name": "taxi_zone_id",
+            "type": "int4"
+          },
+          {
+            "name": "account_name",
+            "type": "text"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          }
+        ],
+        "row_count": 2181,
+        "query_sha256": "sha256:ed5c66ba236ee6fb700a22d46940b6486af0691091a197441751ea0192f84bea",
+        "schema_sha256": "sha256:9766a95dea4a5e55d0e139a2269cdf47aba5b88c0d30680bc222e39e03ed5135",
+        "backend_snapshot": {
+          "kind": "pg_current_snapshot",
+          "value": "2057:2057:",
+          "durable": false,
+          "note": "PostgreSQL keeps no durable time travel; the pin is the local snapshot"
+        },
+        "scan_bytes": null,
+        "scan_estimated": null
+      },
+      "limits": {
+        "timeout_s": 60.0,
+        "max_rows": 100000,
+        "max_bytes": 268435456
+      },
+      "rows": 2181,
+      "bytes": 26235,
+      "sha256": "sha256:4795ce2163d31a2a43399a450b3777ed81e31014441d5204c67256b062f4adfe",
+      "pin": {
+        "class": "local_snapshot",
+        "path": "data/source/live-20260928/customer_accounts.parquet",
+        "sha256": "sha256:4795ce2163d31a2a43399a450b3777ed81e31014441d5204c67256b062f4adfe",
+        "captured_at": "2026-09-28T09:00:06.074844Z"
+      },
+      "warehouse": {
+        "backend": "postgis",
+        "database": "neondb",
+        "schema": "ops",
+        "table": "customer_accounts",
+        "query_sha256": "sha256:ed5c66ba236ee6fb700a22d46940b6486af0691091a197441751ea0192f84bea",
+        "schema_sha256": "sha256:9766a95dea4a5e55d0e139a2269cdf47aba5b88c0d30680bc222e39e03ed5135"
+      },
+      "access": {
+        "retrieved_at": "2026-09-28T09:00:06.074844Z",
+        "downloaded_at": "2026-09-28T09:00:06.074844Z"
+      },
+      "backend_snapshot": {
+        "kind": "pg_current_snapshot",
+        "value": "2057:2057:",
+        "durable": false,
+        "note": "PostgreSQL keeps no durable time travel; the pin is the local snapshot"
+      }
+    },
+    "trip_events": {
+      "schema": "openmapstack-source-snapshot/v1",
+      "source": "trip_events",
+      "backend": "bigquery",
+      "destination": "data/source/live-20260928/trip_events.parquet",
+      "approved": true,
+      "materialized": true,
+      "plan": {
+        "columns": [
+          {
+            "name": "tenant_id",
+            "type": "STRING"
+          },
+          {
+            "name": "trip_id",
+            "type": "STRING"
+          },
+          {
+            "name": "pickup_date",
+            "type": "DATE"
+          },
+          {
+            "name": "trip_distance_km",
+            "type": "FLOAT"
+          },
+          {
+            "name": "pickup_point",
+            "type": "GEOGRAPHY"
+          }
+        ],
+        "row_count": 2917,
+        "query_sha256": "sha256:15837069a5a5df3c84206743bdbc8aeb8e27b39c7d433389292c7d501a8fd46d",
+        "schema_sha256": "sha256:de0b614a4c38dc0c5df157ae5553734b6b2c4efd662f336a1e313b9b6e218242",
+        "backend_snapshot": null,
+        "scan_bytes": null,
+        "scan_estimated": false
+      },
+      "limits": {
+        "timeout_s": 60.0,
+        "max_rows": 100000,
+        "max_bytes": 268435456
+      },
+      "rows": 2917,
+      "bytes": 75641,
+      "sha256": "sha256:dfe1a0a571015aee62983ed5c099b7d12ae62271851141697a632a920e5f0a01",
+      "pin": {
+        "class": "local_snapshot",
+        "path": "data/source/live-20260928/trip_events.parquet",
+        "sha256": "sha256:dfe1a0a571015aee62983ed5c099b7d12ae62271851141697a632a920e5f0a01",
+        "captured_at": "2026-09-28T09:00:12.935392Z"
+      },
+      "warehouse": {
+        "backend": "bigquery",
+        "dataset": "northstar_analytics",
+        "table": "trip_events",
+        "project": "northstar-demo-001",
+        "query_sha256": "sha256:15837069a5a5df3c84206743bdbc8aeb8e27b39c7d433389292c7d501a8fd46d",
+        "schema_sha256": "sha256:de0b614a4c38dc0c5df157ae5553734b6b2c4efd662f336a1e313b9b6e218242"
+      },
+      "access": {
+        "retrieved_at": "2026-09-28T09:00:12.935392Z",
+        "downloaded_at": "2026-09-28T09:00:12.935392Z"
+      }
+    },
+    "market_reference_zones": {
+      "schema": "openmapstack-source-snapshot/v1",
+      "source": "market_reference_zones",
+      "backend": "bigquery",
+      "destination": "data/source/live-20260928/market_reference_zones.parquet",
+      "approved": true,
+      "materialized": true,
+      "plan": {
+        "columns": [
+          {
+            "name": "zone_id",
+            "type": "INTEGER"
+          },
+          {
+            "name": "borough",
+            "type": "STRING"
+          },
+          {
+            "name": "zone_name",
+            "type": "STRING"
+          },
+          {
+            "name": "zone_area",
+            "type": "GEOGRAPHY"
+          }
+        ],
+        "row_count": 60,
+        "query_sha256": "sha256:38709f9808965b1a2e463323c4d93f17ce4206c9335317e0157e0340d531bea9",
+        "schema_sha256": "sha256:a15f33a7ec8c13797488425d26d45f3ae2dc6030a1f5ccb35be877d4bf69a0e4",
+        "backend_snapshot": null,
+        "scan_bytes": 10200,
+        "scan_estimated": true
+      },
+      "limits": {
+        "timeout_s": 60.0,
+        "max_rows": 100000,
+        "max_bytes": 268435456
+      },
+      "rows": 60,
+      "bytes": 2852,
+      "sha256": "sha256:c7b5ea0500e58bdafdeebada8246f9e4b4e9a46b073a2f11860c74fb6a0eea9b",
+      "pin": {
+        "class": "local_snapshot",
+        "path": "data/source/live-20260928/market_reference_zones.parquet",
+        "sha256": "sha256:c7b5ea0500e58bdafdeebada8246f9e4b4e9a46b073a2f11860c74fb6a0eea9b",
+        "captured_at": "2026-09-28T09:05:25.485359Z"
+      },
+      "warehouse": {
+        "backend": "bigquery",
+        "dataset": "northstar_analytics",
+        "table": "taxi_zones",
+        "project": "northstar-demo-001",
+        "query_sha256": "sha256:38709f9808965b1a2e463323c4d93f17ce4206c9335317e0157e0340d531bea9",
+        "schema_sha256": "sha256:a15f33a7ec8c13797488425d26d45f3ae2dc6030a1f5ccb35be877d4bf69a0e4"
+      },
+      "access": {
+        "retrieved_at": "2026-09-28T09:05:25.485359Z",
+        "downloaded_at": "2026-09-28T09:05:25.485359Z"
+      }
+    },
+    "market_scores": {
+      "schema": "openmapstack-source-snapshot/v1",
+      "source": "market_scores",
+      "backend": "motherduck",
+      "destination": "data/source/live-20260928/market_scores.parquet",
+      "approved": true,
+      "materialized": true,
+      "plan": {
+        "columns": [
+          {
+            "name": "taxi_zone_id",
+            "type": "INTEGER"
+          },
+          {
+            "name": "market_score_raw",
+            "type": "DOUBLE"
+          },
+          {
+            "name": "competitor_hubs",
+            "type": "INTEGER"
+          },
+          {
+            "name": "parking_index",
+            "type": "DOUBLE"
+          },
+          {
+            "name": "transit_index",
+            "type": "DOUBLE"
+          },
+          {
+            "name": "source_vintage",
+            "type": "DATE"
+          }
+        ],
+        "row_count": 60,
+        "query_sha256": "sha256:77c7b717e0ba23c4d9748360391affe00a53be54135a8a4b6e2263bbed4cde89",
+        "schema_sha256": "sha256:544870da84244ca67d5a92216a1d4c8b3b1f3372ffe82e05e614feee55a205f5",
+        "backend_snapshot": null,
+        "scan_bytes": null,
+        "scan_estimated": null
+      },
+      "limits": {
+        "timeout_s": 60.0,
+        "max_rows": 100000,
+        "max_bytes": 268435456
+      },
+      "rows": 60,
+      "bytes": 2555,
+      "sha256": "sha256:7286cc561ec36209ec180335b1659ec2ba97756f66f155e17089221d0aa9be17",
+      "pin": {
+        "class": "local_snapshot",
+        "path": "data/source/live-20260928/market_scores.parquet",
+        "sha256": "sha256:7286cc561ec36209ec180335b1659ec2ba97756f66f155e17089221d0aa9be17",
+        "captured_at": "2026-09-28T09:20:06.250022Z"
+      },
+      "warehouse": {
+        "backend": "motherduck",
+        "database": "northstar_market",
+        "schema": "market",
+        "table": "analysis_zone_scores",
+        "query_sha256": "sha256:77c7b717e0ba23c4d9748360391affe00a53be54135a8a4b6e2263bbed4cde89",
+        "schema_sha256": "sha256:544870da84244ca67d5a92216a1d4c8b3b1f3372ffe82e05e614feee55a205f5"
+      },
+      "access": {
+        "retrieved_at": "2026-09-28T09:20:06.250022Z",
+        "downloaded_at": "2026-09-28T09:20:06.250022Z"
+      }
+    },
+    "market_pois": {
+      "schema": "openmapstack-source-snapshot/v1",
+      "source": "market_pois",
+      "backend": "motherduck",
+      "destination": "data/source/live-20260928/market_pois.parquet",
+      "approved": true,
+      "materialized": true,
+      "plan": {
+        "columns": [
+          {
+            "name": "poi_id",
+            "type": "VARCHAR"
+          },
+          {
+            "name": "taxi_zone_id",
+            "type": "INTEGER"
+          },
+          {
+            "name": "category",
+            "type": "VARCHAR"
+          },
+          {
+            "name": "source",
+            "type": "VARCHAR"
+          },
+          {
+            "name": "geom",
+            "type": "GEOMETRY"
+          }
+        ],
+        "row_count": 240,
+        "query_sha256": "sha256:f40da990d678987fb6e61bce649139c98468c60773754d99a4a65ca564da1615",
+        "schema_sha256": "sha256:21de37936cceb97482f873afee5c75f94e664286cd15e1e15bc689b9e85bac92",
+        "backend_snapshot": null,
+        "scan_bytes": null,
+        "scan_estimated": null
+      },
+      "limits": {
+        "timeout_s": 60.0,
+        "max_rows": 100000,
+        "max_bytes": 268435456
+      },
+      "rows": 240,
+      "bytes": 6922,
+      "sha256": "sha256:e4775d03557b341a6dbfc5aff324eb6e41544a6140e4f6c5035b872dc7621a85",
+      "pin": {
+        "class": "local_snapshot",
+        "path": "data/source/live-20260928/market_pois.parquet",
+        "sha256": "sha256:e4775d03557b341a6dbfc5aff324eb6e41544a6140e4f6c5035b872dc7621a85",
+        "captured_at": "2026-09-28T09:20:09.971693Z"
+      },
+      "warehouse": {
+        "backend": "motherduck",
+        "database": "northstar_market",
+        "schema": "market",
+        "table": "analysis_pois",
+        "query_sha256": "sha256:f40da990d678987fb6e61bce649139c98468c60773754d99a4a65ca564da1615",
+        "schema_sha256": "sha256:21de37936cceb97482f873afee5c75f94e664286cd15e1e15bc689b9e85bac92"
+      },
+      "access": {
+        "retrieved_at": "2026-09-28T09:20:09.971693Z",
+        "downloaded_at": "2026-09-28T09:20:09.971693Z"
+      }
+    }
+  }
+}

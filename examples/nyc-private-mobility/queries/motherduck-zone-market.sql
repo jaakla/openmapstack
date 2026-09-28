@@ -18,6 +18,7 @@
 
 SELECT
     s.taxi_zone_id,
+    z.h3_cell,
     s.market_score AS market_score_raw,
     s.competitor_hubs,
     s.parking_index,
@@ -28,4 +29,7 @@ SELECT
     COALESCE(p.competitor_pois, 0) AS competitor_pois,
     COALESCE(p.total_pois, 0) AS total_pois
 FROM market.analysis_zone_scores s
+JOIN market.fixture_zones z ON z.zone_id = s.taxi_zone_id
 LEFT JOIN market.analysis_zone_poi_counts p ON p.taxi_zone_id = s.taxi_zone_id
+
+ORDER BY s.taxi_zone_id

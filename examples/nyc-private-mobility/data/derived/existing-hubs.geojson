@@ -1,0 +1,65 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.95661115441824,
+          40.77186039737063
+        ]
+      },
+      "properties": {
+        "hub_id": "H1",
+        "name": "Northstar Hub 1",
+        "capacity": 27
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.9851069987431,
+          40.734079205547104
+        ]
+      },
+      "properties": {
+        "hub_id": "H2",
+        "name": "Northstar Hub 2",
+        "capacity": 40
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.91691368790532,
+          40.74118937795546
+        ]
+      },
+      "properties": {
+        "hub_id": "H3",
+        "name": "Northstar Hub 3",
+        "capacity": 30
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.95864441195499,
+          40.713648294564074
+        ]
+      },
+      "properties": {
+        "hub_id": "H4",
+        "name": "Northstar Hub 4",
+        "capacity": 48
+      }
+    }
+  ]
+}

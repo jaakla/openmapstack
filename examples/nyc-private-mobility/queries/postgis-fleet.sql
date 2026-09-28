@@ -4,12 +4,14 @@
 -- Executed by the restricted reader through `openmapstack source snapshot`.
 
 SELECT
-    position_id,
-    tenant_id,
-    vehicle_id,
-    taxi_zone_id,
-    status,
-    recorded_at,
-    geom
-FROM ops.fleet_positions
+    z.h3_cell,
+    source.position_id,
+    source.tenant_id,
+    source.vehicle_id,
+    source.taxi_zone_id,
+    source.status,
+    source.recorded_at,
+    source.geom
+FROM ops.fleet_positions AS source
+JOIN ops.taxi_zones AS z ON z.zone_id = source.taxi_zone_id
 ORDER BY position_id

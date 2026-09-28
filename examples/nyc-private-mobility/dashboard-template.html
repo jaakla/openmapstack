@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>__TITLE__</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css">
+<style>
+:root{--ink:#162c38;--muted:#647680;--line:#dce4e7;--surface:#f5f8f8;--accent:#087c80;--soft:#e6f3f2;--warm:#c55218;--warn:#fff5e5;--radius:8px;font:13px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:#fff}
+*{box-sizing:border-box}body{margin:0}button,input,select{font:inherit}button{cursor:pointer}button,select,input[type=search]{border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);padding:8px 11px}button:hover{border-color:var(--accent);background:var(--soft)}button:disabled{opacity:.5;cursor:not-allowed}button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #29a9ba;outline-offset:2px}button.primary{background:var(--accent);color:white;border-color:var(--accent)}a{color:var(--accent)}h1,h2,h3,p{margin:0}h1{font-size:17px;letter-spacing:-.4px}h2{font-size:19px;letter-spacing:-.4px}h3{font-size:14px}small,.muted{color:var(--muted)}[hidden]{display:none!important}
+.topbar{height:66px;padding:0 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);gap:14px}.brand{display:flex;gap:12px;align-items:center;min-width:0}.brand-mark{height:34px;width:34px;display:grid;place-items:center;background:var(--soft);color:var(--accent);border-radius:8px;font-size:24px}.subtitle{font-size:11px;color:var(--muted)}.header-actions{display:flex;align-items:center;gap:8px}.tenant{color:var(--accent);font-size:11px;font-weight:700;border-right:1px solid var(--line);padding-right:16px;margin-right:5px}.fixture-banner{padding:8px 22px;background:var(--warn);color:#785019;font-size:12px;border-bottom:1px solid #ebdfca}.fixture-banner strong{font-weight:750}.workspace{display:grid;grid-template-columns:380px minmax(0,1fr);grid-template-rows:minmax(0,1fr);height:calc(100dvh - 101px);min-height:580px}.sidebar{min-height:0;min-width:0;border-right:1px solid var(--line);display:flex;flex-direction:column;background:#fff;z-index:2}.tabs{display:flex;flex-shrink:0;border-bottom:1px solid var(--line);height:48px;padding:0 10px}.tab{flex:1;border:0;border-radius:0;background:none;font-size:12px;font-weight:700;color:var(--muted);border-bottom:2px solid transparent}.tab[aria-selected=true]{color:var(--accent);border-bottom-color:var(--accent)}.panel{overflow:auto;min-height:0;flex:1}.section{padding:20px;border-bottom:1px solid var(--line)}.eyebrow{font-size:10px;font-weight:750;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:9px}.section>p{margin-top:7px}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:17px}.metric{border-left:2px solid var(--line);padding-left:12px}.metric:first-child{border-color:var(--accent)}.metric strong{display:block;font-size:27px;letter-spacing:-1px;line-height:1.2;font-variant-numeric:tabular-nums}.metric span{font-size:11px;color:var(--muted)}.run-note{margin-top:15px;font-size:11px;color:var(--muted)}.filters{display:grid;gap:11px}.filters label{display:flex;justify-content:space-between;font-size:11px;font-weight:650;margin-bottom:4px}.filter-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.filters input[type=search],.filters select{width:100%;min-width:0}.filters input[type=range]{width:100%;accent-color:var(--accent)}.filter-note{color:var(--warm);font-size:11px;min-height:16px}.list-heading{display:flex;align-items:baseline;justify-content:space-between;padding:15px 20px 8px}.list-heading h3{font-size:12px}.list-heading span{font-size:11px;color:var(--muted)}.rank-list{padding:0 10px 12px}.zone-row{display:grid;grid-template-columns:26px minmax(0,1fr) 52px;width:100%;gap:10px;text-align:left;border:1px solid transparent;border-bottom-color:var(--line);border-radius:6px;padding:12px 10px;align-items:center}.zone-row[aria-pressed=true]{background:var(--soft);border-color:#abd2d0}.rank{font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted)}.zone-name{display:block;font-size:13px;font-weight:650}.zone-summary{display:block;font-size:10px;color:var(--muted);margin-top:3px}.zone-score{font-size:17px;font-weight:750;text-align:right;font-variant-numeric:tabular-nums}.score-track{height:3px;background:#e7e9e9;margin-top:5px;overflow:hidden;border-radius:2px}.score-track i{display:block;height:100%}.empty{padding:26px 20px;color:var(--muted);text-align:center}.empty button{margin-top:12px}.rule-list{padding-left:18px;margin:10px 0;color:var(--muted);font-size:12px}.rule-list li{margin:6px 0}.switch{display:flex;align-items:center;gap:9px;padding:10px 0}.switch input{accent-color:var(--accent);width:16px;height:16px}.switch small{display:block}.legend-row{display:flex;align-items:center;gap:9px;margin:9px 0;font-size:12px}.swatch{width:17px;height:13px;border:1px solid #0002;border-radius:3px}.hub-dot{width:13px;height:13px;background:var(--accent);border:2px solid white;box-shadow:0 0 0 1px var(--accent);border-radius:50%}.check{display:grid;grid-template-columns:1fr auto;gap:8px;margin:10px 0;border-bottom:1px solid var(--line);padding-bottom:9px}.check strong{font-size:11px}.check small{grid-column:1/-1;font-size:11px}.check span{font-size:10px;text-transform:uppercase;color:var(--accent)}.check span.failed{color:#b82e28}.check span.warning{color:#996410}.source{padding:12px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.source strong{font-size:12px}.source small{display:block;font-size:10px}.source code{font-size:10px}details{margin-top:12px}summary{cursor:pointer;font-weight:650;font-size:12px}details p,details li{font-size:12px;margin-top:8px;color:var(--muted)}.weight-row{display:flex;justify-content:space-between;margin:9px 0;font-size:12px}.weight-row strong{font-variant-numeric:tabular-nums}.map-region{position:relative;min-width:0;min-height:0;background:#edf2f2;overflow:hidden}#map{position:absolute;inset:0}.map-toolbar{position:absolute;top:16px;left:16px;display:flex;gap:6px;z-index:1}.map-toolbar button{box-shadow:0 2px 8px #20384412;font-size:12px;padding:9px 13px}.map-key{position:absolute;left:16px;bottom:48px;width:192px;padding:13px 14px;background:#fffffff5;border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 3px 15px #2038440d;z-index:1}.map-key h3{font-size:11px}.legend-ramp{display:flex;height:7px;margin:8px 0 3px;border-radius:2px;overflow:hidden}.legend-ramp span{flex:1}.inspector-mobile-target{display:none}.legend-labels{position:relative;height:13px;font-size:9px;color:var(--muted)}.legend-labels span{position:absolute;transform:translateX(-50%)}.legend-labels span:first-child{transform:none}.legend-labels span:last-child{transform:translateX(-100%)}.map-key small{font-size:10px;display:block;margin-top:7px}.map-footer{position:absolute;bottom:0;left:0;right:0;min-height:32px;background:#fffffff0;border-top:1px solid var(--line);padding:7px 16px;font-size:10px;color:var(--muted);z-index:1;display:flex;justify-content:space-between;gap:12px}.map-footer strong{color:var(--ink)}.map-message{position:absolute;top:62px;left:16px;max-width:330px;z-index:1;padding:9px 12px;border:1px solid #ebdfca;border-radius:6px;background:var(--warn);color:#785019;font-size:11px}.inspector{position:absolute;right:16px;bottom:48px;width:300px;max-height:calc(100% - 120px);overflow:auto;padding:19px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 30px #17344318;z-index:2}.inspector-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.inspector h2{font-size:19px}.close{border:0;padding:0 4px;font-size:21px;color:var(--muted);line-height:1.2}.selection-label{font-size:10px;color:var(--accent);font-weight:700;margin-bottom:5px}.detail-score{display:flex;align-items:baseline;gap:7px;margin:15px 0 12px}.detail-score strong{font-size:32px;line-height:1;letter-spacing:-1px}.detail-score span{font-size:11px;color:var(--muted)}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;padding:13px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.detail-grid strong{display:block;font-size:16px;font-variant-numeric:tabular-nums}.detail-grid small{display:block;font-size:10px}.breakdown{margin-top:14px}.component{display:grid;grid-template-columns:1fr 60px;gap:4px;margin-top:9px;font-size:11px}.component strong{text-align:right;font-variant-numeric:tabular-nums}.component .bar{grid-column:1/-1;height:4px;background:var(--surface);border-radius:2px;overflow:hidden}.component i{display:block;height:100%;background:var(--accent)}.detail-note{margin-top:12px;font-size:10px;color:var(--muted)}.reasons{font-size:12px;color:#8a4d22;padding-left:18px}.maplibregl-ctrl-bottom-right{bottom:34px!important}.maplibregl-popup-content{font-family:inherit;color:var(--ink);padding:15px!important;max-width:220px}.noscript{padding:24px}.notice{position:fixed;top:74px;right:20px;z-index:10;background:var(--ink);color:white;border-radius:6px;padding:10px 16px;font-size:12px}
+.layer-item{border-bottom:1px solid var(--line);padding:3px 0 7px}.layer-item:last-of-type{border-bottom:0}.layer-item .switch{padding:7px 0 1px}.layer-lineage{margin:1px 0 0 25px}.layer-lineage summary{color:var(--accent);font-size:11px;font-weight:650;cursor:pointer}.lineage-flow{border-left:2px solid var(--line);padding-left:11px;margin-top:8px}.lineage-stage{position:relative;padding:0 0 14px}.lineage-stage:last-child{padding-bottom:2px}.lineage-stage:not(:last-child)::after{content:"↓";position:absolute;bottom:-3px;left:0;color:var(--muted)}.lineage-stage strong{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em}.lineage-stage ul{margin:3px 0 0;padding-left:16px;font-size:11px;line-height:1.45;overflow-wrap:anywhere}.lineage-stage li+li{margin-top:2px}
+.fleet-dot{width:9px;height:9px;background:#7250a0;border:1px solid white;box-shadow:0 0 0 1px #7250a0;border-radius:50%}
+@media(min-width:1600px){.workspace{grid-template-columns:410px minmax(0,1fr)}.inspector{width:320px;right:24px;bottom:54px}.section{padding:23px}}
+@media(max-width:1100px){.workspace{grid-template-columns:330px minmax(0,1fr)}.inspector{width:270px}.map-key{display:none}.topbar{padding:0 15px}.tenant{display:none}.section{padding:16px}}
+@media(max-width:720px){.topbar{height:64px;padding:0 12px}.brand-mark{display:none}h1{font-size:15px}.subtitle{font-size:10px}.header-actions button{font-size:11px;padding:7px 9px}#share{display:none}.fixture-banner{padding:8px 12px;font-size:10px;line-height:1.4}.workspace{display:flex;flex-direction:column;height:auto;min-height:0}.map-region{order:0;flex:none;height:53dvh;min-height:370px;overflow:hidden}.sidebar{order:1;border-right:0;border-top:1px solid var(--line);max-height:none}.tabs{position:sticky;top:0;background:#fff;z-index:3}.panel{overflow:visible}.inspector{position:relative;right:auto;bottom:auto;width:auto;margin:14px;border-radius:8px;max-height:none;order:2;box-shadow:none}.workspace>.inspector{display:block}.map-toolbar{top:12px;left:12px}.map-message{left:12px;right:48px;top:55px}.map-footer{font-size:9px;padding:6px 10px}.map-footer .projection{display:none}.metrics{grid-template-columns:repeat(2,1fr)}.metric strong{font-size:24px}.metric span{font-size:10px}.section{padding:18px}.rank-list{max-height:400px;overflow:auto}.inspector-mobile-target{display:block;order:2}.inspector-mobile-target:empty{display:none}.maplibregl-ctrl-bottom-right{bottom:35px!important}.inspector .detail-grid{grid-template-columns:repeat(4,1fr)}.inspector .breakdown{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}.inspector .breakdown h3{grid-column:1/-1}.inspector-head{align-items:center}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<header class="topbar"><div class="brand"><span class="brand-mark" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="7"/><path d="M12 1v6m0 10v6M1 12h6m10 0h6"/><circle cx="12" cy="12" r="2"/></svg></span><div><h1>Northstar · NYC hub opportunities</h1><div class="subtitle">Operations &amp; charging · snapshot analysis, not a live fleet</div></div></div><div class="header-actions"><span class="tenant">TENANT ALPHA</span><button id="share" type="button">Copy view link</button><button id="reset" type="button">Reset view</button></div></header>
+<div class="fixture-banner"><strong>Seeded demo data.</strong> Captured from live PostGIS, BigQuery and MotherDuck services. Some synthetic fleet locations reuse historical 2016 NYC TLC trip pickup coordinates; the points are not live vehicle tracking, and H3 cells are not NYC taxi zones.</div>
+<main class="workspace">
+<aside class="sidebar" aria-label="Analysis and map controls">
+<nav class="tabs" role="tablist" aria-label="Workspace"><button class="tab" id="tab-analysis" role="tab" aria-controls="panel-analysis" aria-selected="true" data-tab="analysis">Analysis</button><button class="tab" id="tab-map" role="tab" aria-controls="panel-map" aria-selected="false" tabindex="-1" data-tab="map">Map</button><button class="tab" id="tab-data" role="tab" aria-controls="panel-data" aria-selected="false" tabindex="-1" data-tab="data">Provenance</button></nav>
+<section class="panel" id="panel-analysis" role="tabpanel" aria-labelledby="tab-analysis">
+<div class="section"><div class="eyebrow">The siting question</div><h2>Where could the next hub help?</h2><p class="muted">Look for demand beyond existing hub coverage, with supporting amenities and less fleet saturation.</p><div class="metrics" id="metrics"></div><div class="run-note" id="run-note"></div></div>
+<div class="section filters"><div><label for="search">Find a zone</label><input id="search" type="search" placeholder="Zone name or ID" autocomplete="off"></div><div class="filter-row"><div><label for="borough">Borough</label><select id="borough"><option value="all">All boroughs</option></select></div><div><label for="scope">Show</label><select id="scope"><option value="eligible">Eligible candidates</option><option value="all">All studied zones</option></select></div></div><div><label for="min-score">Minimum candidate score <output id="score-value" for="min-score">0</output></label><input id="min-score" type="range" min="0" max="100" step="1" value="0"></div><div class="filter-note" id="filter-note"></div></div>
+<div class="list-heading"><h3 id="list-title">Ranked candidates</h3><span id="list-count" role="status" aria-live="polite"></span></div><div class="rank-list" id="rank-list"></div><div class="section"><button id="export" type="button" class="primary">Export visible zones · CSV</button><p class="muted" style="font-size:11px">Filters narrow this run; they never change its scores or eligibility.</p></div>
+</section>
+<section class="panel" id="panel-map" role="tabpanel" aria-labelledby="tab-map" hidden>
+<div class="section"><div class="eyebrow">Map layers</div><h2>Read the spatial context</h2><div class="layer-item"><label class="switch"><input id="layer-context" type="checkbox" checked><span>H3 cells · resolution 8<small>Grey context, including ineligible zones</small></span></label><details class="layer-lineage" id="lineage-context"><summary>View lineage</summary><div class="lineage-content"></div></details></div><div class="layer-item"><label class="switch"><input id="layer-hubs" type="checkbox" checked><span>Existing hubs<small>Tap a hub for its name and capacity</small></span></label><details class="layer-lineage" id="lineage-hubs"><summary>View lineage</summary><div class="lineage-content"></div></details></div><div class="layer-item"><label class="switch"><input id="layer-fleet" type="checkbox" checked><span>Demo fleet observations<small>Latest point per synthetic vehicle · some locations from 2016 TLC pickups</small></span></label><details class="layer-lineage" id="lineage-fleet"><summary>View lineage</summary><div class="lineage-content"></div></details></div><div class="layer-item"><label class="switch"><input id="layer-basemap" type="checkbox" checked><span>Street basemap<small>Requires internet</small></span></label><details class="layer-lineage" id="lineage-basemap"><summary>View lineage</summary><div class="lineage-content"></div></details></div><p class="muted" style="font-size:11px">Coloured zones follow the Analysis filters. Select a grid cell or list entry to inspect the same evidence.</p><details class="layer-lineage" id="lineage-scores" style="margin-left:0"><summary>View coloured zone lineage</summary><div class="lineage-content"></div></details></div>
+<div class="section"><div class="eyebrow">Score key · fixed 0–100 scale</div><div id="legend"></div><div class="legend-row"><span class="swatch" style="background:#dce3e5"></span>Not eligible · no score</div><div class="legend-row"><span class="hub-dot"></span>Existing hub</div><div class="legend-row"><span class="fleet-dot"></span>Demo fleet point</div><p class="muted" style="font-size:11px">A higher score is more promising within this fixture, not a probability of success. These bands are not quantiles.</p></div>
+<div class="section"><div class="eyebrow">Eligibility comes first</div><ul class="rule-list" id="rules"></ul><p class="muted" style="font-size:11px">Hub distance is straight-line from the zone centroid in UTM 18N. It is not a driving distance or travel time.</p></div>
+<div class="section"><div class="eyebrow">How the score is built</div><div id="weights"></div><p class="muted" style="font-size:11px">Demand, coverage gap and fleet saturation are normalized against the complete eligible pool, not the currently visible shortlist. Market context combines private scores, amenities and competition.</p></div>
+</section>
+<section class="panel" id="panel-data" role="tabpanel" aria-labelledby="tab-data" hidden><div class="section"><div class="eyebrow">Snapshot provenance</div><h2>Three live services. Seeded demo rows.</h2><p class="muted">These pinned snapshots were captured through read-only connector sessions. PostGIS and BigQuery also used restricted readers; the MotherDuck token is writable outside its connector session. The source business records are synthetic. This page never connects to a warehouse; it embeds the latest synthetic vehicle points and aggregate zone scores, but no customer records.</p><p id="fleet-note" class="muted" style="font-size:12px"></p><div id="sources"></div></div><div class="section"><h3>Recorded pipeline checks</h3><p class="muted" style="font-size:11px">These are run-record results, not full backend permission checks or proof of a native QGIS render.</p><div id="checks"></div></div><div class="section"><h3>Interpretation &amp; limits</h3><div id="assumptions"></div><details><summary>Source distinctions &amp; security</summary><ul id="provenance"></ul></details></div></section>
+</aside>
+<section class="map-region" aria-label="Candidate zone map"><div id="map" aria-label="Interactive NYC fixture map"></div><div class="map-toolbar"><button id="fit" type="button">Fit studied area</button><button id="fit-visible" type="button">Fit results</button></div><div class="map-message" id="map-message" role="status">Loading map… Your shortlist is available without the basemap.</div><div class="map-key"><h3>Candidate score / 100</h3><div class="legend-ramp" id="legend-ramp"></div><div class="legend-labels"><span style="left:0">0</span><span style="left:50%">50</span><span style="left:65%">65</span><span style="left:75%">75</span><span style="left:100%">100</span></div><small>Grey = context / unscored · large dots = hubs · small dots = demo fleet</small></div><div class="map-footer"><span id="map-status" role="status" aria-live="polite"></span><span class="projection">Distances: EPSG:32618 · geometry: WGS84</span></div><article class="inspector" id="inspector" aria-label="Selected zone" hidden></article></section>
+<div id="mobile-inspector" class="inspector-mobile-target"></div>
+</main>
+<div class="notice" id="notice" role="status" hidden></div>
+<noscript><p class="noscript">Enable JavaScript to explore the map and rankings. The same results are available in <a href="data/derived/hub-candidates.geojson">candidate GeoJSON</a> and <a href="data/derived/zone-metrics.geojson">all zone metrics</a>.</p></noscript>
+<script type="application/json" id="dashboard-data">__DATA__</script>
+<script>
+(() => {
+  "use strict";
+  const data=JSON.parse(document.getElementById("dashboard-data").textContent);
+  const element=id=>document.getElementById(id);
+  const escape=value=>String(value??"").replace(/[&<>"']/g,character=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[character]));
+  const integer=value=>Number(value??0).toLocaleString("en-US");
+  const score=value=>value==null?"—":Number(value).toFixed(1);
+  const zones=data.zones.features;
+  const candidates=zones.filter(feature=>feature.properties.eligible).sort((left,right)=>right.properties.final_score-left.properties.final_score||left.properties.zone_id-right.properties.zone_id);
+  const ranks=new Map(candidates.map((feature,index)=>[feature.properties.zone_id,index+1]));
+  const boroughs=[...new Set(zones.map(feature=>feature.properties.borough))].sort();
+  const components=[['demand','demand_score','Trip demand'],['coverage_gap','coverage_gap_score','Hub coverage gap'],['market','market_score','Market context'],['saturation','saturation_score','Lower fleet saturation']];
+  const source=key=>data.sources.find(item=>item.key===key);
+  // Source relations correspond to the approved queries in queries/.
+  const relations={
+    taxi_zones:["Neon PostGIS · neondb.ops.taxi_zones"],
+    hubs:["Neon PostGIS · neondb.ops.hubs","Neon PostGIS · neondb.ops.taxi_zones"],
+    fleet_positions:["NYC TLC · 2016 Yellow Taxi Trip Data pickup coordinates","Neon PostGIS · neondb.ops.fleet_positions","Neon PostGIS · neondb.ops.taxi_zones"],
+    customer_accounts:["Neon PostGIS · neondb.ops.customer_accounts","Neon PostGIS · neondb.ops.taxi_zones"],
+    trip_events:["BigQuery · northstar-demo-001.northstar_analytics.trip_events"],
+    market_reference_zones:["BigQuery · northstar-demo-001.northstar_analytics.taxi_zones"],
+    market_scores:["MotherDuck · northstar_market.market.analysis_zone_scores"],
+    market_pois:["MotherDuck · northstar_market.market.analysis_pois"],
+  };
+  function lineage(stages){
+    return '<div class="lineage-flow">'+stages.map(stage=>'<div class="lineage-stage"><strong>'+escape(stage.name)
+      +'</strong><ul>'+stage.items.map(item=>'<li>'+escape(item)+'</li>').join('')+'</ul></div>').join('')+'</div>';
+  }
+  function sourceRelations(keys){return [...new Set(keys.flatMap(key=>relations[key]||[key]))];}
+  function snapshots(keys){return keys.map(key=>source(key)?.path||key);}
+  function renderLineage(id,stages){element('lineage-'+id).querySelector('.lineage-content').innerHTML=lineage(stages);}
+  const metricSources=['taxi_zones','hubs','fleet_positions','customer_accounts','trip_events','market_reference_zones','market_scores','market_pois'];
+  const defaults={query:"",borough:"all",scope:"eligible",minimum:0,selected:candidates[0]?.properties.zone_id??null,tab:"analysis",context:true,hubs:true,fleet:true,basemap:true};
+  const state={...defaults};
+  let map=null,visible=[],basemapStyle=null,basemapTimer=null;
+  const color=value=>value==null?"#dce3e5":data.bands.find(band=>value<=band.max)?.color||data.bands.at(-1).color;
+  const bounds=features=>{
+    const extent=[[Infinity,Infinity],[-Infinity,-Infinity]];
+    function visit(coordinates){if(typeof coordinates[0]==="number"){extent[0][0]=Math.min(extent[0][0],coordinates[0]);extent[0][1]=Math.min(extent[0][1],coordinates[1]);extent[1][0]=Math.max(extent[1][0],coordinates[0]);extent[1][1]=Math.max(extent[1][1],coordinates[1]);}else coordinates.forEach(visit);}
+    features.forEach(feature=>visit(feature.geometry.coordinates));return extent;
+  };
+  function restore(){
+    const params=new URLSearchParams(location.hash.slice(1));
+    state.query=(params.get("q")||"").slice(0,100);
+    state.borough=boroughs.includes(params.get("borough"))?params.get("borough"):"all";
+    state.scope=params.get("scope")==="all"?"all":"eligible";
+    const minimum=Number(params.get("min")||0);state.minimum=Number.isFinite(minimum)?Math.max(0,Math.min(100,Math.round(minimum))):0;
+    const selected=Number(params.get("zone"));state.selected=params.has("zone")?(zones.some(feature=>feature.properties.zone_id===selected)?selected:null):defaults.selected;
+    state.tab=["analysis","map","data"].includes(params.get("tab"))?params.get("tab"):"analysis";
+    for(const key of ["context","hubs","fleet","basemap"]) state[key]=params.get(key)!=="0";
+  }
+  function save(){
+    const params=new URLSearchParams();if(state.query)params.set("q",state.query);if(state.borough!=="all")params.set("borough",state.borough);if(state.scope!=="eligible")params.set("scope",state.scope);if(state.minimum)params.set("min",state.minimum);if(state.selected!=null)params.set("zone",state.selected);else params.set("zone","");if(state.tab!=="analysis")params.set("tab",state.tab);for(const key of ["context","hubs","fleet","basemap"])if(!state[key])params.set(key,"0");
+    history.replaceState(null,"",location.pathname+location.search+"#"+params.toString());
+  }
+  function activateTab(tab,focus=false){
+    state.tab=tab;
+    for(const name of ["analysis","map","data"]){const active=name===tab;element("panel-"+name).hidden=!active;element("tab-"+name).setAttribute("aria-selected",String(active));element("tab-"+name).tabIndex=active?0:-1;}
+    if(focus)element("tab-"+tab).focus();save();
+  }
+  function controls(){element("search").value=state.query;element("borough").value=state.borough;element("scope").value=state.scope;element("min-score").value=state.minimum;for(const key of ["context","hubs","fleet","basemap"])element("layer-"+key).checked=state[key];}
+  function reasons(properties){
+    const limits=data.scoring.eligibility,result=[];
+    if((properties.trips_total??0)<limits.trips_total_min)result.push(`${integer(properties.trips_total)} trips: below the ${limits.trips_total_min}-trip minimum`);
+    if(properties.hub_distance_m<limits.hub_distance_m_min)result.push(`${integer(properties.hub_distance_m)} m to a hub: below the ${integer(limits.hub_distance_m_min)} m minimum`);
+    if(properties.fleet_present>limits.fleet_present_max)result.push(`${integer(properties.fleet_present)} vehicles: above the ${limits.fleet_present_max}-vehicle maximum`);
+    return result;
+  }
+  function renderInspector(){
+    const feature=zones.find(item=>item.properties.zone_id===state.selected),panel=element("inspector");panel.hidden=!feature;if(!feature)return;
+    const properties=feature.properties,rank=ranks.get(properties.zone_id),inList=visible.some(item=>item.properties.zone_id===state.selected);
+    panel.innerHTML=`<div class="inspector-head"><div><div class="selection-label">${rank?`CANDIDATE #${rank} OF ${candidates.length}`:"OUTSIDE ELIGIBILITY"}</div><h2>${escape(properties.zone_name)}</h2><small>${escape(properties.borough)} · Zone ${properties.zone_id} · H3 r8</small></div><button class="close" id="close-detail" aria-label="Close zone details">×</button></div><div class="detail-score"><strong>${score(properties.final_score)}</strong><span>${properties.eligible?"/ 100 · opportunity score":"Not scored — fails eligibility"}</span></div><div class="detail-grid"><div><strong>${integer(properties.trips_total)}</strong><small>Trips · 30-day window</small></div><div><strong>${(properties.hub_distance_m/1000).toFixed(2)} km</strong><small>Nearest hub · straight-line</small></div><div><strong>${integer(properties.fleet_present)}</strong><small>Latest observed vehicles</small></div><div><strong>${integer(properties.charging_pois+properties.parking_pois+properties.transit_pois)}</strong><small>Amenity POIs</small></div></div>${properties.eligible?`<div class="breakdown"><h3>Score contributions</h3>${components.map(([weight,field,label])=>{const points=100*data.scoring.weights[weight]*properties[field];return `<div class="component"><span>${label} · ${100*data.scoring.weights[weight]}%</span><strong>${points.toFixed(1)} pts</strong><div class="bar"><i style="width:${properties[field]*100}%"></i></div></div>`;}).join("")}</div>`:`<ul class="reasons">${reasons(properties).map(reason=>`<li>${escape(reason)}</li>`).join("")}</ul>`}<p class="detail-note">${integer(properties.charging_pois)} charging · ${integer(properties.parking_pois)} parking · ${integer(properties.transit_pois)} transit · ${integer(properties.competitor_pois)} competitor POIs.<br>Peak day: ${integer(properties.trips_peak_day)} trips · ${integer(properties.active_days)} active days · ${integer(properties.demand_accounts)} active accounts.</p><p class="detail-note">${inList?"H3 resolution-8 screening; land-based centres, but coastal hexagons can cross water. Not verified sites.":"This zone is outside the current list filters."}</p>`;
+    element("close-detail").onclick=()=>{state.selected=null;refresh(false);};
+    placeInspector();
+  }
+  function placeInspector(){const target=matchMedia("(max-width:720px)").matches?element("mobile-inspector"):document.querySelector(".map-region");if(element("inspector").parentElement!==target)target.append(element("inspector"));}
+  function selectZone(identifier,zoom=false){state.selected=identifier;refresh(false);if(zoom&&map){const feature=zones.find(item=>item.properties.zone_id===identifier);map.fitBounds(bounds([feature]),{padding:fitPadding(),maxZoom:14,duration:matchMedia("(prefers-reduced-motion:reduce)").matches?0:450});}if(matchMedia("(max-width:720px)").matches)element("inspector").scrollIntoView({block:"nearest",behavior:"auto"});}
+  function refresh(clearHidden=true){
+    const query=state.query.trim().toLowerCase();
+    visible=zones.filter(({properties})=>(state.scope==="all"||properties.eligible)&&(state.borough==="all"||properties.borough===state.borough)&&(!query||`${properties.zone_name} ${properties.h3_cell} ${properties.zone_id}`.toLowerCase().includes(query))&&(state.minimum===0||(properties.final_score!=null&&properties.final_score>=state.minimum))).sort((left,right)=>(right.properties.final_score??-1)-(left.properties.final_score??-1)||left.properties.zone_id-right.properties.zone_id);
+    if(clearHidden&&!visible.some(feature=>feature.properties.zone_id===state.selected))state.selected=null;
+    element("score-value").textContent=state.minimum;element("list-count").textContent=`${visible.length} of ${state.scope==="all"?zones.length:candidates.length}`;
+    element("list-title").textContent=state.scope==="all"?"Studied zones · candidates first":"Ranked candidates";
+    const filtered=state.query||state.borough!=="all"||state.minimum||state.scope!=="eligible";
+    element("filter-note").textContent=filtered?"Exploratory view · accepted scores stay fixed":"Accepted shortlist · highest score first";
+    element("rank-list").innerHTML=visible.length?visible.map(({properties})=>`<button class="zone-row" data-zone="${properties.zone_id}" aria-pressed="${properties.zone_id===state.selected}"><span class="rank">${ranks.get(properties.zone_id)?"#"+ranks.get(properties.zone_id):"—"}</span><span><span class="zone-name">${escape(properties.zone_name)}</span><span class="zone-summary">${integer(properties.trips_total)} trips · ${(properties.hub_distance_m/1000).toFixed(1)} km gap · ${properties.fleet_present} vehicles</span></span><span class="zone-score">${score(properties.final_score)}<span class="score-track"><i style="width:${properties.final_score??0}%;background:${color(properties.final_score)}"></i></span></span></button>`).join(""):'<div class="empty"><strong>No matching zones</strong><p>Try a lower score or clear your search.</p><button id="clear-filters">Clear filters</button></div>';
+    document.querySelectorAll("[data-zone]").forEach(button=>button.onclick=()=>selectZone(Number(button.dataset.zone),true));if(element("clear-filters"))element("clear-filters").onclick=reset;
+    element("export").disabled=!visible.length;element("fit-visible").disabled=!visible.length||!map;
+    const shownCandidates=visible.filter(feature=>feature.properties.eligible).length;
+    element("map-status").innerHTML=`<strong>${visible.length}</strong> visible results · <strong>${shownCandidates}</strong> eligible · tenant alpha`;
+    renderInspector();updateMap();save();
+  }
+  function reset(){Object.assign(state,defaults);controls();activateTab("analysis");refresh();applyBasemap();fit(zones);}
+  function fitPadding(){return matchMedia("(max-width:720px)").matches||element("inspector").hidden?50:{top:60,bottom:60,left:40,right:Math.min(element("inspector").offsetWidth+40,element("map").offsetWidth*.55)};}
+  function fit(features){if(map&&features.length)map.fitBounds(bounds(features),{padding:fitPadding(),duration:0});}
+  function updateMap(){
+    if(!map?.getSource("zones"))return;
+    const matches=["in",["get","zone_id"],["literal",visible.map(feature=>feature.properties.zone_id)]];
+    for(const layer of ["zone-fill","zone-line"])map.setFilter(layer,matches);
+    map.setFilter("selection",["==",["get","zone_id"],state.selected??-1]);
+    map.setLayoutProperty("zone-context","visibility",state.context?"visible":"none");map.setLayoutProperty("context-line","visibility",state.context?"visible":"none");map.setLayoutProperty("hubs","visibility",state.hubs?"visible":"none");map.setLayoutProperty("fleet","visibility",state.fleet?"visible":"none");
+  }
+  function addLayers(){
+    if(map.getSource("zones"))return;
+    map.addSource("zones",{type:"geojson",data:data.zones});map.addSource("hubs",{type:"geojson",data:data.hubs});map.addSource("fleet",{type:"geojson",data:data.fleet_points});
+    map.addLayer({id:"zone-context",type:"fill",source:"zones",paint:{"fill-color":"#aebfc4","fill-opacity":.18}});
+    map.addLayer({id:"context-line",type:"line",source:"zones",paint:{"line-color":"#9bafb5","line-width":.7,"line-opacity":.6}});
+    const fill=["case",["==",["get","final_score"],null],"#cbd5d9",["<=",["get","final_score"],50],data.bands[0].color,["<=",["get","final_score"],65],data.bands[1].color,["<=",["get","final_score"],75],data.bands[2].color,data.bands[3].color];
+    map.addLayer({id:"zone-fill",type:"fill",source:"zones",paint:{"fill-color":fill,"fill-opacity":.65}});
+    map.addLayer({id:"zone-line",type:"line",source:"zones",paint:{"line-color":"#a15b35","line-width":1,"line-opacity":.7}});
+    map.addLayer({id:"selection",type:"line",source:"zones",paint:{"line-color":"#087c80","line-width":3}});
+    map.addLayer({id:"fleet",type:"circle",source:"fleet",paint:{"circle-radius":3.5,"circle-color":["case",["==",["get","location_basis"],"synthetic H3-centre fleet seed"],"#2683a1","#7250a0"],"circle-opacity":.72,"circle-stroke-width":.6,"circle-stroke-color":"#ffffff"}});
+    map.addLayer({id:"hubs",type:"circle",source:"hubs",paint:{"circle-radius":7,"circle-color":"#087c80","circle-stroke-width":2,"circle-stroke-color":"#ffffff"}});
+    updateMap();element("fit").disabled=false;element("fit-visible").disabled=!visible.length;
+  }
+  const plainStyle=()=>({version:8,sources:{},layers:[{id:"background",type:"background",paint:{"background-color":"#edf2f2"}}]});
+  function applyBasemap(){if(map)map.setStyle(state.basemap&&basemapStyle?basemapStyle:plainStyle(),{diff:false});}
+  function message(text){element("map-message").hidden=!text;element("map-message").textContent=text;}
+  async function startMap(){
+    try{
+      map=new maplibregl.Map({container:"map",style:plainStyle(),bounds:bounds(zones),fitBoundsOptions:{padding:fitPadding()},attributionControl:true});
+      map.addControl(new maplibregl.NavigationControl({showCompass:false}),"top-right");map.on("style.load",addLayers);
+      map.on("click",event=>{
+        const features=map.queryRenderedFeatures(event.point,{layers:["hubs","fleet","zone-fill","zone-context"].filter(layer=>map.getLayer(layer))});const hit=features[0];if(!hit)return;
+        if(hit.layer.id==="hubs"){const content=document.createElement("div");const name=document.createElement("strong");name.textContent=hit.properties.name;content.append(name,document.createElement("br"),`Capacity: ${integer(hit.properties.capacity)} vehicles`);new maplibregl.Popup().setLngLat(hit.geometry.coordinates).setDOMContent(content).addTo(map);}
+        else if(hit.layer.id==="fleet"){const content=document.createElement("div");const name=document.createElement("strong");name.textContent=hit.properties.vehicle_id;content.append(name,document.createElement("br"),`Synthetic status: ${hit.properties.status}`,document.createElement("br"),`Demo timestamp: ${hit.properties.recorded_at}`,document.createElement("br"),hit.properties.location_basis);new maplibregl.Popup().setLngLat(hit.geometry.coordinates).setDOMContent(content).addTo(map);}
+        else selectZone(Number(hit.properties.zone_id));
+      });
+      map.on("mousemove",event=>{const layers=["hubs","fleet","zone-fill"].filter(layer=>map.getLayer(layer));map.getCanvas().style.cursor=layers.length&&map.queryRenderedFeatures(event.point,{layers}).length?"pointer":"";});
+      map.on("error",()=>message("Some map resources are unavailable. Embedded zones and the shortlist remain usable."));
+      const controller=new AbortController();basemapTimer=setTimeout(()=>controller.abort(),8000);
+      try{const response=await fetch(data.basemap.url,{signal:controller.signal});if(!response.ok)throw new Error("basemap");basemapStyle=await response.json();applyBasemap();message("");}catch{message("Street basemap unavailable. Showing embedded grid cells, fleet points and hubs; no analysis data is missing.");}finally{clearTimeout(basemapTimer);}
+    }catch{map=null;element("fit").disabled=true;element("fit-visible").disabled=true;message("Interactive map unavailable in this browser. Use the linked shortlist, zone details and CSV export.");}
+  }
+  function notify(text){element("notice").textContent=text;element("notice").hidden=false;setTimeout(()=>element("notice").hidden=true,2500);}
+  function exportCsv(){
+    const fields=["zone_id","h3_cell","zone_name","borough","eligible","final_score","trips_total","fleet_present","hub_distance_m","demand_score","coverage_gap_score","market_score","saturation_score"];
+    const cell=value=>'"'+String(value??"").replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"';
+    const csv=[fields.join(","),...visible.map(feature=>fields.map(field=>cell(feature.properties[field])).join(","))].join("\r\n");const link=document.createElement("a");link.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));link.download="northstar-visible-zones.csv";link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+  }
+  element("metrics").innerHTML=`<div class="metric"><strong>${candidates.length}</strong><span>eligible / ${zones.length} zones</span></div><div class="metric"><strong>${integer(zones.reduce((total,feature)=>total+(feature.properties.trips_total??0),0))}</strong><span>trips · 30-day window</span></div>`;
+  element("run-note").textContent=`${data.hubs.features.length} existing hubs · ${data.fleet.vehicles} latest observed vehicles. Run ${data.run_id} · ${data.status}.`;
+  boroughs.forEach(borough=>element("borough").add(new Option(borough,borough)));
+  element("legend").innerHTML=data.bands.map(band=>`<div class="legend-row"><span class="swatch" style="background:${band.color}"></span>${escape(band.label)}</div>`).join("");
+  element("legend-ramp").innerHTML=data.bands.map(band=>`<span style="background:${band.color};flex:${band.max-band.min}"></span>`).join("");
+  const thresholds=data.scoring.eligibility;
+  element("rules").innerHTML=`<li>At least <strong>${thresholds.trips_total_min} trips</strong> in the 30-day window.</li><li>At least <strong>${integer(thresholds.hub_distance_m_min)} m</strong> from an existing hub.</li><li>No more than <strong>${thresholds.fleet_present_max} latest observed vehicles</strong> in the zone.</li>`;
+  element("weights").innerHTML=components.map(([weight,,label])=>`<div class="weight-row"><span>${label}</span><strong>${100*data.scoring.weights[weight]}%</strong></div>`).join("");
+  element("fleet-note").textContent=`Fleet: ${data.fleet.observations} position records → ${data.fleet.vehicles} synthetic vehicles, with ${data.fleet.mapped_vehicles} latest points mapped. ${data.fleet.tlc_derived} use historical TLC pickup coordinates as location seeds. IDs, statuses and 2026 timestamps are generated; these are not current availability.`;
+  renderLineage('context',[
+    {name:'Source',items:sourceRelations(metricSources)},
+    {name:'Snapshots',items:[...snapshots(metricSources),'data/source/tlc-2016-pickups.json']},
+    {name:'Metrics & scoring',items:['latest_fleet_positions + per-zone spatial joins','eligibility and weighted candidate scores','data/derived/zone-metrics.parquet']},
+    {name:'Final',items:['data/derived/zone-metrics.geojson · H3 context geometry and status']},
+  ]);
+  renderLineage('hubs',[
+    {name:'Source',items:sourceRelations(['hubs'])},
+    {name:'Snapshots',items:snapshots(['hubs'])},
+    {name:'Final',items:['data/derived/existing-hubs.geojson']},
+  ]);
+  renderLineage('fleet',[
+    {name:'Source',items:sourceRelations(['fleet_positions'])},
+    {name:'Snapshots',items:['data/source/tlc-2016-pickups.json',...snapshots(['fleet_positions'])]},
+    {name:'Latest points',items:['one located observation per synthetic vehicle; position_id breaks timestamp ties']},
+    {name:'Final',items:['data/derived/fleet-positions.geojson · demo fleet point layer']},
+  ]);
+  renderLineage('basemap',[{name:'Source',items:[`${data.basemap.id} · ${data.basemap.attribution}`,data.basemap.url]}]);
+  renderLineage('scores',[
+    {name:'Source',items:sourceRelations(metricSources)},
+    {name:'Snapshots',items:[...snapshots(metricSources),'data/source/tlc-2016-pickups.json']},
+    {name:'Metrics & scoring',items:['latest_fleet_positions + per-zone spatial joins','eligibility and weighted candidate scores','data/derived/zone-metrics.parquet']},
+    {name:'Final',items:['data/derived/zone-metrics.geojson · coloured candidate scores']},
+  ]);
+  element("sources").innerHTML=data.sources.map(source=>`<div class="source"><strong>${escape(source.key.replaceAll("_"," "))}</strong><small>${escape(source.backend)} · captured ${escape(source.captured_at)} · seeded demo data</small><details><summary>Snapshot &amp; checksum</summary><code>${escape(source.path)}<br>${escape(source.sha256)}</code></details></div>`).join("");
+  element("checks").innerHTML=data.checks.map(check=>`<div class="check"><strong>${escape(check.id.replaceAll("_"," "))}</strong><span class="${escape(check.status)}">${escape(check.status)}</span><small>${escape(check.message)}</small></div>`).join("");
+  element("assumptions").innerHTML=data.assumptions.map(assumption=>`<details><summary>${escape(assumption.id)} · ${escape(assumption.statement.split(".")[0]).slice(0,85)}…</summary><p>${escape(assumption.statement)}</p><p>${escape(assumption.rationale)}</p></details>`).join("");
+  element("provenance").innerHTML=data.provenance.map(item=>`<li>${escape(item)}</li>`).join("");
+  document.querySelectorAll("[data-tab]").forEach(button=>{button.onclick=()=>activateTab(button.dataset.tab);button.onkeydown=event=>{const names=["analysis","map","data"];let index=names.indexOf(state.tab);if(event.key==="ArrowRight")index=(index+1)%3;else if(event.key==="ArrowLeft")index=(index+2)%3;else if(event.key==="Home")index=0;else if(event.key==="End")index=2;else return;event.preventDefault();activateTab(names[index],true);};});
+  element("search").oninput=event=>{state.query=event.target.value;refresh();};element("borough").onchange=event=>{state.borough=event.target.value;refresh();};element("scope").onchange=event=>{state.scope=event.target.value;refresh();};element("min-score").oninput=event=>{state.minimum=Number(event.target.value);refresh();};
+  for(const key of ["context","hubs","fleet","basemap"])element("layer-"+key).onchange=event=>{state[key]=event.target.checked;if(key==="basemap")applyBasemap();else updateMap();save();};
+  element("reset").onclick=reset;element("fit").onclick=()=>fit(zones);element("fit-visible").onclick=()=>fit(visible);element("export").onclick=exportCsv;element("share").onclick=async()=>{try{await navigator.clipboard.writeText(location.href);notify("View link copied");}catch{notify("Copy the address bar to share these filters.");}};
+  window.addEventListener("hashchange",()=>{restore();controls();activateTab(state.tab);refresh(false);applyBasemap();});window.addEventListener("resize",placeInspector);
+  restore();controls();activateTab(state.tab);refresh(false);element("fit").disabled=true;element("fit-visible").disabled=true;
+  const library=document.createElement("script");library.src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js";library.onload=startMap;library.onerror=()=>{element("fit").disabled=true;message("Map library unavailable. Your shortlist, zone details and CSV export still work.");};document.head.append(library);
+  setTimeout(()=>{if(!map)message("Map is unavailable or still loading. Your shortlist, details and CSV export work independently.");},10000);
+})();
+</script>
+</body>
+</html>

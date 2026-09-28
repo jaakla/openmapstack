@@ -1,13 +1,13 @@
 -- Northstar Mobility BigQuery fixture: deterministic seed
 --
--- Every value derives from FARM_FINGERPRINT('northstar|20260917|' || label),
--- BigQuery's stable fingerprint, so the fixture is reproducible: no RAND(),
+-- Every value derives from the first 32 bits of MD5('northstar|20260917|' || label),
+-- a portable deterministic fingerprint, so the fixture is reproducible: no RAND(),
 -- no CURRENT_TIMESTAMP() in fixture rows. Re-running is idempotent (tables
 -- are truncated first).
 --
 --   python provision.py bigquery        (runs after schema.sql)
 --
--- Volumes: trip_events 4800 over 30 days, zone_daily_demand 1800,
+-- Volumes: trip_events 6640 over 30 days, zone_daily_demand aggregated,
 -- vehicle_daily_metrics 1200, driver_costs 240. Tenants alpha/beta/gamma all
 -- exist; only alpha is visible through the row access policy in security.sql.
 --
@@ -16,15 +16,13 @@
 -- may present these rows as belonging to a real operator.
 
 CREATE TEMP FUNCTION fixture_rand(label STRING, modulus INT64) AS (
-    -- MOD twice rather than ABS: FARM_FINGERPRINT may return INT64 min,
-    -- which has no positive ABS.
-    MOD(MOD(FARM_FINGERPRINT(CONCAT('northstar|20260917|', label)), modulus) + modulus, modulus)
+    MOD(CAST(CONCAT('0x', SUBSTR(TO_HEX(MD5(CONCAT('northstar|20260917|', label))), 1, 8)) AS INT64), modulus)
 );
 
 CREATE TEMP FUNCTION fixture_tenant(label STRING) AS (
     CASE
-        WHEN MOD(MOD(FARM_FINGERPRINT(CONCAT('northstar|20260917|', label)), 10) + 10, 10) < 6 THEN 'alpha'
-        WHEN MOD(MOD(FARM_FINGERPRINT(CONCAT('northstar|20260917|', label)), 10) + 10, 10) < 9 THEN 'beta'
+        WHEN MOD(CAST(CONCAT('0x', SUBSTR(TO_HEX(MD5(CONCAT('northstar|20260917|', label))), 1, 8)) AS INT64), 10) < 6 THEN 'alpha'
+        WHEN MOD(CAST(CONCAT('0x', SUBSTR(TO_HEX(MD5(CONCAT('northstar|20260917|', label))), 1, 8)) AS INT64), 10) < 9 THEN 'beta'
         ELSE 'gamma'
     END
 );
@@ -63,27 +61,12 @@ TRUNCATE TABLE `:project`.`:dataset`.zone_daily_demand;
 TRUNCATE TABLE `:project`.`:dataset`.vehicle_daily_metrics;
 TRUNCATE TABLE `:project`.`:restricted_dataset`.driver_costs;
 
--- -- 60 synthetic grid zones over the NYC study bbox -----------------------
--- The same grid the PostGIS fixture builds, so taxi_zone_id 101..160 means
+-- -- H3 resolution-8 cells with land-based centres -----------------------
+-- The same H3 catalogue the PostGIS fixture builds, so taxi_zone_id 101..183 means
 -- the same polygon in every backend.
-INSERT INTO `:project`.`:dataset`.taxi_zones (zone_id, borough, zone_name, zone_source, zone_area)
-SELECT
-    101 + g,
-    'Manhattan',
-    CONCAT('Grid Zone ', CAST(101 + g AS STRING)),
-    'synthetic-grid',
-    ST_GEOGFROMTEXT(FORMAT(
-        'POLYGON((%f %f, %f %f, %f %f, %f %f, %f %f))',
-        x0, y0, x0 + 0.010, y0, x0 + 0.010, y0 + 0.015, x0, y0 + 0.015, x0, y0))
-FROM (
-    SELECT
-        g,
-        -74.030 + MOD(g, 12) * 0.010 AS x0,
-        40.700 + DIV(g, 12) * 0.015 AS y0
-    FROM UNNEST(GENERATE_ARRAY(0, 59)) AS g
-);
+__H3_ZONES__
 
--- -- 4800 trips over 30 days ------------------------------------------------
+-- -- 80 trips per H3 cell over 30 days ------------------------------------------------
 INSERT INTO `:project`.`:dataset`.trip_events
     (trip_id, tenant_id, taxi_zone_id, pickup_date, pickup_ts, trip_distance_km,
      fare_amount, internal_cost, rider_reference, pickup_point)
@@ -97,19 +80,15 @@ SELECT
     CAST(ROUND(3.0 + fixture_rand(CONCAT('trip-fare-', g), 7200) / 100.0, 2) AS NUMERIC),
     CAST(ROUND(1.0 + fixture_rand(CONCAT('trip-cost-', g), 4200) / 100.0, 2) AS NUMERIC),
     FORMAT('R-%s', TO_HEX(MD5(CONCAT('northstar|20260917|rider-', CAST(g AS STRING))))),
-    ST_GEOGPOINT(
-        -74.030 + MOD(zone_id - 101, 12) * 0.010
-            + (0.1 + 0.8 * fixture_rand(CONCAT('trip-x-', g), 10000) / 10000.0) * 0.010,
-        40.700 + DIV(zone_id - 101, 12) * 0.015
-            + (0.1 + 0.8 * fixture_rand(CONCAT('trip-y-', g), 10000) / 10000.0) * 0.015
-    )
+    ST_GEOGPOINT(zone.longitude, zone.latitude)
 FROM (
     SELECT
         g,
-        101 + fixture_rand(CONCAT('trip-zone-', g), 60) AS zone_id,
+        101 + fixture_rand(CONCAT('trip-zone-', g), (SELECT COUNT(*) FROM `:project`.`:dataset`.taxi_zones)) AS zone_id,
         DATE_ADD(DATE '2026-08-01', INTERVAL fixture_rand(CONCAT('trip-day-', g), 30) DAY) AS pickup_date
-    FROM UNNEST(GENERATE_ARRAY(1, 4800)) AS g
-);
+    FROM UNNEST(GENERATE_ARRAY(1, (SELECT COUNT(*) * 80 FROM `:project`.`:dataset`.taxi_zones))) AS g
+) AS trip
+JOIN `:project`.`:dataset`.taxi_zones AS zone USING (zone_id);
 
 -- -- daily demand per zone, derived from the trips above ---------------------
 INSERT INTO `:project`.`:dataset`.zone_daily_demand

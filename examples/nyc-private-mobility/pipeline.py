@@ -4,9 +4,8 @@
 Northstar Mobility — NYC operations/charging hub candidates (tenant alpha).
 
 The pipeline runs exclusively from pinned local snapshots under
-``data/source/`` (each captured through its backend's restricted analysis
-identity, so PostGIS row-level security, the BigQuery row access policy and
-the column grants are all baked into the inputs).
+``data/source/``. The active H3 profile is generated locally and simulates
+restricted-reader extracts; it does not constitute evidence of warehouse security.
 It never touches a live warehouse: provisioning and snapshotting belong to
 ``provision.py`` and ``openmapstack source snapshot``.
 
@@ -22,12 +21,13 @@ Flow:
 
 The scoring model lives in ``project.yaml`` (``scoring:``) and is recomputed
 here from derived columns only; every assumption is recorded in
-``interpretation.assumptions`` (A1-A5).
+``interpretation.assumptions`` (A1-A6).
 """
 
 from __future__ import annotations
 
 import datetime
+import html
 import json
 import re
 import sys
@@ -63,6 +63,9 @@ REQUIRED_CHECKS = (
     "score_components_complete",
     "score_range",
     "eligibility_thresholds",
+    "fleet_latest_observation",
+    "h3_grid_valid",
+    "h3_references_consistent",
     "qgis_project_static_valid",
 )
 
@@ -191,18 +194,114 @@ def pinned_snapshot_paths(manifest: dict) -> dict[str, Path]:
 # -- metrics ------------------------------------------------------------------
 
 
+def demand_relation(duck, snapshots: dict[str, Path]) -> str:
+    """Use reader-captured trip observations when the live source is present."""
+    if "trip_events" not in snapshots:
+        return f"read_parquet('{sql_path(snapshots['zone_demand'])}')"
+    zones = sql_path(snapshots["taxi_zones"])
+    trips = sql_path(snapshots["trip_events"])
+    duck.execute(f"""
+        CREATE OR REPLACE TEMP VIEW zone_demand_from_trips AS
+        WITH daily AS (
+            SELECT z.zone_id AS taxi_zone_id, z.h3_cell, t.pickup_date AS demand_date,
+                   count(*) AS trips
+            FROM read_parquet('{zones}') z
+            JOIN read_parquet('{trips}') t
+              ON ST_Contains(z.geom, t.pickup_point)
+            GROUP BY 1, 2, 3
+        ), totals AS (
+            SELECT z.zone_id AS taxi_zone_id, z.h3_cell,
+                   count(t.trip_id) AS trips_total,
+                   avg(t.trip_distance_km) AS mean_trip_km
+            FROM read_parquet('{zones}') z
+            LEFT JOIN read_parquet('{trips}') t
+              ON ST_Contains(z.geom, t.pickup_point)
+            GROUP BY 1, 2
+        )
+        SELECT totals.taxi_zone_id, totals.h3_cell, totals.trips_total,
+               coalesce(max(daily.trips), 0) AS trips_peak_day,
+               coalesce(stddev_samp(daily.trips), 0) AS trips_stddev_day,
+               count(daily.demand_date) AS active_days,
+               totals.mean_trip_km
+        FROM totals
+        LEFT JOIN daily USING (taxi_zone_id, h3_cell)
+        GROUP BY 1, 2, 3, 7
+    """)
+    return "zone_demand_from_trips"
+
+
+def market_relation(duck, snapshots: dict[str, Path]) -> str:
+    """Attribute source-zone scores by H3 centre and count live POI points."""
+    if "market_scores" not in snapshots:
+        return f"read_parquet('{sql_path(snapshots['zone_market'])}')"
+    zones = sql_path(snapshots["taxi_zones"])
+    reference = sql_path(snapshots["market_reference_zones"])
+    scores = sql_path(snapshots["market_scores"])
+    pois = sql_path(snapshots["market_pois"])
+    ambiguous = duck.execute(f"""
+        SELECT count(*) FROM (
+            SELECT z.zone_id
+            FROM read_parquet('{zones}') z
+            LEFT JOIN read_parquet('{reference}') r
+              ON ST_Contains(r.zone_area, ST_Centroid(z.geom))
+            GROUP BY z.zone_id
+            HAVING count(r.zone_id) != 1
+        )
+    """).fetchone()[0]
+    if ambiguous:
+        raise SystemExit(f"{ambiguous} H3 cells have no unique source market zone")
+    duck.execute(f"""
+        CREATE OR REPLACE TEMP VIEW zone_market_from_sources AS
+        WITH attribution AS (
+            SELECT z.zone_id AS taxi_zone_id, z.h3_cell, s.market_score_raw
+            FROM read_parquet('{zones}') z
+            JOIN read_parquet('{reference}') r
+              ON ST_Contains(r.zone_area, ST_Centroid(z.geom))
+            LEFT JOIN read_parquet('{scores}') s ON s.taxi_zone_id = r.zone_id
+        ), poi_counts AS (
+            SELECT z.h3_cell,
+                   count(p.poi_id) FILTER (WHERE p.category = 'charging') AS charging_pois,
+                   count(p.poi_id) FILTER (WHERE p.category = 'parking') AS parking_pois,
+                   count(p.poi_id) FILTER (WHERE p.category = 'transit') AS transit_pois,
+                   count(p.poi_id) FILTER (WHERE p.category = 'competitor') AS competitor_pois,
+                   count(p.poi_id) AS total_pois
+            FROM read_parquet('{zones}') z
+            LEFT JOIN read_parquet('{pois}') p ON ST_Contains(z.geom, p.geom)
+            GROUP BY z.h3_cell
+        )
+        SELECT a.taxi_zone_id, a.h3_cell, a.market_score_raw,
+               p.charging_pois, p.parking_pois, p.transit_pois,
+               p.competitor_pois, p.total_pois
+        FROM attribution a JOIN poi_counts p USING (h3_cell)
+    """)
+    missing = duck.execute(
+        "SELECT count(*) FROM zone_market_from_sources WHERE market_score_raw IS NULL"
+    ).fetchone()[0]
+    if missing:
+        raise SystemExit(f"{missing} H3 cells have no reader-visible market score")
+    return "zone_market_from_sources"
+
+
 def compute_zone_metrics(duck, snapshots: dict[str, Path]) -> list[dict]:
     """Per-zone operational metrics; all spatial maths in EPSG:32618 (A3)."""
     zones = sql_path(snapshots["taxi_zones"])
     hubs = sql_path(snapshots["hubs"])
     fleet = sql_path(snapshots["fleet_positions"])
     accounts = sql_path(snapshots["customer_accounts"])
-    demand = sql_path(snapshots["zone_demand"])
-    market = sql_path(snapshots["zone_market"])
+    demand_source = demand_relation(duck, snapshots)
+    market_source = market_relation(duck, snapshots)
+    duck.execute(f"""
+        CREATE OR REPLACE TEMP VIEW latest_fleet_positions AS
+        SELECT * FROM read_parquet('{fleet}')
+        QUALIFY row_number() OVER (
+            PARTITION BY tenant_id, vehicle_id
+            ORDER BY recorded_at DESC NULLS LAST, position_id DESC
+        ) = 1
+    """)
     rows = duck.execute(
         f"""
         WITH zones AS (
-            SELECT zone_id, borough, zone_name, geom,
+            SELECT zone_id, h3_cell, borough, zone_name, geom,
                    ST_Centroid(ST_Transform(geom, 'OGC:CRS84', 'EPSG:{ANALYSIS_EPSG}')) AS centroid
             FROM read_parquet('{zones}')
         ),
@@ -211,20 +310,20 @@ def compute_zone_metrics(duck, snapshots: dict[str, Path]) -> list[dict]:
             FROM read_parquet('{hubs}')
         ),
         fleet_by_zone AS (
-            SELECT taxi_zone_id, count(*) AS n
-            FROM read_parquet('{fleet}')
+            SELECT h3_cell, count(*) AS n
+            FROM latest_fleet_positions
             WHERE geom IS NOT NULL
             GROUP BY 1
         ),
         accounts_by_zone AS (
-            SELECT taxi_zone_id, count(*) AS n
+            SELECT h3_cell, count(*) AS n
             FROM read_parquet('{accounts}')
             WHERE is_active
             GROUP BY 1
         ),
-        demand AS (SELECT * FROM read_parquet('{demand}')),
-        market AS (SELECT * FROM read_parquet('{market}'))
-        SELECT z.zone_id, z.borough, z.zone_name, z.geom,
+        demand AS (SELECT * FROM {demand_source}),
+        market AS (SELECT * FROM {market_source})
+        SELECT z.zone_id, z.h3_cell, z.borough, z.zone_name, z.geom,
                coalesce(a.n, 0) AS demand_accounts,
                coalesce(f.n, 0) AS fleet_present,
                CAST(min(ST_Distance(z.centroid, h.g)) AS INTEGER) AS hub_distance_m,
@@ -241,16 +340,16 @@ def compute_zone_metrics(duck, snapshots: dict[str, Path]) -> list[dict]:
                any_value(m.total_pois) AS total_pois
         FROM zones z
         CROSS JOIN hub_points h
-        LEFT JOIN accounts_by_zone a ON a.taxi_zone_id = z.zone_id
-        LEFT JOIN fleet_by_zone f ON f.taxi_zone_id = z.zone_id
-        LEFT JOIN demand d ON d.taxi_zone_id = z.zone_id
-        LEFT JOIN market m ON m.taxi_zone_id = z.zone_id
-        GROUP BY 1, 2, 3, 4, 5, 6
+        LEFT JOIN accounts_by_zone a ON a.h3_cell = z.h3_cell
+        LEFT JOIN fleet_by_zone f ON f.h3_cell = z.h3_cell
+        LEFT JOIN demand d ON d.h3_cell = z.h3_cell
+        LEFT JOIN market m ON m.h3_cell = z.h3_cell
+        GROUP BY 1, 2, 3, 4, 5, 6, 7
         ORDER BY z.zone_id
         """
     ).fetchall()
     fields = (
-        "zone_id", "borough", "zone_name", "geom_wkb", "demand_accounts", "fleet_present",
+        "zone_id", "h3_cell", "borough", "zone_name", "geom_wkb", "demand_accounts", "fleet_present",
         "hub_distance_m", "trips_total", "trips_peak_day", "trips_stddev_day", "active_days",
         "mean_trip_km", "market_score_raw", "charging_pois", "parking_pois", "transit_pois",
         "competitor_pois", "total_pois",
@@ -304,7 +403,7 @@ def score_candidates(metrics: list[dict], scoring: dict) -> list[dict]:
     for zone in pool:
         zone["demand_score"] = zone["trips_total"] / max_demand
         zone["coverage_gap_score"] = zone["hub_distance_m"] / max_distance
-        zone["saturation_score"] = 1.0 - zone["fleet_present"] / max_fleet
+        zone["saturation_score"] = 1.0 - zone["fleet_present"] / max_fleet if max_fleet else 1.0
         zone["market_score"] = market_of(zone)
         zone["final_score"] = round(
             100
@@ -326,7 +425,7 @@ def write_outputs(duck, metrics: list[dict], candidates: list[dict]) -> None:
     DERIVED.mkdir(parents=True, exist_ok=True)
     duck.execute(
         "CREATE OR REPLACE TABLE zone_metrics ("
-        "zone_id INTEGER, borough VARCHAR, zone_name VARCHAR, demand_accounts INTEGER, "
+        "zone_id INTEGER, h3_cell VARCHAR, borough VARCHAR, zone_name VARCHAR, demand_accounts INTEGER, "
         "fleet_present INTEGER, hub_distance_m INTEGER, "
         "trips_total INTEGER, trips_peak_day INTEGER, trips_stddev_day DOUBLE, "
         "active_days INTEGER, mean_trip_km DOUBLE, market_score_raw DOUBLE, "
@@ -338,7 +437,7 @@ def write_outputs(duck, metrics: list[dict], candidates: list[dict]) -> None:
     # Every input the scoring model reads is stored beside the score, so a
     # reviewer can recompute final_score from this file and nothing else.
     columns = (
-        "zone_id", "borough", "zone_name", "demand_accounts", "fleet_present", "hub_distance_m",
+        "zone_id", "h3_cell", "borough", "zone_name", "demand_accounts", "fleet_present", "hub_distance_m",
         "trips_total", "trips_peak_day", "trips_stddev_day", "active_days", "mean_trip_km",
         "market_score_raw", "charging_pois", "parking_pois", "transit_pois", "competitor_pois",
         "total_pois", "demand_score", "coverage_gap_score", "market_score", "saturation_score",
@@ -366,6 +465,8 @@ def write_outputs(duck, metrics: list[dict], candidates: list[dict]) -> None:
     for zone in sorted(candidates, key=lambda item: (-item["final_score"], item["zone_id"])):
         geometry = duck.execute("SELECT ST_AsGeoJSON(ST_GeomFromWKB(?))", [zone["geom_wkb"]]).fetchone()[0]
         properties = {
+            "h3_cell": zone["h3_cell"],
+            "borough": zone["borough"],
             "zone_id": zone["zone_id"],
             "zone_name": zone["zone_name"],
             "trips_total": zone["trips_total"],
@@ -376,6 +477,7 @@ def write_outputs(duck, metrics: list[dict], candidates: list[dict]) -> None:
             "hub_distance_m": zone["hub_distance_m"],
             "charging_pois": zone["charging_pois"],
             "parking_pois": zone["parking_pois"],
+            "transit_pois": zone["transit_pois"],
             "competitor_pois": zone["competitor_pois"],
             "market_score_raw": zone["market_score_raw"],
             "demand_score": zone["demand_score"],
@@ -399,13 +501,7 @@ def write_outputs(duck, metrics: list[dict], candidates: list[dict]) -> None:
             "type": "Feature",
             "geometry": json.loads(geometry),
             "properties": {
-                "zone_id": zone["zone_id"],
-                "zone_name": zone["zone_name"],
-                "trips_total": zone["trips_total"],
-                "fleet_present": zone["fleet_present"],
-                "hub_distance_m": zone["hub_distance_m"],
-                "market_score": zone["market_score"],
-                "final_score": zone["final_score"],
+                **{name: zone[name] for name in columns},
                 "eligible": zone["final_score"] is not None,
             },
         }, separators=(",", ":")))
@@ -413,6 +509,42 @@ def write_outputs(duck, metrics: list[dict], candidates: list[dict]) -> None:
         '{"type": "FeatureCollection", "features": [' + ",\n".join(context) + "]}\n", encoding="utf-8"
     )
     log(f"wrote {len(metrics)} zone metrics and {len(candidates)} candidate zones")
+
+
+def write_hub_context(duck, snapshots: dict[str, Path]) -> dict:
+    features = []
+    for identifier, name, capacity, geometry in duck.execute(
+        f"SELECT hub_id, name, capacity, ST_AsGeoJSON(geom) FROM read_parquet('{sql_path(snapshots['hubs'])}') ORDER BY hub_id"
+    ).fetchall():
+        features.append({"type": "Feature", "geometry": json.loads(geometry),
+                         "properties": {"hub_id": identifier, "name": name, "capacity": capacity}})
+    (DERIVED / "existing-hubs.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": features}, indent=2) + "\n")
+    fleet_features = []
+    for vehicle_id, status, recorded_at, geometry in duck.execute("""
+        SELECT vehicle_id, status, CAST(recorded_at AS VARCHAR), ST_AsGeoJSON(geom)
+        FROM latest_fleet_positions WHERE geom IS NOT NULL
+        ORDER BY vehicle_id
+    """).fetchall():
+        tlc_derived = vehicle_id.startswith("TLC16-DEMO-")
+        fleet_features.append({
+            "type": "Feature", "geometry": json.loads(geometry),
+            "properties": {
+                "vehicle_id": vehicle_id, "status": status, "recorded_at": recorded_at,
+                "location_basis": "2016 TLC pickup coordinate reused for a synthetic vehicle" if tlc_derived
+                                  else "synthetic H3-centre fleet seed",
+            },
+        })
+    (DERIVED / "fleet-positions.geojson").write_text(
+        json.dumps({"type": "FeatureCollection", "features": fleet_features}, separators=(",", ":")) + "\n"
+    )
+    observations, vehicles, earliest, latest, tlc_derived = duck.execute(f"""
+        SELECT (SELECT count(*) FROM read_parquet('{sql_path(snapshots['fleet_positions'])}')),
+               count(*), CAST(min(recorded_at) AS VARCHAR), CAST(max(recorded_at) AS VARCHAR),
+               count(*) FILTER (WHERE vehicle_id LIKE 'TLC16-DEMO-%')
+        FROM latest_fleet_positions
+    """).fetchone()
+    return {"observations": observations, "vehicles": vehicles, "earliest": earliest,
+            "latest": latest, "tlc_derived": tlc_derived, "mapped_vehicles": len(fleet_features)}
 
 
 # -- validation ---------------------------------------------------------------
@@ -428,6 +560,43 @@ def run_checks(duck, snapshots: dict[str, Path], metrics: list[dict], candidates
 
     def q(sql: str):
         return duck.execute(sql).fetchall()
+
+    import h3
+
+    invalid_cells = []
+    for zone in metrics:
+        cell = zone["h3_cell"]
+        if not h3.is_valid_cell(cell) or h3.get_resolution(cell) != 8:
+            invalid_cells.append(zone["zone_id"])
+            continue
+        ring = [[longitude, latitude] for latitude, longitude in h3.cell_to_boundary(cell)]
+        ring.append(ring[0])
+        # h3-pg and h3-py use the same cell boundary with slightly different
+        # floating-point serialization. Exact topological equality can fail
+        # on sub-nanometre slivers, so compare symmetric-difference area.
+        difference, area = duck.execute(
+            "SELECT ST_Area(ST_SymDifference(ST_GeomFromWKB(?), ST_GeomFromGeoJSON(?))), "
+            "ST_Area(ST_GeomFromWKB(?))",
+            [zone["geom_wkb"], json.dumps({"type": "Polygon", "coordinates": [ring]}), zone["geom_wkb"]],
+        ).fetchone()
+        matches = area > 0 and difference / area < 1e-9
+        if not matches:
+            invalid_cells.append(zone["zone_id"])
+    add("h3_grid_valid", "failed" if invalid_cells else "passed",
+        "geometry matches genuine H3 resolution-8 boundaries", invalid_zones=invalid_cells)
+    reference_mismatches = {}
+    for key in ("hubs", "fleet_positions", "customer_accounts"):
+        path = snapshots[key]
+        count = duck.execute(f"""
+            SELECT count(*) FROM read_parquet('{sql_path(path)}') source
+            LEFT JOIN read_parquet('{sql_path(snapshots['taxi_zones'])}') zones
+            ON source.taxi_zone_id = zones.zone_id
+            WHERE zones.zone_id IS NULL OR source.h3_cell IS DISTINCT FROM zones.h3_cell
+        """).fetchone()[0]
+        if count:
+            reference_mismatches[key] = count
+    add("h3_references_consistent", "failed" if reference_mismatches else "passed",
+        "PostGIS operational extracts use the same H3-to-integer-alias mapping", mismatches=reference_mismatches)
 
     invalid = q("SELECT count(*) FROM zone_metrics WHERE NOT ST_IsValid(geom)")[0][0]
     add("geometry_valid", "passed" if invalid == 0 else "failed",
@@ -450,15 +619,17 @@ def run_checks(duck, snapshots: dict[str, Path], metrics: list[dict], candidates
     add("no_null_zone_id", "passed" if nulls == 0 else "failed", "zone ids complete", nulls=nulls)
 
     tenants: set[str] = set()
-    for key in ("hubs", "fleet_positions", "customer_accounts"):
+    for key in ("hubs", "fleet_positions", "customer_accounts", "trip_events"):
+        if key not in snapshots:
+            continue
         found = q(f"SELECT DISTINCT tenant_id FROM read_parquet('{sql_path(snapshots[key])}')")
         tenants.update(str(row[0]) for row in found)
     add("rls_scope_alpha_only", "passed" if tenants == {"alpha"} else "failed",
-        "tenant-bearing snapshots contain only the RLS-visible tenant",
+        "reader-captured tenant-bearing extracts contain only alpha; this does not independently test backend RLS",
         tenants=sorted(tenants), expected=["alpha"])
 
     protected: list[str] = []
-    for key in ("hubs", "fleet_positions", "customer_accounts"):
+    for key in snapshots:
         described = q(f"DESCRIBE SELECT * FROM read_parquet('{sql_path(snapshots[key])}')")
         names = {str(row[0]) for row in described}
         protected.extend(sorted(names & PROTECTED_COLUMNS))
@@ -489,6 +660,14 @@ def run_checks(duck, snapshots: dict[str, Path], metrics: list[dict], candidates
     ]
     add("eligibility_thresholds", "passed" if not violating else "failed",
         "candidates satisfy every eligibility threshold", violations=violating)
+    expected = dict(q("""
+        SELECT h3_cell, count(*) FROM latest_fleet_positions
+        WHERE geom IS NOT NULL GROUP BY h3_cell
+    """))
+    mismatches = [zone["zone_id"] for zone in metrics if zone["fleet_present"] != expected.get(zone["h3_cell"], 0)]
+    add("fleet_latest_observation", "failed" if mismatches else "passed",
+        "one latest observation per tenant and vehicle, with position_id breaking timestamp ties",
+        mismatched_zones=mismatches, counted_vehicles=sum(zone["fleet_present"] for zone in metrics))
     return checks
 
 
@@ -499,10 +678,12 @@ def _environment() -> dict[str, str]:
     import platform
 
     import duckdb
+    import h3
 
     return {
         "python": platform.python_version(),
         "duckdb": duckdb.__version__,
+        "h3": h3.versions()["python"],
         "analysis_crs": f"EPSG:{ANALYSIS_EPSG}",
     }
 
@@ -519,24 +700,9 @@ def write_run_evidence(manifest: dict, checks: list[dict], snapshots: dict[str, 
         status = "passed"
     run_id = "run-" + datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S")
 
-    # data/source/manifest.json belongs to the immutable input set, so it is
-    # written before the input inventory hash is taken.
-    source_manifest = {
-        "schema": "openmapstack-source-manifest/v1",
-        "project": manifest["project"]["id"],
-        "note": (
-            "every snapshot was captured through that backend's restricted analysis identity: "
-            "oms_alpha_reader on PostGIS, a read-only service account on BigQuery, "
-            "a dedicated token on MotherDuck"
-        ),
-        "sources": {
-            key: {"path": path.relative_to(ROOT).as_posix(), "sha256": sha256_file(path)}
-            for key, path in sorted(snapshots.items())
-        },
-    }
-    (ROOT / "data/source/manifest.json").write_text(
-        json.dumps(source_manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    source_manifest_path = manifest.get("runtime", {}).get("fixture", {}).get("source_manifest", "data/source/manifest.json")
+    if not (ROOT / source_manifest_path).is_file():
+        raise ValueError("Missing pinned source manifest; capture and pin the source snapshots before analysis")
 
     input_paths = declared_input_paths(ROOT, manifest)
     output_paths = declared_output_paths(manifest)
@@ -566,7 +732,7 @@ def write_run_evidence(manifest: dict, checks: list[dict], snapshots: dict[str, 
         # What actually produced these bytes. Without it a reader cannot tell
         # whether a hash mismatch is a real difference or a different DuckDB.
         "environment": _environment(),
-        "source_manifest": "data/source/manifest.json",
+        "source_manifest": source_manifest_path,
         "validation_report": "validation/latest-report.json",
         "sources": [
             {"key": key, "sha256": sha256_file(path)}
@@ -604,62 +770,35 @@ def write_run_evidence(manifest: dict, checks: list[dict], snapshots: dict[str, 
 # -- dashboard ----------------------------------------------------------------
 
 
-def write_dashboard(manifest: dict, checks: list[dict], candidates: list[dict], status: str) -> None:
-    rows = "".join(
-        "<tr>"
-        + "".join(
-            f"<td>{zone[field]}</td>"
-            for field in ("zone_id", "zone_name", "trips_total", "fleet_present", "hub_distance_m", "market_score", "final_score")
-        )
-        + "</tr>"
-        for zone in candidates
-    )
-    check_rows = "".join(
-        f'<tr><td>{check["id"]}</td><td class="{check["status"]}">{check["status"]}</td><td>{check["message"]}</td></tr>'
-        for check in checks
-    )
-    provenance = "".join(f"<li>{item}</li>" for item in (manifest.get("presentation", {}).get("provenance_ui", {}) or {}).get("distinctions", []))
-    html = f"""<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>{manifest['project']['title']}</title>
-<style>
-body {{ font-family: system-ui, sans-serif; margin: 2rem; max-width: 60rem; }}
-table {{ border-collapse: collapse; margin: 1rem 0; }}
-td, th {{ border: 1px solid #ccc; padding: .35rem .7rem; text-align: left; }}
-.passed {{ color: #1a7f37; }} .warning {{ color: #9a6700; }} .failed {{ color: #cf222e; }}
-.provenance {{ background: #f6f8fa; border: 1px solid #d0d7de; padding: .5rem 1rem; }}
-</style>
-</head>
-<body>
-<h1>{manifest['project']['title']}</h1>
-<p><strong>Status:</strong> {status} · <strong>Tenant:</strong> alpha (RLS-visible)</p>
-<h2>Hub candidates</h2>
-<table>
-<tr><th>Zone</th><th>Name</th><th>Trips (BigQuery)</th><th>Fleet present (PostGIS)</th><th>Hub distance m (PostGIS)</th><th>Market (MotherDuck)</th><th>Score</th></tr>
-{rows}
-</table>
-<h2>Validation checks</h2>
-<table>
-<tr><th>Check</th><th>Status</th><th>Message</th></tr>
-{check_rows}
-</table>
-<h2>Provenance</h2>
-<div class="provenance">
-<ul>
-{provenance}
-</ul>
-<p>All private inputs are pinned local snapshots, each captured through that
-backend's restricted analysis identity — <code>oms_alpha_reader</code> on
-PostGIS, a read-only service account on BigQuery, a dedicated token on
-MotherDuck. No live warehouse is queried at analysis time, and this page
-rebuilds with every warehouse credential unset.</p>
-</div>
-</body>
-</html>
-"""
-    (ROOT / "dashboard.html").write_text(html, encoding="utf-8")
+def dashboard_payload(manifest: dict, checks: list[dict], status: str, run_id: str, fleet_summary: dict) -> dict:
+    return {
+        "title": manifest["project"]["title"], "run_id": run_id, "status": status,
+        "zones": json.loads((DERIVED / "zone-metrics.geojson").read_text()),
+        "hubs": json.loads((DERIVED / "existing-hubs.geojson").read_text()),
+        "fleet_points": json.loads((DERIVED / "fleet-positions.geojson").read_text()),
+        "scoring": manifest["scoring"], "checks": checks, "fleet": fleet_summary,
+        "basemap": manifest["presentation"]["map"]["basemap"],
+        "fixture": manifest["runtime"].get("fixture", {}),
+        "assumptions": manifest["interpretation"]["assumptions"],
+        "provenance": manifest["presentation"]["provenance_ui"]["distinctions"],
+        "sources": [{"key": key, "backend": source["warehouse"]["backend"],
+                     "path": source["pin"]["path"], "sha256": source["pin"]["sha256"],
+                     "captured_at": source["pin"]["captured_at"], "origin": source.get("origin", "warehouse_capture")}
+                    for key, source in manifest["sources"].items()],
+        "bands": [{"min": low, "max": high, "label": label,
+                   "color": "#" + "".join(f"{part:02x}" for part in fill[:3])}
+                  for low, high, label, fill, outline in SCORE_BANDS],
+    }
+
+
+def write_dashboard(manifest: dict, checks: list[dict], status: str, run_id: str, fleet_summary: dict) -> None:
+    payload = json.dumps(dashboard_payload(manifest, checks, status, run_id, fleet_summary),
+                         ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+    payload = payload.replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
+    template = (ROOT / "dashboard-template.html").read_text(encoding="utf-8")
+    rendered = template.replace("__TITLE__", html.escape(manifest["project"]["title"]))
+    rendered = rendered.replace("__DATA__", payload)
+    (ROOT / "dashboard.html").write_text(rendered, encoding="utf-8")
     log("wrote dashboard.html")
 
 
@@ -1078,6 +1217,7 @@ def main() -> int:
         candidates = [zone for zone in metrics if zone["final_score"] is not None]
         candidates.sort(key=lambda item: (-item["final_score"], item["zone_id"]))
         write_outputs(duck, metrics, candidates)
+        fleet_summary = write_hub_context(duck, snapshots)
         write_qgis_project(manifest)
         checks = run_checks(duck, snapshots, metrics, candidates, manifest["scoring"]["eligibility"])
         checks.append(validate_qgis_project(manifest))
@@ -1085,7 +1225,7 @@ def main() -> int:
         duck.close()
     completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
     status, run_id = write_run_evidence(manifest, checks, snapshots, started_at, completed_at)
-    write_dashboard(manifest, checks, candidates, status)
+    write_dashboard(manifest, checks, status, run_id, fleet_summary)
     for check in checks:
         marker = "ok " if check["status"] == "passed" else "!! "
         log(f"{marker}{check['id']}: {check['status']}")

@@ -85,6 +85,19 @@ def _run_sql_file(cursor, path: Path, params: dict[str, str]) -> None:
 class StaticFixtureContractTests(unittest.TestCase):
     """The committed SQL files must declare the whole security boundary."""
 
+    def test_postgis_seed_derives_h3_geometry_from_pinned_cell_ids(self) -> None:
+        schema = (SETUP / "schema.sql").read_text(encoding="utf-8")
+        zones = (SETUP / "zones.sql").read_text(encoding="utf-8")
+        cells = json.loads((EXAMPLE / "setup/h3/cells.json").read_text(encoding="utf-8"))
+        self.assertIn("CREATE EXTENSION IF NOT EXISTS h3;", schema)
+        self.assertIn("CREATE EXTENSION IF NOT EXISTS h3_postgis CASCADE;", schema)
+        self.assertIn("h3_cell_to_boundary_geometry(h3_cell::h3index)", zones)
+        self.assertIn("h3_cell_to_geometry(h3_cell::h3index)", zones)
+        self.assertNotIn("ST_GeomFromText", zones)
+        seeded = re.findall(r"^\((\d+),'([0-9a-f]+)','([^']+)'\)", zones, re.M)
+        self.assertEqual([(int(zone_id), cell, borough) for zone_id, cell, borough in seeded],
+                         [(item["zone_id"], item["h3_cell"], item["borough"]) for item in cells])
+
     def test_security_sql_declares_the_full_boundary(self) -> None:
         security = (SETUP / "security.sql").read_text(encoding="utf-8")
         self.assertIn(READER_NAME, security)
@@ -130,7 +143,12 @@ class StaticFixtureContractTests(unittest.TestCase):
         )
         for key, source in project["sources"].items():
             with self.subTest(source=key):
-                ref = source["access"]["connection"]["ref"]
+                connection = source["access"].get("connection")
+                if connection is None:
+                    self.assertEqual(source["access"]["method"], "local_synthetic_fixture")
+                    self.assertEqual(source["origin"], "locally_generated_synthetic")
+                    continue
+                ref = connection["ref"]
                 self.assertIn(ref, analysis_refs)
                 for name in admin_names:
                     self.assertNotIn(name, ref)

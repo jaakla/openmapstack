@@ -6,10 +6,12 @@
 -- Executed by the restricted reader through `openmapstack source snapshot`.
 
 SELECT
-    account_id,
-    tenant_id,
-    taxi_zone_id,
-    account_name,
-    is_active
-FROM ops.customer_accounts
+    z.h3_cell,
+    source.account_id,
+    source.tenant_id,
+    source.taxi_zone_id,
+    source.account_name,
+    source.is_active
+FROM ops.customer_accounts AS source
+JOIN ops.taxi_zones AS z ON z.zone_id = source.taxi_zone_id
 ORDER BY account_id

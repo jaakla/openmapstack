@@ -1,18 +1,30 @@
 {
-  "run_id": "run-20260924-131946",
+  "run_id": "run-20260928-113040",
   "schema": "openmapstack-project/v1",
   "status": "passed",
-  "started_at": "2026-09-24T13:19:45.507789+00:00",
-  "completed_at": "2026-09-24T13:19:46.187630+00:00",
-  "inputs_hash": "sha256:1cf94f739ac93ee4f3f7924fd01770f8774f57af391ac3ce289da8420cef7933",
-  "outputs_hash": "sha256:650b1e04e0cdc5c16c79647e96eef675914f06930420fc1401c99f397d56f0e6",
+  "started_at": "2026-09-28T11:30:39.879833+00:00",
+  "completed_at": "2026-09-28T11:30:40.406587+00:00",
+  "inputs_hash": "sha256:dc2b0cfd5315bd82a7334b7ea4ec92d0764d83b64a2800a58f49f597cb1ea232",
+  "outputs_hash": "sha256:cd9d6178850c18be68560c20107a0637e01d05bfa94ce917feca9bfd20476ed6",
   "checks": [
+    {
+      "id": "h3_grid_valid",
+      "status": "passed",
+      "message": "geometry matches genuine H3 resolution-8 boundaries",
+      "invalid_zones": []
+    },
+    {
+      "id": "h3_references_consistent",
+      "status": "passed",
+      "message": "PostGIS operational extracts use the same H3-to-integer-alias mapping",
+      "mismatches": {}
+    },
     {
       "id": "geometry_valid",
       "status": "passed",
       "message": "all derived zone geometries valid",
       "invalid_count": 0,
-      "features_checked": 60
+      "features_checked": 83
     },
     {
       "id": "crs_known",
@@ -27,8 +39,8 @@
       "id": "row_count_gt_zero",
       "status": "passed",
       "message": "zone metrics and candidates non-empty",
-      "zone_rows": 60,
-      "candidate_zones": 15
+      "zone_rows": 83,
+      "candidate_zones": 6
     },
     {
       "id": "no_null_zone_id",
@@ -39,7 +51,7 @@
     {
       "id": "rls_scope_alpha_only",
       "status": "passed",
-      "message": "tenant-bearing snapshots contain only the RLS-visible tenant",
+      "message": "reader-captured tenant-bearing extracts contain only alpha; this does not independently test backend RLS",
       "tenants": [
         "alpha"
       ],
@@ -70,6 +82,13 @@
       "status": "passed",
       "message": "candidates satisfy every eligibility threshold",
       "violations": []
+    },
+    {
+      "id": "fleet_latest_observation",
+      "status": "passed",
+      "message": "one latest observation per tenant and vehicle, with position_id breaking timestamp ties",
+      "mismatched_zones": [],
+      "counted_vehicles": 595
     },
     {
       "id": "qgis_project_static_valid",

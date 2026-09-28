@@ -1,0 +1,38 @@
+{
+  "schema": "openmapstack-source-manifest/v1",
+  "project": "nyc-private-mobility",
+  "sources": {
+    "taxi_zones": {
+      "path": "data/source/live-20260928/taxi_zones.parquet",
+      "sha256": "sha256:98d0e43d69f6950570d365ddd5219dd2674ce1cb3d6ebdf202ea009f6d016fe5"
+    },
+    "hubs": {
+      "path": "data/source/live-20260928/hubs.parquet",
+      "sha256": "sha256:45bae1809d2866367c9476a585ecaa645fcb2001509d90ab64ebb149fc11b510"
+    },
+    "fleet_positions": {
+      "path": "data/source/live-20260928/fleet_positions.parquet",
+      "sha256": "sha256:2d560213f3c74cfca1c44b42556d96e66a03de365a1534d71da721192cc62fbc"
+    },
+    "customer_accounts": {
+      "path": "data/source/live-20260928/customer_accounts.parquet",
+      "sha256": "sha256:4795ce2163d31a2a43399a450b3777ed81e31014441d5204c67256b062f4adfe"
+    },
+    "trip_events": {
+      "path": "data/source/live-20260928/trip_events.parquet",
+      "sha256": "sha256:dfe1a0a571015aee62983ed5c099b7d12ae62271851141697a632a920e5f0a01"
+    },
+    "market_reference_zones": {
+      "path": "data/source/live-20260928/market_reference_zones.parquet",
+      "sha256": "sha256:c7b5ea0500e58bdafdeebada8246f9e4b4e9a46b073a2f11860c74fb6a0eea9b"
+    },
+    "market_scores": {
+      "path": "data/source/live-20260928/market_scores.parquet",
+      "sha256": "sha256:7286cc561ec36209ec180335b1659ec2ba97756f66f155e17089221d0aa9be17"
+    },
+    "market_pois": {
+      "path": "data/source/live-20260928/market_pois.parquet",
+      "sha256": "sha256:e4775d03557b341a6dbfc5aff324eb6e41544a6140e4f6c5035b872dc7621a85"
+    }
+  }
+}

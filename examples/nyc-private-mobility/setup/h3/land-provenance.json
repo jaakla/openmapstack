@@ -1,0 +1,17 @@
+{
+  "dataset": "NYC Department of City Planning borough boundaries, clipped to shoreline",
+  "source_url": "https://data.cityofnewyork.us/City-Government/Borough-Boundaries/gthc-hcne",
+  "download_url": "https://data.cityofnewyork.us/resource/gthc-hcne.geojson?$limit=10",
+  "retrieved_at": "2026-09-27T18:54:42.469281+00:00",
+  "source_sha256": "sha256:7aa44d9fb611f2f518a226ff994a6516a261a8ce982ccf1e7b37d663687f443c",
+  "source_feature_count": 5,
+  "license_url": "https://opendata.cityofnewyork.us/overview/#termsofuse",
+  "processing": "Intersection with study bbox; topology-preserving simplification at 1 metre in EPSG:32618; WGS84 output",
+  "land_mask_sha256": "sha256:547ff97aa8d1348531aee8d0a7a01ba0648eae7f8874c8355d362bab0db1b4e2",
+  "bbox": [
+    -74.03,
+    40.7,
+    -73.91,
+    40.775
+  ]
+}

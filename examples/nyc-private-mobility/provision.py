@@ -7,7 +7,8 @@ analysis implementation and runs exclusively from pinned local snapshots).
 
 Commands:
 
-    python provision.py postgis          # schema.sql -> seed.sql -> security.sql
+    python provision.py postgis          # schema.sql -> seed.sql -> TLC point seed -> security.sql
+    python provision.py augment-fleet    # add pinned TLC-derived demo points to existing PostGIS
     python provision.py bigquery         # + column-security.sql with --policy-tag
     python provision.py motherduck
     python provision.py all              # every backend whose credentials are set
@@ -52,6 +53,7 @@ ROOT = Path(__file__).resolve().parent
 SETUP = ROOT / "setup" / "postgis"
 BIGQUERY_SETUP = ROOT / "setup" / "bigquery"
 MOTHERDUCK_SETUP = ROOT / "setup" / "motherduck"
+TLC_SAMPLE = ROOT / "data" / "source" / "tlc-2016-pickups.json"
 
 READER_NAME_DEFAULT = "oms_alpha_reader"
 BIGQUERY_DATASET_DEFAULT = "northstar_analytics"
@@ -115,9 +117,79 @@ def substitute_variables(sql: str, params: dict[str, str]) -> str:
     return re.sub(r"\x00(\d+)\x00", lambda m: spans[int(m.group(1))], substituted)
 
 
+def fixture_sql(path: Path) -> str:
+    sql = path.read_text(encoding="utf-8")
+    if "__H3_ZONES__" in sql:
+        sql = sql.replace("__H3_ZONES__", (path.parent / "zones.sql").read_text(encoding="utf-8"))
+    return sql
+
+
+def fixture_zone_count() -> int:
+    return len(json.loads((ROOT / "setup/h3/cells.json").read_text()))
+
+
+def augment_fleet_from_tlc(connection) -> int:
+    """Idempotently add synthetic alpha vehicles at pinned 2016 TLC pickups.
+
+    The public rows are trip pickup coordinates. Vehicle IDs, statuses and
+    2026 observation times are generated demo attributes, never TLC claims.
+    The spatial join refuses points outside the provisioned H3 catalogue.
+    """
+    sample = json.loads(TLC_SAMPLE.read_text(encoding="utf-8"))
+    if sample.get("schema") != "northstar-tlc-pickup-coordinate-seed/v1":
+        raise ValueError("unrecognized TLC coordinate seed")
+    records = sample["records"]
+    if len(records) != sample["selected_rows"] or not records:
+        raise ValueError("TLC coordinate seed count mismatch")
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            CREATE TEMP TABLE tlc_demo_points (
+                sample_id integer PRIMARY KEY, h3_cell text NOT NULL,
+                longitude double precision NOT NULL, latitude double precision NOT NULL
+            ) ON COMMIT DROP
+        """)
+        with cursor.copy("COPY tlc_demo_points (sample_id,h3_cell,longitude,latitude) FROM STDIN") as copy:
+            for index, row in enumerate(records, 1):
+                copy.write_row((index, row["h3_cell"], row["longitude"], row["latitude"]))
+        cursor.execute("""
+            SELECT count(*) FROM tlc_demo_points p
+            LEFT JOIN ops.taxi_zones z ON z.h3_cell = p.h3_cell
+              AND ST_Contains(z.geom, ST_SetSRID(ST_Point(p.longitude,p.latitude),4326))
+            WHERE z.zone_id IS NULL
+        """)
+        if cursor.fetchone()[0]:
+            raise ValueError("TLC coordinate seed contains points outside the H3 grid")
+        cursor.execute("""
+            INSERT INTO ops.fleet_positions
+                (tenant_id,vehicle_id,taxi_zone_id,status,recorded_at,geom)
+            SELECT 'alpha', 'TLC16-DEMO-' || lpad(p.sample_id::text,4,'0'), z.zone_id,
+                   (ARRAY['idle','on_trip','charging','maintenance'])[1 + p.sample_id % 4],
+                   timestamptz '2026-09-01 09:00:00+00' + p.sample_id * interval '1 minute',
+                   ST_SetSRID(ST_Point(p.longitude,p.latitude),4326)
+            FROM tlc_demo_points p
+            JOIN ops.taxi_zones z ON z.h3_cell = p.h3_cell
+            WHERE NOT EXISTS (
+                SELECT 1 FROM ops.fleet_positions existing
+                WHERE existing.tenant_id = 'alpha'
+                  AND existing.vehicle_id = 'TLC16-DEMO-' || lpad(p.sample_id::text,4,'0')
+            )
+        """)
+        inserted = cursor.rowcount
+        cursor.execute("""
+            SELECT count(*), count(DISTINCT vehicle_id)
+            FROM ops.fleet_positions
+            WHERE tenant_id = 'alpha' AND vehicle_id LIKE 'TLC16-DEMO-%'
+        """)
+        total, unique = cursor.fetchone()
+        if total != len(records) or unique != total:
+            raise ValueError("TLC-derived fleet seed is incomplete or duplicated")
+    connection.commit()
+    return inserted
+
+
 def _apply_sql_file(connection, path: Path, params: dict[str, str]) -> None:
     """Apply a SQL file with psql-compatible ``:var`` substitution."""
-    sql = substitute_variables(path.read_text(encoding="utf-8"), params)
+    sql = substitute_variables(fixture_sql(path), params)
     with connection.cursor() as cursor:
         cursor.execute(sql)
     connection.commit()
@@ -159,9 +231,12 @@ def provision_postgis(admin_dsn: str, reader_name: str, reader_password: str) ->
                     cursor.execute(f'REVOKE ALL ON SCHEMA "{schema}" FROM "{reader_name}"')
             cursor.execute(f'DROP ROLE IF EXISTS "{reader_name}"')
         connection.commit()
-        for name in ("schema.sql", "seed.sql", "security.sql"):
+        for name in ("schema.sql", "seed.sql"):
             print(f"applying {name}")
             _apply_sql_file(connection, SETUP / name, params)
+        print(f"added {augment_fleet_from_tlc(connection)} TLC-derived synthetic fleet observations")
+        print("applying security.sql")
+        _apply_sql_file(connection, SETUP / "security.sql", params)
     print("postgis fixture provisioned")
 
 
@@ -204,7 +279,7 @@ def verify_postgis(reader_dsn: str) -> int:
     finally:
         connection.close()
     checks = {
-        "taxi_zones >= 60": zones >= 60,
+        "H3 catalogue complete": zones == fixture_zone_count(),
         "fleet_positions RLS-visible": fleet > 0,
         "hubs only tenant alpha": hub_tenants == 1,
         "no other-tenant rows visible": other_tenant_rows == 0,
@@ -249,7 +324,7 @@ def _bigquery_client(credentials: str, project: str, location: str):
 
 def _run_bigquery_script(client, path: Path, params: dict[str, str]) -> None:
     """Submit one setup file as a single BigQuery script job."""
-    sql = substitute_variables(path.read_text(encoding="utf-8"), params)
+    sql = substitute_variables(fixture_sql(path), params)
     print(f"applying {path.name}")
     client.query(sql).result()
 
@@ -446,7 +521,7 @@ def provision_motherduck(admin_token: str, database: str) -> None:
             raise SystemExit("the motherduck fixture needs DuckDB Spatial (geometry columns in schema.sql)")
         for name in ("schema.sql", "seed.sql", "security.sql"):
             print(f"applying {name}")
-            connection.execute((MOTHERDUCK_SETUP / name).read_text(encoding="utf-8"))
+            connection.execute(fixture_sql(MOTHERDUCK_SETUP / name))
     finally:
         connection.close()
     print("motherduck fixture provisioned")
@@ -488,6 +563,9 @@ def verify_motherduck(reader_token: str, database: str) -> tuple[dict, list[str]
     session = connector._session()
     try:
         zones = session.execute("SELECT count(*) FROM market.zone_market_scores").fetchone()[0]
+        visible_zones, distinct_zones = session.execute(
+            "SELECT count(*), count(DISTINCT taxi_zone_id) FROM market.analysis_zone_scores"
+        ).fetchone()
         pois = session.execute("SELECT count(*) FROM market.relevant_pois").fetchone()[0]
         session_writable = _can_write(session)
     finally:
@@ -500,7 +578,7 @@ def verify_motherduck(reader_token: str, database: str) -> tuple[dict, list[str]
         raw.close()
 
     checks = {
-        "zone_market_scores complete (60)": zones == 60,
+        "analysis scores cover each source market zone once": zones > 0 and visible_zones == zones == distinct_zones,
         "relevant_pois complete (240)": pois == 240,
         "analysis views present": "analysis_zone_poi_counts" in by_name,
         "connector session refuses writes": not session_writable,
@@ -556,7 +634,7 @@ def _verdict(results: list[tuple[str, bool]], unconfigured_total: int) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=["postgis", "bigquery", "motherduck", "all", "verify", "destroy"])
+    parser.add_argument("command", choices=["postgis", "augment-fleet", "bigquery", "motherduck", "all", "verify", "destroy"])
     parser.add_argument("--admin-dsn", default=None, help="defaults to OMS_DEMO_POSTGIS_ADMIN_DSN")
     parser.add_argument("--reader-dsn", default=None, help="defaults to OMS_DEMO_POSTGIS_DSN")
     parser.add_argument("--reader-name", default=READER_NAME_DEFAULT)
@@ -621,6 +699,13 @@ def main(argv: list[str] | None = None) -> int:
         if not admin_dsn:
             raise SystemExit("an admin DSN is required: --admin-dsn or OMS_DEMO_POSTGIS_ADMIN_DSN")
         provision_postgis(admin_dsn, args.reader_name, reader_password)
+        return 0
+    if args.command == "augment-fleet":
+        if not admin_dsn:
+            raise SystemExit("an admin DSN is required: --admin-dsn or OMS_DEMO_POSTGIS_ADMIN_DSN")
+        with _connect(admin_dsn) as connection:
+            inserted = augment_fleet_from_tlc(connection)
+        print(f"added {inserted} TLC-derived synthetic fleet observations")
         return 0
     if args.command == "bigquery":
         _provision_bigquery()
