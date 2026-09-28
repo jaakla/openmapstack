@@ -2,6 +2,8 @@
 
 **AI agent skills for geospatial decisions, data discovery, spatial SQL and reproducible analysis projects.**
 
+Explore the [project homepage and two interactive example dashboards](https://jaakla.github.io/openmapstack-skills/). The static Pages site is assembled from the generated NYC and Tartu dashboards with `python3 scripts/build_project_pages.py`; no warehouse credentials are needed to serve it.
+
 Install (assuming you have git and nodejs with npx already installed):
 ```bash
 npx skills@1.5.26 add jaakla/openmapstack-skills --skill open-map-stack -g

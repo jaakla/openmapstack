@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="OpenMapStack: inspectable, reproducible geospatial work and two interactive example dashboards.">
+  <title>OpenMapStack · Geospatial work you can inspect and rerun</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="OpenMapStack home">
+        <svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true" focusable="false">
+          <path d="M18 3 33 11 18 19 3 11Z"/><path d="m3 17 15 8 15-8v5l-15 8L3 22Z"/><path d="m3 27 15 8 15-8v-3l-15 8L3 24Z"/>
+        </svg>
+        <span>OpenMapStack</span>
+      </a>
+      <nav aria-label="Main navigation">
+        <a href="https://github.com/jaakla/openmapstack-skills">GitHub</a>
+        <a href="https://github.com/jaakla/openmapstack-skills#openmapstack">Install</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="intro-title">
+        <div class="hero-copy">
+          <h1 id="intro-title">Geospatial work you can inspect and rerun.</h1>
+          <p>OpenMapStack helps coding agents produce reproducible GIS work with pinned sources, explicit assumptions, validation, and maps you can explore.</p>
+          <a class="primary-link" href="#examples">Explore the examples <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <svg viewBox="0 0 630 360" preserveAspectRatio="xMidYMid slice" focusable="false">
+            <defs><pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse"><path d="M64 0H0V64" fill="none" stroke="#d7e2e3" stroke-width=".8"/></pattern></defs>
+            <rect width="630" height="360" fill="url(#grid)"/>
+            <g fill="none" stroke="#a8c6c9" stroke-width="1.15" opacity=".8">
+              <path d="M-80 300C40 205 42 310 169 226S310 100 423 168 524 267 710 145"/>
+              <path d="M-80 278C40 183 44 288 168 204S311 78 425 146 525 245 710 123"/>
+              <path d="M-80 256C40 161 46 266 167 182S312 56 427 124 526 223 710 101"/>
+              <path d="M-80 234C40 139 48 244 166 160S313 34 429 102 527 201 710 79"/>
+              <path d="M-80 212C40 117 50 222 165 138S314 12 431 80 528 179 710 57"/>
+              <path d="M-80 322C40 227 40 332 170 248S309 122 421 190 523 289 710 167"/>
+              <path d="M-80 344C40 249 38 354 171 270S308 144 419 212 522 311 710 189"/>
+              <path d="M-80 366C40 271 36 376 172 292S307 166 417 234 521 333 710 211"/>
+            </g>
+            <g fill="none" stroke="#78a9ae" stroke-width="1.4" opacity=".55"><path d="M83 49v18m-9-9h18M464 49v18m-9-9h18M548 291v18m-9-9h18M296 286v18m-9-9h18"/></g>
+          </svg>
+        </div>
+      </section>
+
+      <section class="examples" id="examples" aria-labelledby="examples-title">
+        <h2 id="examples-title">Worked examples</h2>
+        <article class="example">
+          <div class="example-copy">
+            <h3>NYC mobility</h3>
+            <p>A hub-siting analysis across an H3 study grid. Business records are seeded demo data; some synthetic fleet locations use historical 2016 NYC TLC taxi pickup coordinates.</p>
+            <a class="text-link" href="./demos/nyc/">Open dashboard <span aria-hidden="true">→</span></a>
+          </div>
+          <a class="example-preview" href="./demos/nyc/" aria-label="Open NYC mobility dashboard">
+            <img src="./assets/nyc-preview.svg" alt="Map preview of NYC H3 analysis cells and fleet points" width="720" height="260" loading="lazy">
+          </a>
+        </article>
+        <article class="example">
+          <div class="example-copy">
+            <h3>Tartu development</h3>
+            <p>A public-source parcel and walking-access analysis with explicit hypothetical scenarios. The municipal education source does not state a reuse license.</p>
+            <a class="text-link" href="./demos/tartu/">Open dashboard <span aria-hidden="true">→</span></a>
+          </div>
+          <a class="example-preview" href="./demos/tartu/" aria-label="Open Tartu development dashboard">
+            <img src="./assets/tartu-preview.svg" alt="Map preview of Tartu road network and candidate parcels" width="720" height="260" loading="lazy">
+          </a>
+        </article>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <strong>OpenMapStack</strong>
+      <span>Open geospatial skills and reproducible example projects.</span>
+      <a href="https://github.com/jaakla/openmapstack-skills">View source on GitHub <span aria-hidden="true">↗</span></a>
+    </footer>
+  </div>
+</body>
+</html>
