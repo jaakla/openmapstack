@@ -18,7 +18,6 @@ class ProjectPagesTests(unittest.TestCase):
             homepage = (output / "index.html").read_text(encoding="utf-8")
             self.assertIn('href="./demos/nyc/"', homepage)
             self.assertIn('href="./demos/tartu/"', homepage)
-            self.assertIn("does not state a reuse license", homepage)
             for relative in (
                 "styles.css", "assets/nyc-preview.svg", "assets/tartu-preview.svg",
                 "demos/nyc/index.html", "demos/tartu/index.html",
@@ -30,6 +29,8 @@ class ProjectPagesTests(unittest.TestCase):
                                   ("tartu-development", "tartu")):
                 self.assertEqual((ROOT / "examples" / example / "dashboard.html").read_bytes(),
                                  (output / "demos" / slug / "index.html").read_bytes())
+            self.assertIn("License not stated in ArcGIS item metadata",
+                          (output / "demos/tartu/index.html").read_text(encoding="utf-8"))
             for name in ("nyc-preview.svg", "tartu-preview.svg"):
                 preview = ElementTree.parse(output / "assets" / name).getroot()
                 self.assertTrue(any(child.tag.endswith("path") for child in preview))
