@@ -3,6 +3,9 @@ name: Import saved evals into LangSmith
 on:
   workflow_dispatch:
     inputs:
+      verify-import-run:
+        description: Existing LangSmith import workflow run ID to verify read-only (skips upload)
+        default: ''
       source-run:
         description: Existing eval workflow run ID (no agents will be rerun)
         required: true
@@ -39,7 +42,63 @@ permissions:
   actions: read
 
 jobs:
+  verify:
+    if: inputs.verify-import-run != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download existing import receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMPORT_RUN: ${{ inputs.verify-import-run }}
+        run: gh run download "$IMPORT_RUN" --repo "$GITHUB_REPOSITORY" --name "langsmith-review-$IMPORT_RUN" --dir previous-import
+      - name: Verify saved dataset and experiment using read-only API requests
+        env:
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          REGION: ${{ inputs.region }}
+        run: |
+          python - <<'PY'
+          import json, os, uuid
+          from pathlib import Path
+          from urllib.request import Request, build_opener, HTTPRedirectHandler
+          from urllib.error import HTTPError
+          receipt = json.loads(Path('previous-import/receipt.json').read_text())
+          dataset = receipt['dataset']
+          workspace = str(uuid.UUID(dataset['tenant_id']))
+          dataset_id = str(uuid.UUID(dataset['id']))
+          experiment_id = str(uuid.UUID(receipt['experiment']['id']))
+          base = 'https://eu.api.smith.langchain.com' if os.environ['REGION'] == 'eu' else 'https://api.smith.langchain.com'
+          headers = {'X-Api-Key': os.environ['LANGSMITH_API_KEY'], 'X-Tenant-Id': workspace}
+          class NoRedirect(HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+          opener = build_opener(NoRedirect)
+          checks = {
+              'workspace': '/settings',
+              'dataset': '/datasets/' + dataset_id,
+              'examples': '/examples?dataset=' + dataset_id + '&limit=1',
+              'experiment': '/sessions/' + experiment_id,
+          }
+          for label, path in checks.items():
+              try:
+                  with opener.open(Request(base + '/api/v1' + path, headers=headers), timeout=45) as response:
+                      data = json.load(response)
+                  if isinstance(data, list):
+                      evidence = {'returned_count': len(data)}
+                      if data:
+                          evidence['first_item_id'] = data[0].get('id')
+                  else:
+                      evidence = {key: data.get(key) for key in ('id', 'name', 'display_name', 'tenant_id', 'reference_dataset_id') if key in data}
+                  print(label + ': HTTP 200 ' + json.dumps(evidence))
+              except HTTPError as error:
+                  print(label + ': HTTP ' + str(error.code))
+          print('Receipt workspace: ' + workspace)
+          print('Receipt dataset: ' + dataset_id)
+          PY
   import:
+    if: inputs.verify-import-run == ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
