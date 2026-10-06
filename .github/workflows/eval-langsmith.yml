@@ -19,10 +19,10 @@ on:
         options: [claude_code, codex, openai_compatible]
         default: claude_code
       case:
-        description: Case ID (empty imports every attempted case in this arm)
+        description: Case ID (all imports every attempted case in this arm)
         default: '001-basic-spatial-analysis'
       trial:
-        description: Repetition number
+        description: Repetition number (all imports every repetition)
         default: '2'
       arm:
         description: Arm to import
@@ -117,7 +117,7 @@ jobs:
           SOURCE_AGENT: ${{ inputs.agent }}
         run: gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name "eval-benchmark-$SOURCE_AGENT-$SOURCE_RUN" --dir saved-evidence
       - name: Build commit-matched fixture reference for the pilot
-        if: inputs.reference && (inputs.case == '' || inputs.case == '001-basic-spatial-analysis')
+        if: inputs.reference && (inputs.case == '' || inputs.case == 'all' || inputs.case == '001-basic-spatial-analysis')
         env:
           SOURCE_AGENT: ${{ inputs.agent }}
           OPENMAPSTACK_SPATIAL_EXTENSION_DIR: ${{ runner.temp }}/langsmith-reference-spatial
@@ -169,8 +169,8 @@ jobs:
             export LANGSMITH_ENDPOINT=https://api.smith.langchain.com
           fi
           selection=()
-          if [ -n "$CASE_ID" ]; then selection+=(--case "$CASE_ID"); fi
-          if [ -n "$TRIAL" ]; then selection+=(--trial "$TRIAL"); fi
+          if [ -n "$CASE_ID" ] && [ "$CASE_ID" != all ]; then selection+=(--case "$CASE_ID"); fi
+          if [ -n "$TRIAL" ] && [ "$TRIAL" != all ]; then selection+=(--trial "$TRIAL"); fi
           if [ -n "$ARM" ]; then selection+=(--arm "$ARM"); fi
           if [ -d reference-artifacts ]; then selection+=(--references reference-artifacts); fi
           if [ -f previous-import/upload.json ]; then selection+=(--exclude-imported previous-import/upload.json); fi

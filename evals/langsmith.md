@@ -117,8 +117,8 @@ the HTTPS GitHub Pages URL is the portable option.
   content, inheriting the saved run's redaction. Raw provider event streams and
   entire project archives are not uploaded.
 
-The first CI pilot imports only one trial. After checking the view, clear `case`
-and `trial` in the manual workflow to import all attempted trials for the selected
+The first CI pilot imports only one trial. After checking the view, set `case`
+and `trial` to `all` in the manual workflow to import all attempted trials for the selected
 arm. To import only the remaining trials, set `exclude-import-run` to the prior
 successful import workflow run ID. It reads that run's `upload.json` and skips
 matching trial identities from the same dataset/source run/model. Locally, use
