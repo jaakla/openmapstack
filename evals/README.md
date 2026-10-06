@@ -121,6 +121,30 @@ Scenario input files are checked in under
 `evals/fixtures/spatial-scenarios/<scenario>/`, and the runner's automatic
 byte-identity check verifies the generator copies them unmodified.
 
+## Coordinate-order boundary regression
+
+Case `018-coordinate-order-boundaries` is a focused fixture/live task for the
+shipped coordinate-order guidance. It converts one named asymmetric Tallinn
+anchor into GeoJSON, MapLibre, Leaflet LatLng and Leaflet GeoJSON payloads.
+The grader compares actual numeric pairs against independent ordered oracles;
+a CRS label, legal coordinate ranges or consistent-but-swapped outputs cannot
+establish the correct location. `geodata.coordinate_pair_equals` is explicitly
+a known-answer check, not an oracle-free spatial validation.
+
+Mutations `929`–`932` swap just one interface each, pin the
+`coordinate_pair_mismatch` failure code, and require a healthy control twin.
+This is a small boundary-conversion task, so it does not require a full
+analysis-project scaffold. It tests coordinate order rather than reprojection,
+rendering, or live model adherence; a fixture pass does not prove an agent pass.
+
+Run the offline controls without a model account or GIS runtime:
+
+```bash
+python3 evals/run.py --mode fixture --case 018-coordinate-order-boundaries \
+  --case 929-geojson-coordinate-swapped --case 930-maplibre-coordinate-swapped \
+  --case 931-leaflet-latlng-coordinate-swapped --case 932-leaflet-geojson-coordinate-swapped
+```
+
 ## Visual integration (PyQGIS + browser)
 
 Fixture CI proves the deterministic contracts; it deliberately cannot prove
