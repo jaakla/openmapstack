@@ -55,7 +55,6 @@ jobs:
   live-benchmark:
     name: live benchmark (${{ matrix.agent }})
     runs-on: ubuntu-latest
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -171,6 +170,13 @@ jobs:
           for case in $EVAL_CASES; do args+=(--case "$case"); done
           python evals/run.py "${args[@]}"
 
+      - name: Build Allure review report
+        if: always() && steps.selection.outputs.run == 'true'
+        uses: ./.github/actions/eval-report
+        with:
+          results: eval-benchmark-results-${{ matrix.agent }}.json
+          artifact-name: allure-live-${{ matrix.agent }}-${{ github.run_id }}-${{ github.run_attempt }}
+
       - name: Upload complete benchmark evidence
         if: always() && steps.selection.outputs.run == 'true'
         uses: actions/upload-artifact@v4
@@ -180,3 +186,4 @@ jobs:
           path: |
             eval-benchmark-results-${{ matrix.agent }}.json
             evals/results/**
+            !evals/results/report/**

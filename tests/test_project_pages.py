@@ -16,6 +16,9 @@ class ProjectPagesTests(unittest.TestCase):
             output = Path(directory)
             build(output)
             homepage = (output / "index.html").read_text(encoding="utf-8")
+            renderer = (output / "langsmith/index.html").read_text(encoding="utf-8")
+            self.assertIn('/* SAVED_REVIEW_DATA */ null', renderer)
+            self.assertIn("Waiting for LangSmith", renderer)
             self.assertIn('href="./demos/nyc/"', homepage)
             self.assertIn('href="./demos/tartu/"', homepage)
             for relative in (

@@ -81,6 +81,13 @@ jobs:
             --volume "${PWD}/evals/results:/results" \
             openmapstack-evals-offline
 
+      - name: Build Allure review report
+        if: always()
+        uses: ./.github/actions/eval-report
+        with:
+          results: eval-results.json
+          artifact-name: allure-fixture-${{ github.run_id }}-${{ github.run_attempt }}
+
       - name: Upload eval and coverage results
         if: always()
         uses: actions/upload-artifact@v4

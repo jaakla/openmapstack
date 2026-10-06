@@ -1,0 +1,57 @@
+name: Review eval evidence with Allure
+description: Export existing eval JSON, generate a portable HTML report, and attach the diagnosis to the job summary
+inputs:
+  results:
+    description: Eval v2 JSON file (relative to repository root)
+    required: true
+  artifact-name:
+    description: Unique artifact name for this job or matrix leg
+    required: true
+  output:
+    description: Fresh report directory
+    default: evals/results/report
+runs:
+  using: composite
+  steps:
+    - name: Export Allure results and job summary
+      id: export
+      if: always()
+      shell: bash
+      env:
+        EVAL_REPORT_INPUT: ${{ inputs.results }}
+        EVAL_REPORT_OUTPUT: ${{ inputs.output }}
+      run: |
+        python3 evals/report.py "$EVAL_REPORT_INPUT" --allow-missing --output "$EVAL_REPORT_OUTPUT/allure-results"
+        cat "$EVAL_REPORT_OUTPUT/allure-results/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+    - uses: actions/setup-node@v4
+      id: node
+      if: always() && steps.export.outcome == 'success'
+      with:
+        node-version: '24'
+
+    - name: Generate portable Allure HTML
+      if: always() && steps.export.outcome == 'success' && steps.node.outcome == 'success'
+      shell: bash
+      env:
+        EVAL_REPORT_OUTPUT: ${{ inputs.output }}
+      run: |
+        npx --yes allure@3.20.0 awesome "$EVAL_REPORT_OUTPUT/allure-results" --single-file --output "$EVAL_REPORT_OUTPUT/html" --report-name 'OpenMapStack eval review'
+
+    - name: Upload review report
+      id: report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ inputs.output }}/
+        if-no-files-found: warn
+
+    - name: Link review artifact
+      if: always() && steps.report.outputs.artifact-url != ''
+      shell: bash
+      env:
+        EVAL_REPORT_URL: ${{ steps.report.outputs.artifact-url }}
+      run: |
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo "[Download Allure report and evidence]($EVAL_REPORT_URL) — extract the artifact and open html/index.html." >> "$GITHUB_STEP_SUMMARY"

@@ -39,6 +39,13 @@ jobs:
       - name: Run visual integration evals
         run: python3 evals/run.py --mode visual --json eval-visual-results.json
 
+      - name: Build Allure review report
+        if: always()
+        uses: ./.github/actions/eval-report
+        with:
+          results: eval-visual-results.json
+          artifact-name: allure-visual-${{ github.run_id }}-${{ github.run_attempt }}
+
       - name: Upload visual evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -47,4 +54,5 @@ jobs:
           path: |
             eval-visual-results.json
             evals/results/
+            !evals/results/report/**
           if-no-files-found: warn
