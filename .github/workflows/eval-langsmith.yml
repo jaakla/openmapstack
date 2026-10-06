@@ -58,8 +58,10 @@ jobs:
         if: inputs.reference && inputs.case == '001-basic-spatial-analysis'
         env:
           SOURCE_AGENT: ${{ inputs.agent }}
+          OPENMAPSTACK_SPATIAL_EXTENSION_DIR: ${{ runner.temp }}/langsmith-reference-spatial
         run: |
           python -m pip install 'duckdb>=1.2' 'PyYAML>=6'
+          python evals/prepare_spatial.py
           TASK_COMMIT=$(python - <<'PY'
           import json, os, re
           from pathlib import Path
