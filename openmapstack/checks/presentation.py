@@ -158,9 +158,11 @@ def table_downloads_linked(workspace: Path, project_dir: str = ".", dashboard: s
         return passed("no tables declared in the view (vacuously true)")
     root = project_root(workspace, project_dir)
     outputs = proj.get("outputs") or {}
-    candidates = [dashboard] if dashboard else [
+    # The dashboard first: a report declared before it must not stand in for
+    # the view that shows the tables.
+    candidates = [dashboard] if dashboard else ["dashboard.html"] + [
         o.get("path") for o in outputs.values() if isinstance(o, dict) and str(o.get("path", "")).lower().endswith((".html", ".htm"))
-    ] + ["dashboard.html"]
+    ]
     page = next((root / c for c in candidates if c and (root / c).is_file()), None)
     if page is None:
         return not_testable("no dashboard HTML found to inspect", code="dashboard_missing")

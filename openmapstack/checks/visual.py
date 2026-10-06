@@ -218,7 +218,8 @@ def _playwright():
     return sync_playwright
 
 
-_MAP_SELECTOR = '[data-testid="map"], #map, .maplibregl-map, canvas'
+_MAP_CONTAINER_SELECTOR = '[data-testid="map"], #map, .maplibregl-map'
+_MAP_SELECTOR = f"{_MAP_CONTAINER_SELECTOR}, canvas"
 _LEGEND_SELECTOR = '[data-testid="legend"], #legend, .legend'
 _PROVENANCE_SELECTOR = '[data-testid="provenance"], #provenance, .provenance'
 _WARNINGS_SELECTOR = '[data-testid="warnings"], #warnings, .warnings'
@@ -241,11 +242,14 @@ def _dashboard_layout_problems(page: Any) -> list[str]:
     viewport = page.viewport_size
     if viewport is None:
         return ["browser viewport is unavailable"]
-    map_element = _first_visible(page, _MAP_SELECTOR, require_height=True)
+    # An explicit map container wins; a bare canvas may be a chart, so it is
+    # the map only when no container is visible.
+    selector = _MAP_CONTAINER_SELECTOR if _first_visible(page, _MAP_CONTAINER_SELECTOR) else "canvas"
+    map_element = _first_visible(page, selector, require_height=True)
     if map_element is None:
         # A map container without a CSS height collapses to 0 px. It still has
         # a width, and a zero-height box satisfies every containment test below.
-        if _first_visible(page, _MAP_SELECTOR) is not None:
+        if _first_visible(page, selector) is not None:
             return ["map element has zero height"]
         return ["map element is absent"]
     map_box = map_element.bounding_box()

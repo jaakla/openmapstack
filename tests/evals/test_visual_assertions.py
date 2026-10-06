@@ -868,6 +868,26 @@ class DashboardLayoutTests(unittest.TestCase):
         self.assertIn("1440x900: map element has zero height", result.detail)
         self.assertIn("390x844: map element has zero height", result.detail)
 
+    def sidebar_chart_dashboard(self, map_css):
+        workspace = make_workspace()
+        write_dashboard(workspace, "<!doctype html><style>html,body{margin:0;height:100%}"
+                                   "#side{position:absolute;left:0;top:0;width:200px}"
+                                   ".layer-control{position:absolute;right:10px;top:10px}" + map_css + "</style>"
+                                   "<div id='side'><canvas width='180' height='120'></canvas></div>"
+                                   "<div id='map'><div class='layer-control'><button>Layers</button></div></div>")
+        return workspace
+
+    def test_chart_canvas_before_the_map_is_not_the_map(self):
+        result = visual.dashboard_layout_within_viewport(self.sidebar_chart_dashboard(
+            "#map{position:absolute;left:220px;top:0;right:0;bottom:0}"))
+        self.assertEqual(result.status, "passed", result.detail)
+
+    def test_zero_height_map_beside_a_chart_still_fails(self):
+        result = visual.dashboard_layout_within_viewport(self.sidebar_chart_dashboard(
+            "#map{position:absolute;left:220px;top:0;right:0;height:0}"))
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertIn("map element has zero height", result.detail)
+
     def test_collapsed_canvas_before_the_map_is_not_the_map(self):
         workspace = make_workspace()
         write_dashboard(workspace, "<!doctype html><style>html,body{margin:0;height:100%}"

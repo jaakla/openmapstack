@@ -171,7 +171,8 @@ def _conforms(value: Any, kind: str) -> bool:
     if _blank(value):
         return True
     if kind == "string":
-        return True
+        # CSV readers return text; typed JSON, XLSX and Parquet cells must be text too.
+        return isinstance(value, str)
     if kind == "boolean":
         return isinstance(value, bool) or str(value).strip().lower() in {"true", "false", "0", "1"}
     if kind == "integer":

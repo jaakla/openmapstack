@@ -170,6 +170,18 @@ class TableCheckTests(unittest.TestCase):
                 result = tables.columns_declared(self.workspace, path="data/derived/dates.csv", columns=columns)
                 self.assertEqual(result.status, status, result.detail)
 
+    def test_typed_values_in_a_string_column_fail(self) -> None:
+        columns = [{"name": "scenario", "type": "string"}]
+        target = self.workspace / "data/derived/typed.json"
+        for value in (1, 2.5, True, {"a": 1}, [1]):
+            with self.subTest(value=value):
+                target.write_text(json.dumps([{"scenario": "walk"}, {"scenario": value}]))
+                result = tables.columns_declared(self.workspace, path="data/derived/typed.json", columns=columns)
+                self.assertEqual((result.status, result.data.get("code")), ("failed", "table_type_mismatch"))
+        target.write_text(json.dumps([{"scenario": "walk"}, {"scenario": ""}, {"scenario": None}]))
+        result = tables.columns_declared(self.workspace, path="data/derived/typed.json", columns=columns)
+        self.assertEqual(result.status, "passed", result.detail)
+
     def test_duckdb_written_dates_and_timestamps_conform(self) -> None:
         try:
             import duckdb
@@ -370,6 +382,19 @@ class PresentationTableTests(unittest.TestCase):
         workspace = self._workspace('<a href="data/derived/summary.csv">CSV</a>')
         result = presentation_checks.table_downloads_linked(workspace)
         self.assertEqual((result.status, result.data["code"]), ("failed", "table_download_unlinked"))
+
+    def test_the_dashboard_wins_over_an_earlier_report(self) -> None:
+        workspace = make_workspace()
+        project = _table_project()
+        project["presentation"]["tables"] = [{"output": "summary", "downloads": ["csv", "json"]}]
+        project["outputs"] = {"report": {"path": "report.html", "format": "HTML", "kind": "document", "generated_by": "export"},
+                              **project["outputs"],
+                              "dashboard": {"path": "dashboard.html", "format": "HTML", "kind": "document", "generated_by": "export"}}
+        write_project(workspace, project)
+        (workspace / "report.html").write_text("<p>Summary report</p>")
+        (workspace / "dashboard.html").write_text('<a href="data/derived/summary.csv">CSV</a> <a href="data/derived/summary.json">JSON</a>')
+        result = presentation_checks.table_downloads_linked(workspace)
+        self.assertEqual(result.status, "passed", result.detail)
 
     def test_no_dashboard_is_not_testable(self) -> None:
         self.assertEqual(presentation_checks.table_downloads_linked(self._workspace(None)).status, "not_testable")
