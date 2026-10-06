@@ -74,6 +74,15 @@ class EvalReportTests(unittest.TestCase):
         self.assertEqual(parameters["reported_model"]["value"], "<synthetic>")
         self.assertTrue(parameters["reported_model"]["excluded"])
 
+    def test_provider_blocked_trials_are_skipped_with_an_incomplete_summary(self):
+        output, records = self.export([
+            self.trial(status='setup_failed', assertions=[], setup_error={'stage': 'agent_execution', 'message': 'quota reached'}),
+            self.trial(trial=2, status='skipped', assertions=[], skip_category='provider_blocked',
+                       reason='not attempted after quota_exhausted in trial 1'),
+        ])
+        self.assertEqual(sorted(r['status'] for r in records), ['broken', 'skipped'])
+        self.assertIn('Run incomplete: 1 trials not attempted', (output / 'summary.md').read_text())
+
     def test_bundle_rerun_and_visual_attachments_survive_relocation(self):
         bundle = self.root / "evidence/trial"
         project = bundle / "generated-project"

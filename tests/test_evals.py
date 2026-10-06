@@ -916,6 +916,122 @@ class EvalRunnerTests(_RunnerHarness):
         payload = json.loads(output.read_text(encoding="utf-8"))
         self.assertEqual([result["id"] for result in payload["results"]], ["first", "second"])
 
+    def test_fatal_provider_failure_stops_both_arms_and_retains_incomplete_evidence(self):
+        self.write_case('a-live', modes=['live'])
+        self.write_case('b-live', modes=['live'])
+        self.write_case('z-fixture')
+        calls = []
+        diagnosis = 'Workspace API usage limits reached; access resumes 2026-11-01.'
+        failure = {'category': 'quota_exhausted', 'scope': 'provider', 'retryable': False, 'message': diagnosis}
+        class Adapter:
+            executable = 'fake-agent'
+            def is_available(self):
+                return True
+            def run(self, prompt, workspace, **kwargs):
+                calls.append(workspace)
+                (workspace / 'marker.txt').write_text('ok')
+                failed = len(calls) == 3
+                return AgentRunResult(agent='codex', model=kwargs['model'], workspace=workspace,
+                                      duration_s=0.1, success=not failed, returncode=1 if failed else 0,
+                                      version='fake 1', final_message=diagnosis if failed else 'done',
+                                      failure=failure if failed else None, cost_usd=0.5)
+        output = self.root / 'stopped.json'
+        with patch.object(eval_runner, '_load_adapter', return_value=Adapter()):
+            code, stdout, stderr = self.call_main([
+                '--mode', 'live', '--agent', 'codex', '--model', 'test-model', '--arms', 'paired',
+                '--repetitions', '2', '--seed', '42', '--run-id', 'quota-stop', '--json', str(output),
+            ])
+        self.assertEqual(code, 2, (stdout, stderr))
+        self.assertEqual(len(calls), 3)
+        summary = json.loads(output.read_text())
+        self.assertTrue(summary['run_incomplete'])
+        self.assertEqual(summary['selection']['trials_run'], 3)
+        self.assertEqual(summary['selection']['trials_not_attempted'], 5)
+        self.assertEqual(summary['selection']['case_definitions_skipped'], 1)
+        self.assertEqual(summary['outcomes'], {'passed': 2, 'assertions_failed': 0, 'setup_failed': 1})
+        self.assertEqual(summary['agent_benchmark']['graded_trials'], 2)
+        self.assertEqual(summary['score_types']['agent_benchmark']['trials_run'], 3)
+        trigger = summary['results'][2]
+        self.assertIn(diagnosis, trigger['setup_error']['message'])
+        grading = json.loads((Path(trigger['artifact_bundle']) / 'grading.json').read_text())
+        self.assertEqual(grading['agent_run']['failure'], failure)
+        for row in summary['results'][3:8]:
+            self.assertEqual(row['status'], 'skipped')
+            self.assertEqual(row['skip_category'], 'provider_blocked')
+            self.assertEqual(row['blocked_by']['trial'], 2)
+            self.assertEqual(row['blocked_by']['arm'], 'plain')
+            self.assertIsNone(row['agent_run'])
+            self.assertNotIn('artifact_bundle', row)
+        self.assertIn('STOP   codex: quota_exhausted', stdout)
+        self.assertIn('Run incomplete: 5 trials not attempted', stdout)
+        self.assertEqual(eval_runner.validation_errors(summary, eval_runner._load_eval_schema('results-v2.schema.json')), [])
+
+    def test_trial_failures_and_retryable_provider_errors_do_not_stop_later_calls(self):
+        self.write_case('live', modes=['live'])
+        for failure in (None,
+                        {'category': 'rate_limit', 'scope': 'provider', 'retryable': True, 'message': 'temporary rate limit'},
+                        {'category': 'budget_exhausted', 'scope': 'trial', 'retryable': False, 'message': 'trial budget reached'}):
+            with self.subTest(failure=failure):
+                calls = []
+                class Adapter:
+                    executable = 'fake-agent'
+                    def is_available(self):
+                        return True
+                    def run(self, prompt, workspace, **kwargs):
+                        calls.append(workspace)
+                        # The first invocation fails; the next reaches grading
+                        # and fails a project check; the third is healthy.
+                        if len(calls) == 3:
+                            (workspace / 'marker.txt').write_text('ok')
+                        return AgentRunResult(agent='codex', model=kwargs['model'], workspace=workspace,
+                                              duration_s=0.1, success=len(calls) > 1, returncode=1 if len(calls) == 1 else 0,
+                                              version='fake 1', failure=failure if len(calls) == 1 else None)
+                output = self.root / 'continued.json'
+                with patch.object(eval_runner, '_load_adapter', return_value=Adapter()):
+                    code, stdout, stderr = self.call_main([
+                        '--mode', 'live', '--agent', 'codex', '--model', 'test-model',
+                        '--arms', 'plain', '--repetitions', '3', '--no-retain-artifacts', '--json', str(output),
+                    ])
+                self.assertEqual(code, 2, (stdout, stderr))
+                self.assertEqual(len(calls), 3)
+                summary = json.loads(output.read_text())
+                self.assertFalse(summary['run_incomplete'])
+                self.assertEqual([r['status'] for r in summary['results']], ['setup_failed', 'assertions_failed', 'passed'])
+                self.assertEqual(summary['selection']['trials_not_attempted'], 0)
+
+    def test_fatal_provider_stop_does_not_block_an_independent_adapter(self):
+        for case_id, agent in (('a-blocked', 'codex'), ('b-independent', 'openai_compatible')):
+            case = self.write_case(case_id, modes=['live'])
+            definition = yaml.safe_load((case / 'expected.yaml').read_text())
+            definition['live']['agent'] = agent
+            (case / 'expected.yaml').write_text(yaml.safe_dump(definition))
+        calls = []
+        failure = {'category': 'authentication', 'scope': 'provider', 'retryable': False, 'message': 'Invalid API key'}
+        class Adapter:
+            executable = 'fake-agent'
+            def __init__(self, name):
+                self.name = name
+            def is_available(self):
+                return True
+            def run(self, prompt, workspace, **kwargs):
+                calls.append(self.name)
+                (workspace / 'marker.txt').write_text('ok')
+                failed = self.name == 'codex'
+                return AgentRunResult(agent=self.name, model=kwargs['model'], workspace=workspace,
+                                      duration_s=0.1, success=not failed, returncode=1 if failed else 0,
+                                      version='fake 1', failure=failure if failed else None)
+        output = self.root / 'independent.json'
+        with patch.object(eval_runner, '_load_adapter', side_effect=lambda name, options: Adapter(name)):
+            code, stdout, stderr = self.call_main([
+                '--mode', 'live', '--model', 'test-model', '--arms', 'plain',
+                '--repetitions', '2', '--no-retain-artifacts', '--json', str(output),
+            ])
+        self.assertEqual(code, 2, (stdout, stderr))
+        self.assertEqual(calls, ['codex', 'openai_compatible', 'openai_compatible'])
+        summary = json.loads(output.read_text())
+        self.assertEqual([r['status'] for r in summary['results']], ['setup_failed', 'skipped', 'passed', 'passed'])
+        self.assertEqual(summary['selection']['trials_not_attempted'], 1)
+
 
 class CollectionArmTests(_RunnerHarness):
     def test_collection_injection_exports_v2_without_forcing_all_references(self):

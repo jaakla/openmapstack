@@ -11,9 +11,15 @@
     "schema": {"const": "openmapstack-eval-results/v2"},
     "run_config": {"type": "object"},
     "environment": {"type": "object"},
-    "selection": {"type": "object"},
+    "selection": {
+      "type": "object",
+      "properties": {
+        "trials_not_attempted": {"type": "integer", "minimum": 0}
+      }
+    },
     "outcomes": {"type": "object"},
     "run_setup_failed": {"type": "boolean"},
+    "run_incomplete": {"type": "boolean"},
     "setup_errors": {"type": "array"},
     "score_types": {"type": "object"},
     "agent_benchmark": {

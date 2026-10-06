@@ -10,6 +10,7 @@ unisolated. Only imported by `--mode live` runs, never by fixture CI.
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import time
@@ -27,6 +28,36 @@ ALLOWED_TOOLS = ("Read", "Write", "Edit", "Glob", "Grep", "Bash", "Skill", "WebS
 # Non-secret provider routing the operator may set (e.g. a workspace header
 # that scopes spend); forwarded by name, recorded by name only.
 PROVIDER_SETTINGS = ("ANTHROPIC_BASE_URL", "ANTHROPIC_CUSTOM_HEADERS")
+
+
+def _provider_failure(events: list[dict]) -> dict | None:
+    """Recognize terminal API errors, never quoted/tool/assistant output."""
+    event = next((event for event in reversed(events) if event.get("type") == "result"), {})
+    if event.get("is_error") is not True:
+        return None
+    message = event.get("result")
+    if not isinstance(message, str):
+        return None
+    api_error = re.match(r"API Error:\s*(\d{3})\b", message)
+    if event.get("terminal_reason") != "api_error" and not api_error:
+        return None
+    status = event.get("api_error_status") or (int(api_error[1]) if api_error else None)
+    lower = message.lower()
+    category = None
+    if any(text in lower for text in (
+        "you have reached your specified workspace api usage limits",
+        "you have reached your specified organization api usage limits",
+        "credit balance is too low",
+        "monthly spend limit",
+    )):
+        category = "quota_exhausted"
+    elif status == 401:
+        category = "authentication"
+    elif status == 403:
+        category = "permission_denied"
+    if category is None:
+        return None  # Rate limits, server errors and trial budgets stay local.
+    return {"category": category, "scope": "provider", "retryable": False, "message": message[:2000]}
 
 
 def _claude_observability(events: list[dict], requested_model: str | None) -> tuple[str | None, dict, float | None, str | None, bool]:
@@ -214,6 +245,7 @@ class ClaudeCodeAdapter(AgentAdapter):
             usage=usage,
             cost_usd=cost_usd,
             final_message=final_message,
+            failure=_provider_failure(events) if not success else None,
             permissions={
                 "mode": "acceptEdits",
                 "session_persistence": False,

@@ -13,7 +13,7 @@ from unittest.mock import patch
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "evals"))
 
-from adapters.claude_code import ClaudeCodeAdapter  # noqa: E402
+from adapters.claude_code import ClaudeCodeAdapter, _provider_failure  # noqa: E402
 from adapters.codex import CodexAdapter  # noqa: E402
 from adapters.openai_compatible import OpenaiCompatibleAdapter  # noqa: E402
 
@@ -187,6 +187,51 @@ class AdapterContractTests(unittest.TestCase):
             result = adapter.run("build it", self.workspace, model="claude-test")
         self.assertFalse(result.success)
         return result
+
+    def test_claude_classifies_terminal_quota_and_auth_but_not_local_failures(self):
+        quota = 'API Error: 400 You have reached your specified workspace API usage limits. You will regain access on 2026-11-01 at 00:00 UTC.'
+        for message, expected in (
+            (quota, 'quota_exhausted'),
+            ('API Error: 400 Your credit balance is too low to access the Anthropic API.', 'quota_exhausted'),
+            ('API Error: 401 Invalid API key', 'authentication'),
+            ('API Error: 403 Permission denied', 'permission_denied'),
+            ('API Error: 429 rate_limit_error', None),
+            ('API Error: 500 Internal server error', None),
+            ('API Error: 400 Invalid model', None),
+            ('Exceeded --max-budget-usd', None),
+        ):
+            with self.subTest(message=message):
+                failure = _provider_failure([{'type': 'result', 'is_error': True, 'result': message}])
+                self.assertEqual(failure['category'] if failure else None, expected)
+                if failure:
+                    self.assertFalse(failure['retryable'])
+                    self.assertEqual(failure['scope'], 'provider')
+        self.assertIsNone(_provider_failure([{'type': 'assistant', 'message': {'content': quota}}]))
+        self.assertIsNone(_provider_failure([{'type': 'result', 'is_error': False, 'result': quota}]))
+        self.assertIsNone(_provider_failure([{'type': 'result', 'is_error': True, 'result': 'Quoted error: ' + quota}]))
+
+    def test_claude_quota_failure_retains_partial_usage_and_redacts_diagnosis(self):
+        message = 'API Error: 400 You have reached your specified workspace API usage limits. sk-test-secret'
+        event = {'type': 'result', 'subtype': 'success', 'is_error': True,
+                 'terminal_reason': 'api_error', 'api_error_status': 400, 'result': message,
+                 'total_cost_usd': 0.97, 'usage': {'input_tokens': 12}}
+        def run(command, **kwargs):
+            if command[-1] == '--version':
+                return subprocess.CompletedProcess(command, 0, '2.1.289 (Claude Code)', '')
+            return subprocess.CompletedProcess(command, 1, json.dumps(event), '')
+        with (
+            patch('adapters.claude_code.shutil.which', return_value='/bin/claude'),
+            patch('adapters.claude_code.subprocess.run', side_effect=run),
+            patch('adapters.base.subprocess.run', side_effect=run),
+            patch('adapters.claude_code.unavailable_reason', return_value=None),
+            patch.dict(os.environ, {'ANTHROPIC_API_KEY': 'sk-test-secret'}, clear=True),
+        ):
+            result = ClaudeCodeAdapter(max_budget_usd=2).run('build it', self.workspace, model='claude-test')
+        self.assertFalse(result.success)
+        self.assertEqual(result.failure['category'], 'quota_exhausted')
+        self.assertEqual(result.cost_usd, 0.97)
+        self.assertEqual(result.usage['input_tokens'], 12)
+        self.assertNotIn('sk-test-secret', json.dumps(result.normalized()))
 
     def test_claude_refuses_a_run_without_a_budget_cap(self) -> None:
         result = self._claude_refusal(ClaudeCodeAdapter(), environment={"ANTHROPIC_API_KEY": "k"})
