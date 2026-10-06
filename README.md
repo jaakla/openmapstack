@@ -327,8 +327,9 @@ See `references/project-spec.md`.
 library in `openmapstack/checks/` against what the pipeline actually produced:
 geometry read back through DuckDB Spatial, dataset CRS read from the artifact
 rather than the manifest's claim, validation evidence recomputed from the
-geodata it summarises, and QGIS project structure and runtime loading where
-PyQGIS is available.
+geodata it summarises, non-spatial `kind: table` outputs read back as tables
+(declared columns and types, unique key, CSV/XLSX downloads holding the same
+rows), and QGIS project structure and runtime loading where PyQGIS is available.
 
 ```bash
 openmapstack verify path/to/project.yaml
@@ -356,8 +357,9 @@ checked output. A check whose dependency is missing reports `not_testable` and
 is counted separately — never a silent pass. A mixture of executed and
 `not_testable` checks has aggregate status `warning`, and every report includes
 `applicable`, `executed`, and `execution_rate` coverage. Install
-`openmapstack[geo]` for the DuckDB-backed geodata checks; PyQGIS comes from a
-system QGIS install.
+`openmapstack[geo]` for the DuckDB-backed geodata checks and for reading XLSX
+(DuckDB `excel` extension) and Parquet tables; CSV and JSON tables need nothing
+extra. PyQGIS comes from a system QGIS install.
 
 See [the applicability reference](docs/verify-applicability.md) for the exact
 plan conditions, dependencies, current regression evidence, and deliberate

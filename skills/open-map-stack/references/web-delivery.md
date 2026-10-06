@@ -371,6 +371,7 @@ Smoke test before handing off:
 * Browser devtools show `206 Partial Content` or equivalent ranged responses from the static origin.
 * MapLibre style uses the exact `source-layer` from the tiles.
 * Attribution, legend, empty-state handling, and mobile viewport behavior are visible.
+* Every `presentation.tables` output renders as a scrollable table with a sticky header and links its pipeline-written download files (CSV, XLSX), which are published beside the dashboard.
 
 ## When NOT to pre-tile
 

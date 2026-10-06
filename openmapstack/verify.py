@@ -36,6 +36,7 @@ from .checks import project as project_checks
 from .checks import provenance as provenance_checks
 from .checks import qgis as qgis_checks
 from .checks import rerun as rerun_checks
+from .checks import tables as table_checks
 from .checks import validation as validation_checks
 from .expectations import evaluate_expectation
 from .project import get_in, load_project
@@ -143,8 +144,13 @@ class VerifyResult:
         return payload
 
 
-def _declared_output_paths(project: dict[str, Any]) -> list[tuple[str, str, str | None]]:
-    """Return (output id, project-relative path, declared EPSG or None)."""
+def _declared_output_paths(project: dict[str, Any], kind: str = "geodata") -> list[tuple[str, str, str | None]]:
+    """Return (output id, project-relative path, declared EPSG or None) for outputs of one kind.
+
+    The kind is the declared ``outputs.<name>.kind``; an undeclared kind is
+    ``geodata`` (``presentation._output_kind``), so an unreadable format stays
+    in the geodata plan as ``not_testable`` rather than being skipped.
+    """
     outputs = project.get("outputs")
     if not isinstance(outputs, dict):
         return []
@@ -154,6 +160,8 @@ def _declared_output_paths(project: dict[str, Any]) -> list[tuple[str, str, str 
             continue
         path = spec.get("path")
         if not isinstance(path, str) or not path.strip():
+            continue
+        if presentation_checks._output_kind(spec) != kind:
             continue
         match = _EPSG.search(str(spec.get("format", "")))
         found.append((str(name), path, f"EPSG:{match.group(1)}" if match else None))
@@ -308,7 +316,23 @@ def verify_project(
                 )
             )
 
+    # -- tables: non-spatial outputs are read back as tables, never as geodata
+    outputs_spec = manifest.get("outputs") if isinstance(manifest.get("outputs"), dict) else {}
+    for name, path, _ in _declared_output_paths(manifest, kind="table"):
+        spec = outputs_spec.get(name) or {}
+        table = spec.get("table") if isinstance(spec.get("table"), dict) else {}
+        _run(runs, "tables.readable", table_checks.readable, root, path=path)
+        _run(runs, "tables.not_empty", table_checks.not_empty, root, path=path)
+        _run(runs, "tables.columns_declared", table_checks.columns_declared, root, path=path, columns=table.get("columns") or [])
+        if table.get("key"):
+            _run(runs, "tables.key_unique", table_checks.key_unique, root, path=path, key=table.get("key"))
+        if spec.get("downloads"):
+            _run(runs, "tables.downloads_consistent", table_checks.downloads_consistent, root, path=path, formats=spec.get("downloads"))
+
     # -- presentation and QGIS: the product matches what the manifest claims
+    if get_in(manifest, "presentation", "tables"):
+        _run(runs, "presentation.tables_reference_table_outputs", presentation_checks.tables_reference_table_outputs, root)
+        _run(runs, "presentation.table_downloads_linked", presentation_checks.table_downloads_linked, root)
     for name, fn in (
         ("layers_use_semantic_roles", presentation_checks.layers_use_semantic_roles),
         ("controls_match_pipeline", presentation_checks.controls_match_pipeline),
