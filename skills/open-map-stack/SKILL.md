@@ -84,6 +84,7 @@ For simple one-shot questions (single CRS conversion, one `ogr2ogr` invocation),
 
 * **Storage formats:** GeoParquet (vector analytics), COG (raster), PMTiles (tile delivery), GeoPackage (desktop interchange). Never produce Shapefile as new output.
 * **CRS:** WGS84 (EPSG:4326) for storage; Web Mercator (EPSG:3857) for web rendering; local projected CRS for any metric computation (distance, area, buffer). For Estonia, EPSG:3301 (L-EST97).
+* **Coordinate order:** treat it as an interface contract, not a CRS guess. Internally prefer GIS `x,y` (`lon,lat` for geographic coordinates), but obey each external format/API contract; GeoJSON/MapLibre/OpenLayers use `lon,lat`, while Leaflet `LatLng` and Google Maps `LatLng` use `lat,lng`. Never infer tuple order from `EPSG:4326` alone. See `references/formats-and-crs.md`.
 * **Compute placement:** push spatial joins and aggregations to DuckDB or PostGIS — not Python loops. R-tree / GIST / spatial indexing is mandatory at scale.
 * **Discovery first:** check STAC catalogs (Microsoft Planetary Computer, Earth Search, Overture STAC) before downloading anything. Lazy load with `odc-stac` or `stackstac` and only materialize what's needed.
 * **Cloud-native access:** prefer querying remote GeoParquet/COG over downloading. DuckDB with `httpfs` extension is the default pattern for Overture and similar S3-hosted datasets.
