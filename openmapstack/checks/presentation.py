@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import AssertionResult, failed, get_in, load_project_yaml, passed, warning
+from . import AssertionResult, failed, get_in, load_project_yaml, not_testable, passed, project_root, warning
 
 SEMANTIC_ROLES = {
     "primary_result", "secondary_result", "source", "context", "constraint",
@@ -81,9 +81,113 @@ def controls_match_pipeline(workspace: Path, project_dir: str = ".") -> Assertio
                 f"control {f.get('id')} canonical value(s) {absent!r} not found in matching step expression(s)"
             )
 
+    # View switches between variants the pipeline already measured (travel
+    # mode, analysis year, metric). They change which precomputed columns the
+    # view shows, never the analysis, so they reference outputs, not overrides.
+    outputs = proj.get("outputs") or {}
+    views = get_in(proj, "presentation.controls.views", []) or []
+    for v in views:
+        options = v.get("options") or []
+        if not options or len(set(map(str, options))) != len(options):
+            errors.append(f"view {v.get('id')} needs a non-empty list of distinct options")
+            continue
+        if v.get("canonical") not in options:
+            errors.append(f"view {v.get('id')} canonical {v.get('canonical')!r} is not one of its options")
+        fields = v.get("fields") or {}
+        output = outputs.get(v.get("output")) if v.get("output") else None
+        if fields and v.get("output") and not isinstance(output, dict):
+            errors.append(f"view {v.get('id')} references unknown output {v.get('output')!r}")
+            continue
+        declared = {c.get("name") if isinstance(c, dict) else c for c in get_in(output or {}, "table.columns", []) or []}
+        for option in options:
+            if fields and str(option) not in {str(k) for k in fields}:
+                errors.append(f"view {v.get('id')} option {option!r} has no fields mapping")
+            for column in (fields.get(option) or fields.get(str(option)) or []) if fields else []:
+                if declared and column not in declared:
+                    errors.append(f"view {v.get('id')} option {option!r} shows undeclared column {column!r}")
+
     if errors:
         return failed("; ".join(errors), errors=errors, code="control_pipeline_drift")
+    if views:
+        return passed(f"{len(filters)} filter control(s), {len(scenarios)} scenario control(s) and {len(views)} view control(s) consistent")
     return passed(f"{len(filters)} filter control(s) and {len(scenarios)} scenario control(s) consistent")
+
+
+def tables_reference_table_outputs(workspace: Path, project_dir: str = ".") -> AssertionResult:
+    """Every presentation.tables entry shows a declared table output and offers only its declared downloads."""
+    proj = load_project_yaml(workspace, project_dir)
+    if proj is None:
+        return failed("project.yaml missing", code="manifest_missing")
+    tables = get_in(proj, "presentation.tables", []) or []
+    if not tables:
+        return passed("no tables declared in the view (vacuously true)")
+    outputs = proj.get("outputs") or {}
+    errors: list[str] = []
+    for entry in tables:
+        name = entry.get("output") if isinstance(entry, dict) else None
+        output = outputs.get(name) if name else None
+        if not isinstance(output, dict):
+            errors.append(f"table view references unknown output {name!r}")
+            continue
+        if _output_kind(output) != "table":
+            errors.append(f"table view {name!r} shows an output that is not kind: table")
+        offered = set(entry.get("downloads") or output.get("downloads") or [])
+        undeclared = sorted(offered - set(output.get("downloads") or []))
+        if undeclared:
+            errors.append(f"table view {name!r} offers downloads the output does not declare: {undeclared}")
+    if errors:
+        return failed("; ".join(errors), errors=errors, code="table_view_drift")
+    return passed(f"{len(tables)} table view(s) show declared table outputs")
+
+
+def table_downloads_linked(workspace: Path, project_dir: str = ".", dashboard: str | None = None) -> AssertionResult:
+    """The delivered dashboard links every download file of every table it shows.
+
+    The links must point at the files the pipeline wrote (hashed in the run
+    record), not at data regenerated in the browser."""
+    import os
+    import re
+
+    from .tables import download_paths
+
+    proj = load_project_yaml(workspace, project_dir)
+    if proj is None:
+        return failed("project.yaml missing", code="manifest_missing")
+    tables = get_in(proj, "presentation.tables", []) or []
+    if not tables:
+        return passed("no tables declared in the view (vacuously true)")
+    root = project_root(workspace, project_dir)
+    outputs = proj.get("outputs") or {}
+    candidates = [dashboard] if dashboard else [
+        o.get("path") for o in outputs.values() if isinstance(o, dict) and str(o.get("path", "")).lower().endswith((".html", ".htm"))
+    ] + ["dashboard.html"]
+    page = next((root / c for c in candidates if c and (root / c).is_file()), None)
+    if page is None:
+        return not_testable("no dashboard HTML found to inspect", code="dashboard_missing")
+    html = page.read_text(encoding="utf-8", errors="replace")
+    hrefs = {h.strip().removeprefix("./") for h in re.findall(r"""href\s*=\s*["']([^"'#?]+)""", html)}
+    missing: list[str] = []
+    for entry in tables:
+        output = outputs.get(entry.get("output")) if isinstance(entry, dict) else None
+        if not isinstance(output, dict):
+            continue
+        formats = entry.get("downloads") or output.get("downloads") or []
+        for relative in download_paths(output.get("path", ""), formats).values():
+            expected = Path(os.path.relpath(root / relative, page.parent)).as_posix()
+            if expected not in hrefs:
+                missing.append(relative)
+    if missing:
+        return failed(f"{page.name} does not link downloads {missing}", code="table_download_unlinked", missing=missing)
+    return passed(f"{page.name} links every declared table download")
+
+
+def _output_kind(output: dict) -> str:
+    """The declared ``outputs.<name>.kind``; undeclared outputs stay ``geodata``.
+
+    Only an explicit declaration changes how an output is checked: an
+    undeclared CSV or PDF keeps its ``unsupported_format`` not_testable entry
+    instead of being silently dropped from the plan."""
+    return str(output.get("kind") or "geodata")
 
 
 def edit_targets_reference_real_sources(workspace: Path, project_dir: str = ".") -> AssertionResult:

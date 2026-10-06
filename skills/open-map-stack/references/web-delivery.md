@@ -372,6 +372,7 @@ Smoke test before handing off:
 * MapLibre style uses the exact `source-layer` from the tiles.
 * Attribution, legend, empty-state handling, and mobile viewport behavior are visible.
 * Position map overlays relative to a bounded map wrapper, rather than the page. Verify the actual desktop and mobile bounds of the map, legend and clickable controls: positive element dimensions do not prove they are on-screen. Resize the map after layout changes and fit its initial view to validated output coordinates.
+* Every `presentation.tables` output renders as a scrollable table with a sticky header and links its pipeline-written download files (CSV, XLSX), which are published beside the dashboard.
 
 ## When NOT to pre-tile
 
