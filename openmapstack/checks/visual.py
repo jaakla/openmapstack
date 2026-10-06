@@ -261,7 +261,10 @@ def _dashboard_layout_problems(page: Any) -> list[str]:
             continue
         # Ordinary legends may live in a scrollable sidebar. Map overlays must
         # stay inside the map and viewport, including their clickable children.
-        overlay = element.evaluate("e => ['absolute', 'fixed'].includes(getComputedStyle(e).position)")
+        # MapLibre positions its corner wrappers; the `.maplibregl-ctrl`
+        # children are static but still overlays whose bounds must be checked.
+        overlay = element.evaluate("""e => e.matches('.maplibregl-ctrl') ||
+            ['absolute', 'fixed'].includes(getComputedStyle(e).position)""")
         if overlay:
             if not contained(box, screen):
                 problems.append("map legend or controls extend outside the viewport")
