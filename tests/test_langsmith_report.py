@@ -167,12 +167,13 @@ class LangSmithReportTests(unittest.TestCase):
         self.assertNotIn('private-dashboard-content', str(caught.exception))
         self.assertNotIn('secret-token', str(caught.exception))
 
-        opener.open.side_effect = HTTPError('https://eu.api.smith.langchain.com', 422, 'Invalid', {},
-                                           io.BytesIO(json.dumps({'detail': 'Invalid workspace secret-token'}).encode()))
-        with patch.object(langsmith, 'build_opener', return_value=opener):
-            with self.assertRaisesRegex(ValueError, 'Invalid workspace') as caught:
-                langsmith.upload({}, endpoint='https://eu.api.smith.langchain.com', api_key='secret-token')
-        self.assertNotIn('secret-token', str(caught.exception))
+        for detail in ('Invalid workspace secret-token', ['Invalid workspace secret-token']):
+            opener.open.side_effect = HTTPError('https://eu.api.smith.langchain.com', 422, 'Invalid', {},
+                                               io.BytesIO(json.dumps({'detail': detail}).encode()))
+            with patch.object(langsmith, 'build_opener', return_value=opener):
+                with self.assertRaisesRegex(ValueError, 'Invalid workspace') as caught:
+                    langsmith.upload({}, endpoint='https://eu.api.smith.langchain.com', api_key='secret-token')
+            self.assertNotIn('secret-token', str(caught.exception))
 
 
 if __name__ == "__main__":
