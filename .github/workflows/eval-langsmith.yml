@@ -1,0 +1,121 @@
+name: Import saved evals into LangSmith
+
+on:
+  workflow_dispatch:
+    inputs:
+      source-run:
+        description: Existing eval workflow run ID (no agents will be rerun)
+        required: true
+        default: '37291508703'
+      agent:
+        description: Saved artifact's adapter name
+        type: choice
+        options: [claude_code, codex, openai_compatible]
+        default: claude_code
+      case:
+        description: Case ID (empty imports every attempted case in this arm)
+        default: '001-basic-spatial-analysis'
+      trial:
+        description: Repetition number
+        default: '2'
+      arm:
+        description: Arm to import
+        default: oms
+      region:
+        description: LangSmith workspace region
+        type: choice
+        options: [eu, us]
+        default: eu
+      dataset:
+        description: Externally managed dataset name; use a new name when task expectations change
+        default: openmapstack-fb0d8fcb-live-review
+      reference:
+        description: Include the frozen fixture control for case 001 (illustrative reference layout)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install report validator
+        run: python -m pip install 'jsonschema>=4,<5'
+      - name: Download retained evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.source-run }}
+          SOURCE_AGENT: ${{ inputs.agent }}
+        run: gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name "eval-benchmark-results-$SOURCE_AGENT" --dir saved-evidence
+      - name: Build commit-matched fixture reference for the pilot
+        if: inputs.reference && inputs.case == '001-basic-spatial-analysis'
+        env:
+          SOURCE_AGENT: ${{ inputs.agent }}
+        run: |
+          python -m pip install 'duckdb>=1.2' 'PyYAML>=6'
+          TASK_COMMIT=$(python - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          summary = json.loads(Path('saved-evidence', 'eval-benchmark-results-' + os.environ['SOURCE_AGENT'] + '.json').read_text())
+          commit = summary['run_config'].get('skill_commit', '')
+          if not re.fullmatch('[0-9a-f]{40}', commit):
+              raise SystemExit('No immutable task commit in saved evidence')
+          print(commit)
+          PY
+          )
+          git fetch --depth=1 origin "$TASK_COMMIT"
+          mkdir frozen-task
+          git archive "$TASK_COMMIT" evals/fixtures/reference_pipeline evals/fixtures/mini-tartu evals/fixtures/vendor openmapstack templates | tar -x -C frozen-task
+          python frozen-task/evals/fixtures/reference_pipeline/gen.py reference-artifacts/001-basic-spatial-analysis
+          export TASK_COMMIT
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          manifest = {'task_commit': os.environ['TASK_COMMIT'], 'provenance': 'Regenerated fixture control from the recorded task commit. Illustrates one valid layout; recorded acceptance criteria remain authoritative.'}
+          Path('reference-artifacts/001-basic-spatial-analysis/reference.json').write_text(json.dumps(manifest))
+          PY
+      - name: Prepare and import selected trials
+        env:
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          LANGSMITH_WORKSPACE_ID: ${{ vars.LANGSMITH_WORKSPACE_ID }}
+          SOURCE_AGENT: ${{ inputs.agent }}
+          SOURCE_RUN: ${{ inputs.source-run }}
+          CASE_ID: ${{ inputs.case }}
+          TRIAL: ${{ inputs.trial }}
+          ARM: ${{ inputs.arm }}
+          REGION: ${{ inputs.region }}
+          DATASET: ${{ inputs.dataset }}
+        run: |
+          if [ "$REGION" = eu ]; then
+            export LANGSMITH_ENDPOINT=https://eu.api.smith.langchain.com
+          else
+            export LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+          fi
+          selection=()
+          if [ -n "$CASE_ID" ]; then selection+=(--case "$CASE_ID"); fi
+          if [ -n "$TRIAL" ]; then selection+=(--trial "$TRIAL"); fi
+          if [ -n "$ARM" ]; then selection+=(--arm "$ARM"); fi
+          if [ -d reference-artifacts ]; then selection+=(--references reference-artifacts); fi
+          python evals/integrations/langsmith.py "saved-evidence/eval-benchmark-results-$SOURCE_AGENT.json" \
+            --artifact-root saved-evidence --output langsmith-review \
+            --dataset-name "$DATASET" --experiment-name "$SOURCE_AGENT-$ARM-$SOURCE_RUN-import-$GITHUB_RUN_ID" \
+            "${selection[@]}" --upload
+      - name: Retain local review and import receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: langsmith-review-${{ github.run_id }}
+          path: langsmith-review/
+          if-no-files-found: ignore
+      - name: Review setup links
+        run: |
+          echo 'Open Datasets & Experiments in your LangSmith region and select the imported dataset.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Dataset menu → Custom Output Rendering → Enable → renderer URL:' >> "$GITHUB_STEP_SUMMARY"
+          echo 'https://jaakla.github.io/openmapstack-skills/langsmith/' >> "$GITHUB_STEP_SUMMARY"

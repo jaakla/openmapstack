@@ -132,6 +132,10 @@ def build(destination: Path) -> None:
         directory.mkdir(parents=True, exist_ok=True)
     shutil.copy2(SITE / "index.html", destination / "index.html")
     shutil.copy2(SITE / "styles.css", destination / "styles.css")
+    # Public renderer code only: trial data arrives from LangSmith in-browser.
+    renderer = destination / "langsmith"
+    renderer.mkdir(exist_ok=True)
+    shutil.copy2(SITE / "langsmith/index.html", renderer / "index.html")
     shutil.copy2(NYC / "dashboard.html", nyc / "index.html")
     shutil.copy2(TARTU / "dashboard.html", tartu / "index.html")
     for name in ("hub-candidates.geojson", "zone-metrics.geojson"):

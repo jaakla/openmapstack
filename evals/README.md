@@ -192,6 +192,60 @@ and every dashboard screenshot.
 
 ## Running
 
+### Reviewing failures with Allure
+
+For prompt, reference and actual artifact comparison with human feedback, see
+[LangSmith human review setup](langsmith.md). It imports saved evidence without
+running agents and uses a custom HTML renderer rather than the raw JSON view.
+
+Fixture, live and visual CI jobs attach an **Allure report artifact** and put
+separate grading/infrastructure counts, capability gaps and grouped provider
+errors in the GitHub job summary. Download the linked artifact, extract it,
+and open `html/index.html` directly in a browser. It is a single-file Allure 3
+report with embedded evidence; no server or account is required. The live
+workflow remains red when a matrix leg fails, while other legs and evidence
+uploads still run.
+
+Generate the same view locally from existing results, without an agent call
+or a regrade:
+
+```bash
+python3 evals/run.py --mode fixture --json eval-results.json
+# Run this even when the eval command above exits nonzero.
+python3 evals/report.py eval-results.json --output evals/results/review/allure-results
+npx --yes allure@3.20.0 awesome evals/results/review/allure-results \
+  --single-file --output evals/results/review/html
+```
+
+The exporter uses the existing Python eval dependencies. Only HTML generation
+needs Node.js 24 and the pinned Allure CLI. Use a fresh output directory per
+run; the exporter rejects nonempty directories so stale results cannot mix
+with a new run. To review a downloaded CI evidence bundle, pass
+`--artifact-root /path/to/extracted-artifact` so its recorded `artifact_bundle`
+paths resolve after relocation. Missing bundles are called out in the trial
+description. CI's `--allow-missing` emits a broken run-setup record when an
+earlier step failed before producing JSON; normal local use rejects missing
+or invalid input.
+
+Each case/trial/arm/model is a separate Allure result. Repetitions are **not
+retries**. Select the score-type suite before interpreting results: the Allure
+overview is a navigation summary, not a combined correctness score. The v2
+JSON and `allure-results/summary.md` retain the authoritative denominators.
+Mutation assertion steps pass when the expected defect/code is detected;
+`not_testable` steps are skipped, never passed. A trial that passes its hard
+gates can still carry the `capability-incomplete` tag and unmet soft gates.
+
+Trial details show expected/actual assertions and arguments, provider errors,
+and attachments for grading, prompts, agent messages/events, clean-rerun
+tracebacks, generated-project ZIPs and visual screenshots where retained.
+Reports never execute generated projects. Historical v2 records lack trial
+wall-clock timestamps, so the exporter leaves the Allure timeline unset and
+shows recorded duration in each trial description. Reports inherit the
+original evidence's redaction; they do not add a new secret-scrubbing pass.
+CI stores these reports as artifacts; this does not publish them to Pages.
+
+### Executing cases
+
 ```bash
 python evals/run.py                        # every case, fixture mode
 python evals/run.py --case attribute-override
