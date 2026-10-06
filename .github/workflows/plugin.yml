@@ -24,11 +24,11 @@ jobs:
 
       - name: Validate marketplace and plugin manifests
         run: |
-          # Validate the two manifests explicitly. Validating the repository
-          # root also inspects maintainer-only CLAUDE.md and, in newer Claude
-          # Code versions, warns that root CLAUDE.md is not plugin context.
-          # That warning is unrelated to manifest correctness but --strict
-          # promotes it to an error.
+          # Validate the two manifests explicitly. Newer Claude Code versions
+          # warn that the maintainer-only root CLAUDE.md is not plugin context,
+          # and --strict promotes that warning to an error. The marketplace
+          # manifest stays strict. Plugin validation always inspects the plugin
+          # root, so it runs without --strict: schema errors still fail it.
           claude plugin validate .claude-plugin/marketplace.json --strict
           claude plugin validate .claude-plugin/plugin.json
 
