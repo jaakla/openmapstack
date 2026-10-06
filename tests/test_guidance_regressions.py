@@ -104,6 +104,15 @@ class GeographyIndexGuidanceTests(GuidanceCase):
 class AcceptanceGuidanceTests(GuidanceCase):
     """Content regressions only; native task-quality review remains a live gate."""
 
+    def test_coordinate_order_summary_names_the_geographic_interfaces(self) -> None:
+        skill = (SKILLS_ROOT / "open-map-stack/SKILL.md").read_text(encoding="utf-8")
+        summary = next(line for line in skill.splitlines() if line.startswith("* **Coordinate order:**"))
+        self.assertIn("MapLibre `LngLatLike`", summary)
+        self.assertIn("OpenLayers geographic arrays", summary)
+        self.assertIn("Leaflet `LatLng`", summary)
+        self.assertNotIn("GeoJSON/MapLibre/OpenLayers", summary)
+        self.assertIn("Never infer tuple order from `EPSG:4326` alone", summary)
+
     def test_geography_support_and_projected_input_are_not_confused(self) -> None:
         for path, text in _shipped_copies("spatial-sql.md").items():
             with self.subTest(path=path):

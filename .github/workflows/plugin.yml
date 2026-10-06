@@ -23,7 +23,14 @@ jobs:
         run: npm install -g @anthropic-ai/claude-code
 
       - name: Validate marketplace and plugin manifests
-        run: claude plugin validate . --strict
+        run: |
+          # Validate the two manifests explicitly. Validating the repository
+          # root also inspects maintainer-only CLAUDE.md and, in newer Claude
+          # Code versions, warns that root CLAUDE.md is not plugin context.
+          # That warning is unrelated to manifest correctness but --strict
+          # promotes it to an error.
+          claude plugin validate .claude-plugin/marketplace.json --strict
+          claude plugin validate .claude-plugin/plugin.json
 
       # Informational only: prints skills/agents/hooks/MCP counts and the
       # projected token cost. Never gates the build.

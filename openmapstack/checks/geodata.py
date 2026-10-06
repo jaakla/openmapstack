@@ -7,16 +7,56 @@ No dependency on any one LLM; these run against whatever files the pipeline
 
 from __future__ import annotations
 
+import json
+import math
 from pathlib import Path
 from typing import Any
 
-from . import AssertionResult, failed, not_testable, passed, project_root
+from . import AssertionResult, failed, get_in, not_testable, passed, project_root
 from .spatial import connect_spatial
 
 
 def _connect():
     """Load only a preinstalled Spatial extension; grading never downloads."""
     return connect_spatial()
+
+
+def coordinate_pair_equals(
+    workspace: Path, path: str, field: str, equals: list[float],
+    tolerance: float = 1e-7, project_dir: str = ".",
+) -> AssertionResult:
+    """A JSON field contains the known point in the consuming interface's order.
+
+    The oracle supplies an ordered pair; do not infer or normalize its order
+    from a CRS label or from the submitted coordinates. This focused check
+    needs no spatial runtime and does not prove reprojection or map rendering.
+    """
+    def finite_pair(value):
+        try:
+            return (isinstance(value, list) and len(value) == 2
+                    and all(type(v) in (int, float) and math.isfinite(v) for v in value))
+        except OverflowError:
+            return False
+
+    if not finite_pair(equals) or not math.isfinite(tolerance) or tolerance < 0:
+        raise ValueError("equals must be two finite numbers and tolerance finite and non-negative")
+    target = project_root(workspace, project_dir) / path
+    if not target.is_file():
+        return failed(f"{path} does not exist", code="file_missing")
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeError) as exc:
+        return failed(f"{path} is not valid JSON: {exc}", code="json_invalid")
+    except OSError as exc:
+        return not_testable(f"could not read {path}: {exc}", code="read_error")
+    actual = get_in(payload, field)
+    if not finite_pair(actual):
+        return failed(f"{path}:{field} must contain two finite numeric coordinates",
+                      code="coordinate_pair_invalid")
+    if any(abs(a - e) > tolerance for a, e in zip(actual, equals)):
+        return failed(f"{path}:{field} {actual} != expected ordered pair {equals}",
+                      code="coordinate_pair_mismatch", actual=actual, expected=equals)
+    return passed(f"{path}:{field} matches the expected ordered pair", actual=actual, expected=equals)
 
 
 def _read(con, path: Path):
