@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import base64
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 from html.parser import HTMLParser
 import json
@@ -223,9 +223,15 @@ def prepare(summary: dict[str, Any], *, artifact_root: Path, dataset_name: str, 
                              "score_type": result.get("score_type"), "arm": result.get("arm"), "run_id": config.get("run_id")},
             **({"error": review["diagnosis"] or "Trial setup failed"} if result["status"] == "setup_failed" else {}),
         })
+    # LangSmith requires a strictly positive experiment interval. This is the
+    # preparation interval, never an invented historical execution duration.
+    finished_at = max(datetime.now(timezone.utc),
+                      datetime.fromisoformat(imported_at) + timedelta(microseconds=1)).isoformat()
+    for row in rows:
+        row['end_time'] = finished_at
     return {"experiment_name": experiment_name, "dataset_name": dataset_name,
             "experiment_description": "Imported retained eval evidence; no agent execution or regrading. Timestamps describe import, not execution.",
-            "experiment_start_time": imported_at, "experiment_end_time": imported_at,
+            "experiment_start_time": imported_at, "experiment_end_time": finished_at,
             "experiment_metadata": {"source_schema": summary["schema"], "timestamp_source": "import_time", "run_config": config,
                                     "source_outcomes": summary["outcomes"], "source_score_types": summary["score_types"]},
             "results": rows}

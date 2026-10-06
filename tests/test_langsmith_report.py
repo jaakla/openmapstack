@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import redirect_stderr
+from datetime import datetime
 import io
 import json
 from pathlib import Path
@@ -53,7 +54,9 @@ class LangSmithReportTests(unittest.TestCase):
         self.assertFalse(row["expected_outputs"]["reference"]["available"])
         self.assertEqual(row["expected_outputs"]["checks"][0]["args"], {"equals": 3})
         self.assertNotIn("actual_status", row["expected_outputs"]["checks"][0])
-        self.assertEqual(row["start_time"], row["end_time"])
+        self.assertLess(datetime.fromisoformat(row["start_time"]), datetime.fromisoformat(row["end_time"]))
+        self.assertLess(datetime.fromisoformat(payload["experiment_start_time"]),
+                        datetime.fromisoformat(payload["experiment_end_time"]))
         self.assertEqual(row["run_metadata"]["timestamp_source"], "import_time")
         self.assertEqual(row["run_metadata"]["original_duration_s"], 1.5)
 
