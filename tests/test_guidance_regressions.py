@@ -104,6 +104,16 @@ class GeographyIndexGuidanceTests(GuidanceCase):
 class AcceptanceGuidanceTests(GuidanceCase):
     """Content regressions only; native task-quality review remains a live gate."""
 
+    def test_native_qgis_delivery_requires_save_reload_and_regeneration(self) -> None:
+        for path, text in _shipped_copies("project-workflow.md").items():
+            with self.subTest(path=path):
+                self.assertShips(text, 'QgsProject.write("project.qgz")', path)
+                self.assertShips(text, "check its return value", path)
+                self.assertShips(text, "Reopen the saved project from another working directory", path)
+                self.assertShips(text, "require a valid project CRS plus valid layers", path)
+                self.assertShips(text, "serialized `./data/...` relative paths", path)
+                self.assertShips(text, "canonical pipeline must rebuild the QGIS companion on every run", path)
+
     def test_geography_support_and_projected_input_are_not_confused(self) -> None:
         for path, text in _shipped_copies("spatial-sql.md").items():
             with self.subTest(path=path):
