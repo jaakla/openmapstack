@@ -34,6 +34,32 @@ WORKFLOW_ADDITIONS = (
     " Record every coded attribute the selection depends on as `selection.semantic_predicates`"
     " (`field`, `domain_value`) on the source it filters, even when the source is local and"
     " unfiltered on load; a free-text `selection.filter` does not document it.",
+    # tests/test_guidance_regressions.py native QGIS delivery guidance;
+    # tests/evals/test_qgis_assertions.py native CRS/relocation controls;
+    # live 001 qgis.runtime_load, static_valid and reproducibility checks.
+    "  * When PyQGIS is available, use `QgsProject.write(\"project.qgz\")` and check its return value."
+    " Reopen the saved project from another working directory and require a valid project CRS plus valid layers."
+    " Bare `data/...` strings in hand-written XML are not QGIS's serialized `./data/...` relative paths."
+    " The canonical pipeline must rebuild the QGIS companion on every run; a one-off export is insufficient.\n",
+    # tests/test_guidance_regressions.py CreditsHeaderGuidanceTests: delivered views
+    # credit the toolkit, the analysis time and the author.
+    '* **Credit the toolkit, the author and the run.** The provenance tab of a '
+    'dashboard, or the provenance section of a report, opens with a credits block in '
+    'the view\'s language: a "made with AI using the free OpenMapStack toolkit" '
+    'statement linked to https://github.com/jaakla/openmapstack-skills, the analysis '
+    'date and time with its UTC offset taken from `runs.latest.completed_at`, and '
+    "the author's name and email from `project.author` (email as a `mailto:` link, "
+    'plus the optional `url`). Take the author from the requesting user or their '
+    'version-control identity and ask when neither is known; never invent one. A '
+    'canonical rerun refreshes the timestamp. See `project-spec.md` section 3, '
+    'Credits header.\n',
+    # tests/test_tables.py and CreditsHeaderGuidanceTests' sibling TableOutputGuidanceTests:
+    # non-spatial results are declared table outputs with downloads.
+    '* **Tables are outputs too.** A non-spatial result (scenario comparison, cost '
+    'table, ranking) is declared with `kind: table`, its columns and `downloads: '
+    '[csv, xlsx]`; the pipeline writes every download format, and the view shows it '
+    'as a scrollable table that links those files. See `project-spec.md` section '
+    '2.5, Non-spatial table outputs, and section 3, Tabular results.\n',
 )
 
 

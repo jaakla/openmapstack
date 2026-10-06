@@ -23,6 +23,13 @@ project:
   created_at: 2026-08-25T00:00:00Z
   updated_at: 2026-08-25T00:00:00Z
   status: draft              # draft | in_progress | validated | warning | failed
+  author:                    # shown in the credits header; ask the user, never invent
+    name: TODO-author-name
+    email: TODO-author-email
+    # url: https://...       # optional author link
+  generated_with:            # keep as is; shown in the credits header
+    tool: OpenMapStack
+    url: https://github.com/jaakla/openmapstack-skills
 
 interpretation:
   objective: >-
@@ -119,6 +126,18 @@ outputs:
     # role: exploratory_companion    # optional; mark anything that is NOT the
     # note: >-                       # accepted result, and say why
     #   TODO
+  # A non-spatial result is an output too (project-spec.md s.2.5):
+  # example_summary:
+  #   path: data/derived/example-summary.csv
+  #   format: CSV
+  #   kind: table                    # geodata (default) | table | document
+  #   generated_by: load_example
+  #   table:
+  #     key: [TODO_id]
+  #     columns:
+  #       - {name: TODO_id, type: string}
+  #       - {name: TODO_value, type: number, unit: TODO}
+  #   downloads: [csv, xlsx]         # the pipeline writes example-summary.xlsx too
 
 validation:
   # Flat identifiers only (no `no_duplicate: field` mappings) — each name must
@@ -183,13 +202,15 @@ presentation:
           sections: [selected_feature, draw_geometry, draft_overrides, export_bundle]
         - id: provenance
           title: Provenance
-          sections: [provenance, overrides, validation, outputs, run_record]
+          sections: [credits, provenance, overrides, validation, outputs, run_record]
   controls:                        # see presentation.yaml + project-spec.md s.3
     reconfigurable: true
     canonical_reset: true          # canonical position == the accepted run
     off_canonical_labelling: required
     filters: []                    # id, label, type, field(s), unit, canonical, step/options
     scenarios: []                  # id, override, canonical, baseline_fields
+    views: []                      # id, options, canonical, output, fields (precomputed variants)
+  tables: []                       # output, title, downloads, default_sort (kind: table outputs)
   map:
     engine_preference: maplibre    # maplibre | deck | kepler
     interaction:
@@ -230,6 +251,10 @@ presentation:
     show_source_timestamp: true
     show_override_badge: true
     show_assumptions: true
+    credits:                       # first block of the provenance tab (project-spec.md s.3)
+      generated_with: true         # project.generated_with, linked
+      analysis_timestamp: runs.latest.completed_at
+      author: true                 # project.author name, mailto: email, optional url
   editing:
     allow_draw_geometry: true
     allow_attribute_override: true

@@ -19,7 +19,8 @@ from pathlib import Path
 
 import yaml
 
-from openmapstack.integrity import canonical_file_set_hash
+from openmapstack.checks import validation as validation_checks
+from openmapstack.integrity import canonical_file_set_hash, declared_output_paths
 from openmapstack.validation import validate_project
 from tests.evals.helpers import make_workspace, minimal_project, write_project
 
@@ -86,6 +87,65 @@ class TemplatePipelineOwnsRunPointerTests(unittest.TestCase):
         self.assertIn("lib/helpers.py", {item["path"] for item in record["inputs"]})
         checks = {check.id: check for check in validate_project(workspace).checks}
         self.assertEqual(checks["runs.latest"].status, "passed", checks["runs.latest"].message)
+
+
+class TableDownloadInventoryTests(unittest.TestCase):
+    """A table's downloads are declared outputs (project-spec.md s.2.5).
+
+    The template hashes them in the run record. The validators must require
+    them there too, or a record that leaves one out still passes while that
+    published file goes unhashed and unprotected from sample runs.
+    """
+
+    def _workspace(self) -> Path:
+        workspace = _workspace()
+        project = yaml.safe_load((workspace / "project.yaml").read_text())
+        project["outputs"]["summary"] = {
+            "path": "data/derived/summary.csv", "format": "CSV", "kind": "table", "generated_by": "export",
+            "table": {"columns": [{"name": "scenario", "type": "string"}]}, "downloads": ["csv", "json"],
+        }
+        write_project(workspace, project)
+        (workspace / "data" / "derived" / "summary.csv").write_text("scenario\nwalk\n")
+        (workspace / "data" / "derived" / "summary.json").write_text('[{"scenario": "walk"}]')
+        return workspace
+
+    def test_the_template_record_covers_every_download(self) -> None:
+        workspace = self._workspace()
+        project = _finalize(workspace)
+        self.assertEqual(
+            declared_output_paths(project),
+            ["data/derived/final.json", "data/derived/summary.csv", "data/derived/summary.json"],
+        )
+        record = json.loads((workspace / "runs" / f"{RUN_ID}.json").read_text())
+        self.assertIn("data/derived/summary.json", {item["path"] for item in record["outputs"]})
+        checks = {check.id: check for check in validate_project(workspace).checks}
+        self.assertEqual(checks["runs.latest"].status, "passed", checks["runs.latest"].message)
+        self.assertEqual(validation_checks.run_record_matches(workspace).status, "passed")
+
+    def test_a_record_that_omits_a_download_fails(self) -> None:
+        workspace = self._workspace()
+        _finalize(workspace)
+        # Drop the JSON download and re-hash consistently everywhere, so the
+        # omission is the only defect left.
+        record_path = workspace / "runs" / f"{RUN_ID}.json"
+        record = json.loads(record_path.read_text())
+        record["outputs"] = [item for item in record["outputs"] if item["path"] != "data/derived/summary.json"]
+        outputs_hash = canonical_file_set_hash(workspace, [item["path"] for item in record["outputs"]])
+        record["outputs_hash"] = outputs_hash
+        record_path.write_text(json.dumps(record))
+        report_path = workspace / "validation" / "latest-report.json"
+        report = json.loads(report_path.read_text())
+        report["outputs_hash"] = outputs_hash
+        report_path.write_text(json.dumps(report))
+        project = yaml.safe_load((workspace / "project.yaml").read_text())
+        project["runs"]["latest"]["outputs_hash"] = outputs_hash
+        write_project(workspace, project)
+
+        checks = {check.id: check for check in validate_project(workspace).checks}
+        self.assertEqual(checks["runs.latest"].status, "failed")
+        self.assertIn("data/derived/summary.json", checks["runs.latest"].message)
+        result = validation_checks.run_record_matches(workspace)
+        self.assertEqual((result.status, result.data["code"]), ("failed", "hash_inventory_incomplete"))
 
 
 if __name__ == "__main__":  # pragma: no cover

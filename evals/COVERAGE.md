@@ -39,7 +39,8 @@ Legend: ✅ covered · ⚠️ partially covered · ❌ not covered (tracked belo
 |---|---|---|
 | Mixed input CRS with correct reprojection | 007 (WGS84 source + EPSG:3301 analysis; sub-mm round trip) | — |
 | Legitimate EPSG:4326 storage followed by projected metric analysis | 007 | — |
-| CRS/axis-order or output-metadata mismatch | 007 (real 3301 coordinates vs declared CRS cross-checked) | 914 `crs-metadata-mismatch` (relabelled output CRS) |
+| CRS/output-metadata mismatch | 007 (real 3301 coordinates vs declared CRS cross-checked) | 914 `crs-metadata-mismatch` (relabelled output CRS) |
+| Coordinate order at API/representation boundaries | 018 (same asymmetric named point in GeoJSON, MapLibre, Leaflet LatLng and Leaflet GeoJSON; fixture/live) | 929–932 `coordinate_pair_mismatch` (one interface swapped per mutation) |
 | Wrong analysis CRS | 001 (analysis_crs enforced) | 902 `wrong-crs` |
 | Geographic CRS used for metric operations | every case (`geodata.crs_not_used_for_metrics`) | — |
 | Complete QGIS layer CRS + project reprojection enabled | every visual-leg case | 922 `qgis-incomplete-crs` |
@@ -92,6 +93,7 @@ Legend: ✅ covered · ⚠️ partially covered · ❌ not covered (tracked belo
 | Style | Case | Oracle |
 |---|---|---|
 | Fully specified (baseline) | 001–006 | exact golden artifacts |
+| Focused coordinate-interface conversion | 018 | independent ordered pairs for the same Tallinn anchor; Leaflet LatLng differs from its own GeoJSON input |
 | Underspecified ("make me a useful map") | 070 | structural conformance + declared assumptions; no silent threshold invention is asserted structurally |
 | Contradictory constraints | 071 | empty candidate set + warning propagates to project status |
 | Missing attribute, "do not invent" | 072 | empty candidate set + warning; no invented data |

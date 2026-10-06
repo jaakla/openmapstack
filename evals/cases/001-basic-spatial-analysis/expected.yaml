@@ -48,27 +48,27 @@ assertions:
     args: { source: cadastral_parcels }
 
   - assert: geodata.crs_not_used_for_metrics
-  - assert: geodata.dataset_crs_is
-    args: { path: data/derived/candidate-parcels.parquet, expected: "EPSG:3301" }
+  - assert: geodata.dataset_crs_matches_storage_crs
+    args: { path: $OUTPUT:candidate_parcels }
   - assert: geodata.row_count
-    args: { path: data/derived/candidate-parcels.parquet, at_least: 1 }
+    args: { path: $OUTPUT:candidate_parcels, at_least: 1 }
   - assert: geodata.geometry_all_valid
-    args: { path: data/derived/candidate-parcels.parquet }
+    args: { path: $OUTPUT:candidate_parcels }
   - assert: geodata.no_duplicate_ids
-    args: { path: data/derived/candidate-parcels.parquet, id_field: cadastral_id }
+    args: { path: $OUTPUT:candidate_parcels, id_field: cadastral_id }
   - assert: geodata.no_null_ids
-    args: { path: data/derived/candidate-parcels.parquet, id_field: cadastral_id }
+    args: { path: $OUTPUT:candidate_parcels, id_field: cadastral_id }
   # known geospatial truth: P1, P2, P5 qualify; P3 too far; P4 wrong land use
   - assert: geodata.feature_present
-    args: { path: data/derived/candidate-parcels.parquet, id_field: cadastral_id, id: P1 }
+    args: { path: $OUTPUT:candidate_parcels, id_field: cadastral_id, id: P1 }
   - assert: geodata.feature_present
-    args: { path: data/derived/candidate-parcels.parquet, id_field: cadastral_id, id: P2 }
+    args: { path: $OUTPUT:candidate_parcels, id_field: cadastral_id, id: P2 }
   - assert: geodata.feature_absent
-    args: { path: data/derived/candidate-parcels.parquet, id_field: cadastral_id, id: P3 }
+    args: { path: $OUTPUT:candidate_parcels, id_field: cadastral_id, id: P3 }
   - assert: geodata.feature_absent
-    args: { path: data/derived/candidate-parcels.parquet, id_field: cadastral_id, id: P4 }
+    args: { path: $OUTPUT:candidate_parcels, id_field: cadastral_id, id: P4 }
   - assert: geodata.row_count
-    args: { path: data/derived/candidate-parcels.parquet, equals: 3 }
+    args: { path: $OUTPUT:candidate_parcels, equals: 3 }
 
   - assert: validation.required_all_present
   - assert: validation.no_implicit_pass
@@ -76,10 +76,10 @@ assertions:
   - assert: validation.report_evidence_recomputes
     args:
       evidence:
-        - { check_id: geometry_valid, evidence_field: features_checked, metric: row_count, path: data/derived/candidate-parcels.parquet }
-        - { check_id: geometry_valid, evidence_field: invalid_count, metric: invalid_geometry_count, path: data/derived/candidate-parcels.parquet }
-        - { check_id: no_duplicate_cadastral_id, evidence_field: duplicates, metric: duplicate_count, path: data/derived/candidate-parcels.parquet, field: cadastral_id }
-        - { check_id: no_null_cadastral_id, evidence_field: nulls, metric: null_count, path: data/derived/candidate-parcels.parquet, field: cadastral_id }
+        - { check_id: geometry_valid, evidence_field: features_checked, metric: row_count, path: $OUTPUT:candidate_parcels }
+        - { check_id: geometry_valid, evidence_field: invalid_count, metric: invalid_geometry_count, path: $OUTPUT:candidate_parcels }
+        - { check_id: no_duplicate_cadastral_id, evidence_field: duplicates, metric: duplicate_count, path: $OUTPUT:candidate_parcels, field: cadastral_id }
+        - { check_id: no_null_cadastral_id, evidence_field: nulls, metric: null_count, path: $OUTPUT:candidate_parcels, field: cadastral_id }
 
   - assert: qgis.static_valid
   # GeoParquet layers open invalid in QGIS builds without GDAL's optional
@@ -97,7 +97,13 @@ assertions:
   # A non-QGIS unit-test interpreter records this explicitly as not_testable;
   # the scheduled QGIS integration environment is expected to make it pass.
   - assert: qgis.runtime_load
+    modes: [fixture, visual]
     hard_gate: false
+    args: { render_png: "../visual/qgis-render.png" }
+  # Live CI now provides a matching native PyQGIS runtime. Missing capability
+  # must not hide a broken delivery there.
+  - assert: qgis.runtime_load
+    modes: [live]
     args: { render_png: "../visual/qgis-render.png" }
   # Visual mode is defined as the environment that has PyQGIS and a browser,
   # so its own assertions gate: soft-gating them here would mean a real
@@ -121,6 +127,8 @@ assertions:
   - assert: visual.dashboard_loads_in_browser
     modes: [visual]
     args: { screenshots_dir: "../visual/screenshots" }
+  - assert: visual.dashboard_layout_within_viewport
+    modes: [live, visual]
 
   - assert: presentation.layers_use_semantic_roles
   - assert: presentation.required_layer_groups_exist
@@ -138,7 +146,7 @@ assertions:
     args:
       rerun_workspace: "$RERUN"
       paths:
-        - data/derived/candidate-parcels.parquet
+        - $OUTPUT:candidate_parcels
   - assert: rerun.validation_report_reproducible
     modes: [live]
     args: { rerun_workspace: "$RERUN" }
@@ -150,3 +158,6 @@ assertions:
         - data/source/parcels.geojson
         - data/source/roads.geojson
         - data/source/pois.geojson
+
+  - assert: geodata.feature_geometries_match_source
+    args: { path: "$OUTPUT:candidate_parcels", source_path: data/source/parcels.geojson, id_field: cadastral_id, comparison_crs: "EPSG:3301" }

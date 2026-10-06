@@ -30,8 +30,8 @@ assertions:
     args:
       rerun_workspace: "$RERUN"
       paths:
-        - data/derived/candidate-parcels.parquet
-        - data/derived/education_pois.geojson
+        - $OUTPUT:candidate_parcels
+        - $OUTPUT:education_pois
   - assert: rerun.validation_report_reproducible
     args: { rerun_workspace: "$RERUN" }
   - assert: project.one_canonical_pipeline

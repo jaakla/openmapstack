@@ -121,6 +121,30 @@ Scenario input files are checked in under
 `evals/fixtures/spatial-scenarios/<scenario>/`, and the runner's automatic
 byte-identity check verifies the generator copies them unmodified.
 
+## Coordinate-order boundary regression
+
+Case `018-coordinate-order-boundaries` is a focused fixture/live task for the
+shipped coordinate-order guidance. It converts one named asymmetric Tallinn
+anchor into GeoJSON, MapLibre, Leaflet LatLng and Leaflet GeoJSON payloads.
+The grader compares actual numeric pairs against independent ordered oracles;
+a CRS label, legal coordinate ranges or consistent-but-swapped outputs cannot
+establish the correct location. `geodata.coordinate_pair_equals` is explicitly
+a known-answer check, not an oracle-free spatial validation.
+
+Mutations `929`–`932` swap just one interface each, pin the
+`coordinate_pair_mismatch` failure code, and require a healthy control twin.
+This is a small boundary-conversion task, so it does not require a full
+analysis-project scaffold. It tests coordinate order rather than reprojection,
+rendering, or live model adherence; a fixture pass does not prove an agent pass.
+
+Run the offline controls without a model account or GIS runtime:
+
+```bash
+python3 evals/run.py --mode fixture --case 018-coordinate-order-boundaries \
+  --case 929-geojson-coordinate-swapped --case 930-maplibre-coordinate-swapped \
+  --case 931-leaflet-latlng-coordinate-swapped --case 932-leaflet-geojson-coordinate-swapped
+```
+
 ## Visual integration (PyQGIS + browser)
 
 Fixture CI proves the deterministic contracts; it deliberately cannot prove
@@ -749,6 +773,26 @@ case author omitted it and requires the baseline to cover the complete
 
 `validation.report_evidence_recomputes` independently derives supported row,
 geometry-validity, duplicate-ID, and null-ID counters from actual geodata.
+Live cases that name a semantic result use `$OUTPUT:candidate_parcels` to read its
+path from `outputs.candidate_parcels` in project.yaml. This also resolves nested
+validation evidence and clean-rerun paths; it never guesses another file when
+the declared output is missing. Supported spatial formats remain readable by
+the existing geodata checks. Storage CRS must match the actual dataset metadata,
+while metric analysis still requires a suitable CRS.
+
+Live benchmark CI uses Ubuntu 24.04's `python3-qgis` system package and a
+`--system-site-packages` virtual environment created with `/usr/bin/python3`.
+This keeps the native QGIS bindings and Python interpreter compatible. A
+preflight verifies the OGR provider and CRS database before any model call.
+Case 001's QGIS runtime check is a hard gate in live mode; fixture mode
+continues to report missing PyQGIS honestly as `not_testable`.
+
+`geodata.feature_geometries_match_source` compares candidate geometry against
+source geometry by stable ID after explicit x/y reprojection to the case's metric
+CRS. `visual.dashboard_layout_within_viewport` checks real desktop/mobile bounds
+of the map and its overlays in live case 001; live CI installs Chromium for it.
+Neither check substitutes for the fuller visual/QGIS integration suite.
+
 `geodata.dataset_crs_is` reads real dataset CRS metadata rather than trusting
 the manifest. `geodata.dataset_crs_matches_storage_crs` compares that metadata
 with the project's declared `processing.storage_crs`, for tasks that leave the

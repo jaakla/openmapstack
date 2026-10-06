@@ -22,15 +22,15 @@ presentation:
         - id: analysis             #   assumptions | warnings | filters |
           title: Analysis          #   scenario_controls | layer_controls |
           sections: [summary, metrics, criteria, assumptions, warnings]
-        - id: map                  #   basemap | provenance | overrides |
-          title: Map               #   validation | outputs | run_record
+        - id: map                  #   basemap | credits | provenance |
+          title: Map               #   overrides | validation | outputs | run_record
           sections: [scenario_controls, filters, layer_controls, basemap]
         - id: edit
           title: Edit
           sections: [selected_feature, draw_geometry, draft_overrides, export_bundle]
         - id: provenance
           title: Provenance
-          sections: [provenance, overrides, validation, outputs, run_record]
+          sections: [credits, provenance, overrides, validation, outputs, run_record]
     footer_panel: table            # full_map | table | details | timeline | none
 
   # What the reader may reconfigure. `canonical` is the value the pipeline
@@ -59,6 +59,24 @@ presentation:
       #   override: OVERRIDE-001   # the override this switch turns on and off
       #   canonical: true
       #   baseline_fields: [dist_b_baseline_m]   # measured without the override
+    views:
+      # A switch between precomputed variants that is not an override
+      # (travel mode, analysis year). See project-spec.md s.3.
+      # - id: travel_mode
+      #   label: Travel mode
+      #   options: [walk, bike]
+      #   canonical: walk
+      #   output: scenario_summary # a kind: table output
+      #   fields: {walk: [walk_time_saved_h], bike: [bike_time_saved_h]}
+
+  tables:
+    # Non-spatial (kind: table) outputs rendered as scrollable tables with a
+    # sticky header, sorting, row count and links to the pipeline-written
+    # download files. See project-spec.md s.2.5 and s.3 Tabular results.
+    # - output: scenario_summary
+    #   title: Scenario comparison
+    #   downloads: [csv, xlsx]
+    #   default_sort: time_saved_h_year
 
   map:
     engine_preference: maplibre    # maplibre | deck | kepler; see project-spec.md s.2.7
@@ -115,6 +133,10 @@ presentation:
     show_override_badge: true
     show_assumptions: true
     show_warnings: true
+    credits:                        # first block of the provenance tab: toolkit link,
+      generated_with: true          # analysis time with UTC offset and author
+      analysis_timestamp: runs.latest.completed_at   # (project-spec.md s.3, Credits header)
+      author: true
 
   editing:
     allow_draw_geometry: true

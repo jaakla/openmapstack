@@ -1,0 +1,25 @@
+id: 930-maplibre-coordinate-swapped
+case_type: mutation
+modes: [fixture]
+score_types: {fixture: mutation_tests}
+project_dir: project
+hard_gate: true
+fixture:
+  generator: "{python} {evals_dir}/fixtures/coordinate-order/gen.py {project_dir} --swap=maplibre"
+  source_baseline:
+    - {source: ../../fixtures/coordinate-order/anchor.json, destination: data/source/anchor.json}
+mutation:
+  control_generator: "{python} {evals_dir}/fixtures/coordinate-order/gen.py {project_dir}"
+
+# Only the named interface is swapped; all other boundary outputs remain healthy.
+assertions:
+  - assert: geodata.coordinate_pair_equals
+    args: {path: coordinate-payloads.json, field: geojson.coordinates, equals: [24.7536, 59.4370]}
+  - assert: geodata.coordinate_pair_equals
+    args: {path: coordinate-payloads.json, field: maplibre, equals: [24.7536, 59.4370]}
+    expect: failed
+    expect_code: coordinate_pair_mismatch
+  - assert: geodata.coordinate_pair_equals
+    args: {path: coordinate-payloads.json, field: leaflet_latlng, equals: [59.4370, 24.7536]}
+  - assert: geodata.coordinate_pair_equals
+    args: {path: coordinate-payloads.json, field: leaflet_geojson.coordinates, equals: [24.7536, 59.4370]}

@@ -104,6 +104,25 @@ class GeographyIndexGuidanceTests(GuidanceCase):
 class AcceptanceGuidanceTests(GuidanceCase):
     """Content regressions only; native task-quality review remains a live gate."""
 
+    def test_coordinate_order_summary_names_the_geographic_interfaces(self) -> None:
+        skill = (SKILLS_ROOT / "open-map-stack/SKILL.md").read_text(encoding="utf-8")
+        summary = next(line for line in skill.splitlines() if line.startswith("* **Coordinate order:**"))
+        self.assertIn("MapLibre `LngLatLike`", summary)
+        self.assertIn("OpenLayers geographic arrays", summary)
+        self.assertIn("Leaflet `LatLng`", summary)
+        self.assertNotIn("GeoJSON/MapLibre/OpenLayers", summary)
+        self.assertIn("Never infer tuple order from `EPSG:4326` alone", summary)
+
+    def test_native_qgis_delivery_requires_save_reload_and_regeneration(self) -> None:
+        for path, text in _shipped_copies("project-workflow.md").items():
+            with self.subTest(path=path):
+                self.assertShips(text, 'QgsProject.write("project.qgz")', path)
+                self.assertShips(text, "check its return value", path)
+                self.assertShips(text, "Reopen the saved project from another working directory", path)
+                self.assertShips(text, "require a valid project CRS plus valid layers", path)
+                self.assertShips(text, "serialized `./data/...` relative paths", path)
+                self.assertShips(text, "canonical pipeline must rebuild the QGIS companion on every run", path)
+
     def test_geography_support_and_projected_input_are_not_confused(self) -> None:
         for path, text in _shipped_copies("spatial-sql.md").items():
             with self.subTest(path=path):
@@ -319,6 +338,73 @@ class VerifiedBackendGuidanceTests(GuidanceCase):
                 for needle in ("read_csv()", "read_parquet()", "ST_Read()"):
                     self.assertShips(text, needle, path)
                 self.assertShips(text, "relations the connector exposed", path)
+
+
+
+class CreditsHeaderGuidanceTests(GuidanceCase):
+    """A delivered view credits the toolkit, the analysis time and the author.
+
+    Dashboards shipped without them gave readers no way to tell who made the
+    analysis, when it ran, or which tool produced it."""
+
+    TOOLKIT_URL = "https://github.com/jaakla/openmapstack-skills"
+
+    def test_the_delivery_rules_require_the_credits_block(self) -> None:
+        for path, text in _shipped_copies("project-workflow.md").items():
+            with self.subTest(path=path):
+                self.assertShips(text, "Credit the toolkit, the author and the run.", path)
+                self.assertShips(text, self.TOOLKIT_URL, path)
+                self.assertShips(text, "`runs.latest.completed_at`", path)
+                self.assertShips(text, "`project.author`", path)
+                self.assertShips(text, "never invent one", path)
+
+    def test_the_contract_defines_the_credits_header(self) -> None:
+        for path, text in _shipped_copies("project-spec.md").items():
+            with self.subTest(path=path):
+                self.assertShips(text, "#### Credits header", path)
+                self.assertShips(text, "sections: [credits, provenance, overrides, validation, outputs, run_record]", path)
+                self.assertShips(text, "never invent an author", path)
+
+    def test_every_template_copy_scaffolds_the_credits(self) -> None:
+        copies = [REPO_ROOT / "templates/project.yaml", *sorted(SKILLS_ROOT.glob("*/templates/project.yaml"))]
+        for path in copies:
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(path=str(path.relative_to(REPO_ROOT))):
+                self.assertIn("author:", text)
+                self.assertIn(self.TOOLKIT_URL, text)
+                self.assertIn("sections: [credits, provenance,", text)
+                self.assertIn("analysis_timestamp: runs.latest.completed_at", text)
+
+
+
+class TableOutputGuidanceTests(GuidanceCase):
+    """Non-spatial results are declared table outputs with downloads.
+
+    A material trial's main answers were scenario and cost tables; with no way
+    to declare them, `verify` read them as GeoJSON or flagged them as
+    undeclared derived files."""
+
+    def test_the_delivery_rules_make_tables_outputs(self) -> None:
+        for path, text in _shipped_copies("project-workflow.md").items():
+            with self.subTest(path=path):
+                self.assertShips(text, "Tables are outputs too.", path)
+                self.assertShips(text, "`downloads: [csv, xlsx]`", path)
+
+    def test_the_contract_defines_tables_downloads_and_views(self) -> None:
+        for path, text in _shipped_copies("project-spec.md").items():
+            with self.subTest(path=path):
+                self.assertShips(text, "#### Non-spatial table outputs", path)
+                self.assertShips(text, "### Tabular results", path)
+                self.assertShips(text, "Only a declared `kind` changes how an output is checked.", path)
+                self.assertShips(text, "Never generate a\n  download in the browser", path)
+                self.assertShips(text, "**Views switch between precomputed variants.**", path)
+
+    def test_every_template_copy_scaffolds_tables(self) -> None:
+        for path in [REPO_ROOT / "templates", *sorted(SKILLS_ROOT.glob("*/templates"))]:
+            with self.subTest(path=str(path.relative_to(REPO_ROOT))):
+                self.assertIn("kind: table", (path / "project.yaml").read_text(encoding="utf-8"))
+                self.assertIn("tables:", (path / "presentation.yaml").read_text(encoding="utf-8"))
+                self.assertIn("def write_table(", (path / "pipeline.py").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":  # pragma: no cover

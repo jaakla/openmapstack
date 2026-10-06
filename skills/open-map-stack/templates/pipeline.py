@@ -70,6 +70,28 @@ def apply_overrides(con: duckdb.DuckDBPyConnection, table: str) -> None:
         """)
 
 
+TABLE_FORMATS = {"csv": "(FORMAT csv, HEADER true)", "xlsx": "(FORMAT xlsx, HEADER true)",
+                 "parquet": "(FORMAT parquet)", "json": "(FORMAT json, ARRAY true)"}
+
+
+def write_table(con: duckdb.DuckDBPyConnection, query: str, output: Path, formats: list[str]) -> list[Path]:
+    """Write a non-spatial (kind: table) output and its download formats from one query.
+
+    Every format comes from the same rows, so `tables.downloads_consistent`
+    holds by construction (project-spec.md s.2.5). Values stay machine-readable:
+    plain numbers and ISO dates; the view formats them for the reader. XLSX
+    needs DuckDB's `excel` extension.
+    """
+    written = []
+    for fmt in dict.fromkeys([output.suffix.lstrip("."), *formats]):
+        if fmt == "xlsx":
+            con.execute("INSTALL excel; LOAD excel")
+        target = output.with_suffix("." + fmt)
+        con.execute(f"COPY ({query}) TO '{target}' {TABLE_FORMATS[fmt]}")
+        written.append(target)
+    return written
+
+
 def _file_set_hash(paths: list[Path]) -> str:
     """Canonical file-set hash (project-spec.md s.2.8): sorted paths, each
     length-prefixed, followed by the file bytes."""
@@ -122,7 +144,11 @@ def finalize_run(report: dict, started_at: str) -> None:
     project = yaml.safe_load((ROOT / "project.yaml").read_text())
     completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
     inputs = _declared_inputs(project)
-    outputs = [ROOT / output["path"] for output in (project.get("outputs") or {}).values()]
+    outputs = []
+    for output in (project.get("outputs") or {}).values():
+        outputs.append(ROOT / output["path"])
+        # A table's download formats are declared outputs too (project-spec.md s.2.5).
+        outputs += [(ROOT / output["path"]).with_suffix("." + fmt) for fmt in output.get("downloads") or []]
     report["inputs_hash"] = _file_set_hash(inputs)
     report["outputs_hash"] = _file_set_hash(outputs)
 
@@ -179,6 +205,9 @@ def main() -> None:
 
     # STEP 5 — reproject to storage CRS and write derived output.
     # candidate = con.query(f"ST_Transform origin 'EPSG:3301'->'{STORAGE_CRS}'")
+    # A non-spatial result goes out as a table plus its declared downloads:
+    # write_table(con, "SELECT scenario, time_saved_h_year FROM summary ORDER BY scenario",
+    #             OUT / "scenario-summary.csv", ["csv", "xlsx"])
 
     # STEP 6 — validation is a pipeline stage; write the report.
     # Every id below must match a name in project.yaml validation.required

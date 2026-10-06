@@ -67,6 +67,13 @@ project:
   created_at: 2026-08-25T08:15:03+03:00
   updated_at: 2026-08-25T08:42:11+03:00
   status: validated        # draft | in_progress | validated | warning | failed
+  author:                  # who the analysis is made for and by; shown in the credits header
+    name: Mari Maasikas
+    email: mari.maasikas@example.org
+    url: https://example.org/mari     # optional author link
+  generated_with:          # constant for this toolkit; shown in the credits header
+    tool: OpenMapStack
+    url: https://github.com/jaakla/openmapstack-skills
 
 interpretation:
   objective: >             # analyst interpretation of the objective
@@ -84,8 +91,12 @@ interpretation:
 
 `interpretation` is where "what the user actually wanted" is pinned, including any rephrasing you did. Every assumption needs a `statement` and `rationale`.
 
-The schema requires every `project.*` and `interpretation.*` key shown above and
-closes `project.status` to the five listed values. The per-assumption
+The schema requires every `project.*` and `interpretation.*` key shown above except
+`project.author` and `project.generated_with`, and closes `project.status` to the
+five listed values. `author` and `generated_with` are delivery requirements: the
+credits header (section 3) renders them. Fill `author` from the requesting user or
+their version-control identity (`git config user.name` / `user.email`) and ask when
+neither is known; never invent an author or leave a placeholder in a delivered view. The per-assumption
 `statement`/`rationale` requirement is a semantic rule checked by `openmapstack validate`,
 not by the schema — a manifest can be schema-valid and still fail the audit.
 
@@ -311,6 +322,53 @@ An output that exists to feed a control rather than to answer the question must
 say so. Mark it `role: exploratory_companion` and name the accepted result in
 `note`, so no reader mistakes a what-if artifact for the finding.
 
+#### Non-spatial table outputs
+
+Many answers are tables, not geodata: a scenario comparison, a cost-benefit
+summary, a ranked list of sites. Declare them as first-class outputs with
+`kind: table`, the columns the reader depends on, and the formats people can
+download:
+
+```yaml
+outputs:
+  scenario_summary:
+    path: data/derived/scenario-summary.csv
+    format: CSV
+    kind: table                     # geodata (default) | table | document
+    generated_by: compare_scenarios
+    table:
+      key: [scenario]               # columns that identify a row
+      columns:
+        - {name: scenario, type: string, label: Scenario}
+        - {name: time_saved_h_year, type: number, unit: h/year, label: Time saved}
+        - {name: daily_crossings, type: integer, unit: trips/day}
+    downloads: [csv, xlsx]          # sibling files: scenario-summary.csv, scenario-summary.xlsx
+  dashboard:
+    path: dashboard.html
+    format: HTML
+    kind: document                  # a view, not data: no data checks apply
+    generated_by: render_dashboard
+```
+
+- **Only a declared `kind` changes how an output is checked.** An output without
+  one is geodata; an unreadable format stays visible as `not_testable`. A table
+  declared as geodata fails geometry checks, and a table left undeclared is an
+  `outputs.undeclared_derived_files` warning, so declare it.
+- **Write machine-readable values.** Plain numbers with a point decimal and no
+  thousands separators, ISO 8601 dates, one header row, UTF-8. Locale formatting
+  (`1 234,5`) and units belong in the view and in `table.columns[].unit`, never in
+  the cells. `tables.columns_declared` fails a numeric column that holds formatted text.
+- **Downloads are files the pipeline writes.** Each format in `downloads` is the
+  output path with that format's suffix, written by the canonical pipeline in the
+  same step from the same rows: CSV (RFC 4180, comma-separated, UTF-8) for tools,
+  XLSX (one sheet, typed numeric cells, header row) for spreadsheet users. They are
+  declared outputs, hashed in the run record, and `tables.downloads_consistent`
+  verifies that every format holds the same columns and values. Never generate a
+  download in the browser from data embedded in the page: what a reader downloads
+  must be what the run produced.
+- A table may be the primary output in Parquet or JSON records (an array of
+  objects) as well; `downloads` then lists the human formats beside it.
+
 ### 2.6 Validation
 
 ```yaml
@@ -470,7 +528,12 @@ presentation:
           sections: [selected_feature, draw_geometry, draft_overrides, export_bundle]
         - id: provenance
           title: Provenance
-          sections: [provenance, overrides, validation, outputs, run_record]
+          sections: [credits, provenance, overrides, validation, outputs, run_record]
+  tables:                             # non-spatial outputs shown as scrollable tables
+    - output: scenario_summary        # a kind: table output
+      title: Scenario comparison
+      downloads: [csv, xlsx]          # subset of the output's declared downloads
+      default_sort: time_saved_h_year
   controls:                           # what the reader may reconfigure, and from where
     reconfigurable: true
     canonical_reset: true
@@ -552,6 +615,10 @@ presentation:
     show_source_timestamp: true
     show_override_badge: true
     show_assumptions: true
+    credits:                          # first block of the provenance tab
+      generated_with: true            # project.generated_with, linked
+      analysis_timestamp: runs.latest.completed_at
+      author: true                    # project.author name, mailto: email, optional url
   editing:
     allow_draw_geometry: true
     allow_attribute_override: true
@@ -867,6 +934,44 @@ Four rules keep a reconfigurable view honest:
   (`dist_kg_m` / `dist_kg_baseline_m`) and let the control choose. Never approximate
   the counterfactual, and never let switching an override off imply the source data
   changed.
+* **Views switch between precomputed variants.** A switch that only chooses which
+  measured columns to show (travel mode, analysis year, a second metric) is not an
+  override. Declare it under `presentation.controls.views` with its `options`, the
+  `canonical` option the view opens at, and, when it addresses a table output, the
+  columns each option shows:
+
+  ```yaml
+  controls:
+    views:
+      - id: travel_mode
+        label: Travel mode
+        options: [walk, bike]
+        canonical: walk
+        output: scenario_summary
+        fields: {walk: [walk_time_saved_h], bike: [bike_time_saved_h]}
+  ```
+
+  `presentation.controls_match_pipeline` checks that the canonical option exists and
+  that every listed column is a declared column of that output.
+
+### Tabular results
+
+A table output shown in the view is a working table, not a picture of one:
+
+* **Scrollable, with the header in view.** Put it in its own scroll container with a
+  sticky header row and a sticky first column when it is wide; the page itself must
+  not scroll sideways. Show the row count. Above roughly 50 rows add a text filter
+  and keep scrolling inside the table; do not paginate a table that fits in memory.
+* **Sortable and honest about units.** Sorting by any column header; `table.columns`
+  supplies the labels and units for the header. Numbers are right-aligned with
+  tabular figures and formatted in the reader's locale; the underlying value is
+  unchanged.
+* **Downloads next to the table.** A link per format in `downloads`, pointing at the
+  file the pipeline wrote, relative to the dashboard (`data/derived/x.csv`), and
+  shipped with it when the view is published. `presentation.table_downloads_linked`
+  checks that the delivered dashboard links every declared download.
+* **One source of truth.** The table the view renders is read from the same output the
+  downloads come from, never a separately computed copy.
 
 ### Provenance UX
 
@@ -875,6 +980,16 @@ Make provenance inspectable in the UI, not hidden in a README. Selecting a featu
 `Source`, `Dataset`, `Dataset version`, `Retrieved timestamp`, `Original feature ID`, `Transformation chain`, `Manual overrides`, `Override author`, `Override rationale`, `Evidence`, `Validation status`.
 
 At the project level offer: `Sources`, `Assumptions`, `Manual edits`, `Processing steps`, `Validation results`, `Run history`.
+
+#### Credits header
+
+The provenance tab of a dashboard, or the provenance section of a report, opens with a credits block before any other provenance content. Write it in the view's language and render all three lines:
+
+1. **Generated with:** a statement that the analysis was made with AI using the free OpenMapStack toolkit, linked to `project.generated_with.url` (https://github.com/jaakla/openmapstack-skills).
+2. **Analysis made:** the date and time of `runs.latest.completed_at`, shown with its UTC offset. Fall back to `project.updated_at` only for a view of a project that has no canonical run yet, and label it as such.
+3. **Author:** `project.author.name`, with `project.author.email` as a `mailto:` link and `project.author.url`, when present, as a link.
+
+An Estonian view, for example, reads: "Valmistatud AI abil, kasutades tasuta vahendit OpenMapStack" (linked), "Analüüs tehtud: 25.08.2026 08:42 (UTC+03:00)" and "Autor: Mari Maasikas, mari.maasikas@example.org". The values come from the manifest and the run record, never from the chat, so a canonical rerun refreshes the timestamp without a hand edit.
 
 ---
 

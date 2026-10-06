@@ -443,6 +443,7 @@ class _Validator:
                 output_errors.append(f"{key}.generated_by={generated_by!r} is not a step id")
             if _present(output.get("path")) and project_path(self.root, output.get("path")) is None:
                 output_errors.append(f"{key}.path escapes the project directory")
+            output_errors.extend(_table_output_errors(key, output))
         if graph_errors:
             self.add("processing.graph", "failed", "; ".join(graph_errors), path="processing.steps", errors=graph_errors)
         elif steps:
@@ -603,6 +604,13 @@ class _Validator:
                 declared_targets.add(target)
                 if not target.exists():
                     missing.append(str(relative))
+            # A table's download formats are part of the declared output.
+            for download in _download_paths(output):
+                download_target = project_path(self.root, download)
+                if download_target is not None:
+                    declared_targets.add(download_target.resolve())
+                    if not download_target.exists():
+                        missing.append(download)
         if missing:
             self.add("outputs.files", "failed", f"declared outputs do not exist: {missing}", path="outputs", missing=missing)
         elif outputs:
@@ -1087,3 +1095,45 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return f"sha256:{digest.hexdigest()}"
+
+
+TABLE_DOWNLOAD_FORMATS = ("csv", "xlsx", "json", "parquet")
+OUTPUT_KINDS = ("geodata", "table", "document")
+
+
+def _download_paths(output: dict) -> list[str]:
+    """Sibling files a table output offers for download (project-spec.md s.2.5)."""
+    from .checks.tables import download_paths
+
+    path = output.get("path")
+    formats = output.get("downloads") or []
+    if not isinstance(path, str) or not isinstance(formats, list):
+        return []
+    return [p for p in download_paths(path, [f for f in formats if isinstance(f, str)]).values() if p != Path(path).as_posix()]
+
+
+def _table_output_errors(key: str, output: dict) -> list[str]:
+    """Declaration rules for non-spatial table outputs."""
+    errors: list[str] = []
+    kind = output.get("kind")
+    if kind is not None and kind not in OUTPUT_KINDS:
+        errors.append(f"{key}.kind={kind!r} is not one of {list(OUTPUT_KINDS)}")
+    from .checks.presentation import _output_kind
+
+    if _output_kind(output) != "table":
+        if output.get("downloads"):
+            errors.append(f"{key}.downloads is only defined for kind: table outputs")
+        return errors
+    table = output.get("table")
+    columns = table.get("columns") if isinstance(table, dict) else None
+    if not isinstance(columns, list) or not columns:
+        errors.append(f"{key}.table.columns must declare the table's columns")
+    else:
+        for index, column in enumerate(columns):
+            name = column.get("name") if isinstance(column, dict) else column
+            if not isinstance(name, str) or not name.strip():
+                errors.append(f"{key}.table.columns[{index}] has no name")
+    formats = output.get("downloads") or []
+    if not isinstance(formats, list) or any(f not in TABLE_DOWNLOAD_FORMATS for f in formats):
+        errors.append(f"{key}.downloads must list formats from {list(TABLE_DOWNLOAD_FORMATS)}")
+    return errors

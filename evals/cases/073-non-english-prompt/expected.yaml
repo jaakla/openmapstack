@@ -28,36 +28,38 @@ assertions:
 - assert: validation.required_all_present
 - assert: validation.no_implicit_pass
 - assert: validation.run_record_matches
-- assert: geodata.dataset_crs_is
+- assert: geodata.dataset_crs_matches_storage_crs
   args:
-    path: data/derived/candidate-parcels.parquet
-    expected: EPSG:3301
+    path: $OUTPUT:candidate_parcels
 - assert: geodata.row_count
   args:
-    path: data/derived/candidate-parcels.parquet
+    path: $OUTPUT:candidate_parcels
     equals: 3
 - assert: geodata.feature_present
   args:
-    path: data/derived/candidate-parcels.parquet
+    path: $OUTPUT:candidate_parcels
     id_field: cadastral_id
     id: P1
 - assert: geodata.feature_present
   args:
-    path: data/derived/candidate-parcels.parquet
+    path: $OUTPUT:candidate_parcels
     id_field: cadastral_id
     id: P2
 - assert: geodata.feature_present
   args:
-    path: data/derived/candidate-parcels.parquet
+    path: $OUTPUT:candidate_parcels
     id_field: cadastral_id
     id: P5
 - assert: geodata.feature_absent
   args:
-    path: data/derived/candidate-parcels.parquet
+    path: $OUTPUT:candidate_parcels
     id_field: cadastral_id
     id: P3
 - assert: geodata.feature_absent
   args:
-    path: data/derived/candidate-parcels.parquet
+    path: $OUTPUT:candidate_parcels
     id_field: cadastral_id
     id: P4
+
+- assert: geodata.feature_geometries_match_source
+  args: { path: "$OUTPUT:candidate_parcels", source_path: data/source/parcels.geojson, id_field: cadastral_id, comparison_crs: "EPSG:3301" }

@@ -29,7 +29,7 @@ assertions:
     args: { id: OVERRIDE-001, status: applied }
   - assert: geodata.feature_field_equals
     args:
-      path: data/derived/education_pois.geojson
+      path: $OUTPUT:education_pois
       id_field: poi_id
       id: poi-7
       field: status

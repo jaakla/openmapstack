@@ -69,6 +69,11 @@ def static_valid(workspace: Path, path: str = "project.qgz", project_dir: str = 
             continue
         if raw_path.lower().endswith(".gpkg") and "layername=" not in ds:
             errors.append(f"GeoPackage datasource missing layername=: {ds}")
+        if raw_path and not raw_path.startswith(("./", "../")):
+            # QGIS leaves bare `data/...` strings unresolved on project read.
+            # Python resolving the string against root is not proof that QGIS
+            # will do the same. Its serialized relative paths start `./` or `../`.
+            errors.append(f"datasource is not explicitly relative to the project: {raw_path}; use ./ or ../")
         resolved = (root / raw_path).resolve() if raw_path.startswith("./") or not raw_path.startswith("/") else Path(raw_path)
         if raw_path and not str(raw_path).startswith(("http",)) and not resolved.exists():
             errors.append(f"datasource file does not exist: {raw_path}")
@@ -285,6 +290,8 @@ def runtime_load(
         invalid = [lyr.name() for lyr in layers.values() if not lyr.isValid()]
         if invalid:
             return failed(f"invalid layers: {invalid}", code="invalid_layers")
+        if not project.crs().isValid():
+            return failed("QGIS project has no valid CRS", code="project_crs_invalid")
 
         layer_details = []
         for lyr in layers.values():

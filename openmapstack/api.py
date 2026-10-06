@@ -65,6 +65,7 @@ CHECK_MODULES = (
     "overrides",
     "validation",
     "geodata",
+    "tables",
     "presentation",
     "qgis",
     "visual",
@@ -79,6 +80,7 @@ DIMENSIONS = {
     "overrides": "override_handling",
     "provenance": "provenance",
     "geodata": "gis_correctness",
+    "tables": "table_correctness",
     "validation": "validation_integrity",
     "qgis": "presentation_contract",
     "presentation": "presentation_contract",
@@ -87,8 +89,9 @@ DIMENSIONS = {
     "metamorphic": "metamorphic_evidence",
 }
 
-# The checks that need a known answer. They are reachable on user data
-# only through validation.expectations[] attestations.
+# Checks that need an independent known answer. Automatic user-project plans
+# admit only the allowlisted validation.expectations[] attestations; external
+# harnesses may supply their own oracles to the other known-answer checks.
 KNOWN_ANSWER_CHECKS = frozenset(
     {
         "geodata.row_count",
@@ -96,6 +99,7 @@ KNOWN_ANSWER_CHECKS = frozenset(
         "geodata.feature_absent",
         "geodata.feature_field_equals",
         "geodata.field_range",
+        "geodata.coordinate_pair_equals",
     }
 )
 

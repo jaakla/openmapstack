@@ -68,7 +68,7 @@ sys.path.insert(0, str(EVALS_DIR))
 
 from openmapstack import __version__ as OPENMAPSTACK_VERSION  # noqa: E402
 from openmapstack.api import CHECK_API_VERSION  # noqa: E402
-from openmapstack.checks import AssertionResult, STATUSES  # noqa: E402
+from openmapstack.checks import AssertionResult, STATUSES, failed, load_project_yaml  # noqa: E402
 from openmapstack.snapshot import create_skill_snapshot  # noqa: E402
 from openmapstack.collection import create_collection_snapshot  # noqa: E402
 from openmapstack.rerun import (  # noqa: E402
@@ -969,6 +969,31 @@ def _assertion_entries(
     return entries
 
 
+def _resolve_output_references(value: Any, project_path: Path) -> Any:
+    """Resolve explicit semantic output IDs, never guess a similarly named file.
+
+    Used recursively so geodata, evidence and clean-rerun assertions all inspect
+    the same manifest-declared artifact, regardless of filename or format.
+    """
+    if isinstance(value, dict):
+        return {key: _resolve_output_references(item, project_path) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_resolve_output_references(item, project_path) for item in value]
+    if isinstance(value, str) and value.startswith("$OUTPUT:"):
+        output_id = value.removeprefix("$OUTPUT:")
+        project = load_project_yaml(project_path) or {}
+        outputs = project.get("outputs") or {}
+        output = outputs.get(output_id) if isinstance(outputs, dict) else None
+        path = output.get("path") if isinstance(output, dict) else None
+        if not isinstance(path, str) or not path.strip():
+            raise ValueError(f"output {output_id!r} has no declared path in project.yaml")
+        relative = Path(path)
+        if relative.is_absolute() or ".." in relative.parts or not (project_path / relative).resolve().is_relative_to(project_path.resolve()):
+            raise ValueError(f"output {output_id!r} path must stay inside the project: {path}")
+        return path
+    return value
+
+
 def _evaluate_assertions(
     case_def: dict[str, Any],
     project_path: Path,
@@ -1001,7 +1026,12 @@ def _evaluate_assertions(
         module_name, fn = _resolve_assertion(assert_name)
 
         try:
-            result: AssertionResult = fn(project_path, **args)
+            try:
+                args = _resolve_output_references(args, project_path)
+            except ValueError as exc:
+                result = failed(str(exc), code="output_reference_invalid")
+            else:
+                result: AssertionResult = fn(project_path, **args)
         except Exception as exc:  # noqa: BLE001
             raise SetupFailure(
                 "assertion_execution",

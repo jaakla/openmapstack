@@ -19,6 +19,24 @@ def _write_qgz(path, datasources, extra_xml=""):
 
 
 class StaticValidTests(unittest.TestCase):
+    def test_explicit_parent_relative_path_passes(self) -> None:
+        workspace = make_workspace()
+        (workspace / "project").mkdir()
+        (workspace / "layer.geojson").write_text("{}", encoding="utf-8")
+        _write_qgz(workspace / "project/project.qgz", ["../layer.geojson"])
+        result = qgis_assertions.static_valid(workspace, project_dir="project")
+        self.assertEqual(result.status, "passed", result.detail)
+
+    def test_bare_relative_path_fails_even_when_python_can_resolve_it(self) -> None:
+        workspace = make_workspace()
+        (workspace / "data").mkdir()
+        (workspace / "data/layer.geojson").write_text("{}", encoding="utf-8")
+        _write_qgz(workspace / "project.qgz", ["data/layer.geojson"])
+        result = qgis_assertions.static_valid(workspace)
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertEqual(result.data["code"], "broken_datasource")
+        self.assertIn("use ./", result.detail)
+
     def test_valid_relative_datasource_passes(self) -> None:
         workspace = make_workspace()
         (workspace / "data").mkdir()
@@ -255,6 +273,51 @@ class RuntimeLoadWithRealPyqgisTests(unittest.TestCase):
     """
 
     WORKED_EXAMPLE = Path(__file__).resolve().parents[2] / "examples" / "tartu-development"
+
+    def make_native_project(self):
+        from qgis.core import Qgis, QgsCoordinateReferenceSystem, QgsProject, QgsVectorLayer
+        import json
+
+        workspace = make_workspace()
+        (workspace / "data").mkdir()
+        (workspace / "data/layer.geojson").write_text(json.dumps({
+            "type": "FeatureCollection", "features": [{"type": "Feature", "properties": {},
+                "geometry": {"type": "Point", "coordinates": [26.73, 58.31]}}]}))
+        qgis_assertions._qgis_application()
+        project = QgsProject.instance()
+        project.clear()
+        project.setCrs(QgsCoordinateReferenceSystem("EPSG:3301"))
+        project.setFileName(str(workspace / "project.qgz"))
+        project.setFilePathStorage(Qgis.FilePathType.Relative)
+        layer = QgsVectorLayer(str(workspace / "data/layer.geojson"), "POI", "ogr")
+        self.assertTrue(layer.isValid())
+        project.addMapLayer(layer)
+        self.assertTrue(project.write())
+        project.clear()
+        return workspace
+
+    def test_native_project_loads_after_relocation_from_another_cwd(self):
+        import shutil
+        workspace = self.make_native_project()
+        relocated = make_workspace() / "relocated"
+        shutil.copytree(workspace, relocated)
+        self.assertEqual(qgis_assertions.static_valid(relocated).status, "passed")
+        result = qgis_assertions.runtime_load(relocated)
+        self.assertEqual(result.status, "passed", result.detail)
+        self.assertEqual(len(result.data["layers"]), 1)
+
+    def test_missing_project_crs_is_not_a_runtime_pass(self):
+        import xml.etree.ElementTree as ET
+        workspace = self.make_native_project()
+        with zipfile.ZipFile(workspace / "project.qgz") as archive:
+            name = next(name for name in archive.namelist() if name.endswith(".qgs"))
+            document = ET.fromstring(archive.read(name))
+        document.remove(document.find("projectCrs"))
+        with zipfile.ZipFile(workspace / "project.qgz", "w") as archive:
+            archive.writestr(name, ET.tostring(document))
+        result = qgis_assertions.runtime_load(workspace)
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertEqual(result.data["code"], "project_crs_invalid")
 
     def test_real_worked_example_loads_and_reports_layers(self) -> None:
         if not (self.WORKED_EXAMPLE / "project.qgz").is_file():

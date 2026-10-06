@@ -7,16 +7,56 @@ No dependency on any one LLM; these run against whatever files the pipeline
 
 from __future__ import annotations
 
+import json
+import math
 from pathlib import Path
 from typing import Any
 
-from . import AssertionResult, failed, not_testable, passed, project_root
+from . import AssertionResult, failed, get_in, not_testable, passed, project_root
 from .spatial import connect_spatial
 
 
 def _connect():
     """Load only a preinstalled Spatial extension; grading never downloads."""
     return connect_spatial()
+
+
+def coordinate_pair_equals(
+    workspace: Path, path: str, field: str, equals: list[float],
+    tolerance: float = 1e-7, project_dir: str = ".",
+) -> AssertionResult:
+    """A JSON field contains the known point in the consuming interface's order.
+
+    The oracle supplies an ordered pair; do not infer or normalize its order
+    from a CRS label or from the submitted coordinates. This focused check
+    needs no spatial runtime and does not prove reprojection or map rendering.
+    """
+    def finite_pair(value):
+        try:
+            return (isinstance(value, list) and len(value) == 2
+                    and all(type(v) in (int, float) and math.isfinite(v) for v in value))
+        except OverflowError:
+            return False
+
+    if not finite_pair(equals) or not math.isfinite(tolerance) or tolerance < 0:
+        raise ValueError("equals must be two finite numbers and tolerance finite and non-negative")
+    target = project_root(workspace, project_dir) / path
+    if not target.is_file():
+        return failed(f"{path} does not exist", code="file_missing")
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeError) as exc:
+        return failed(f"{path} is not valid JSON: {exc}", code="json_invalid")
+    except OSError as exc:
+        return not_testable(f"could not read {path}: {exc}", code="read_error")
+    actual = get_in(payload, field)
+    if not finite_pair(actual):
+        return failed(f"{path}:{field} must contain two finite numeric coordinates",
+                      code="coordinate_pair_invalid")
+    if any(abs(a - e) > tolerance for a, e in zip(actual, equals)):
+        return failed(f"{path}:{field} {actual} != expected ordered pair {equals}",
+                      code="coordinate_pair_mismatch", actual=actual, expected=equals)
+    return passed(f"{path}:{field} matches the expected ordered pair", actual=actual, expected=equals)
 
 
 def _read(con, path: Path):
@@ -354,6 +394,69 @@ def dataset_crs_is(
 # GeoParquet always stores longitude/latitude and defaults WGS 84 to
 # OGC:CRS84, so a declared EPSG:4326 is written as either identifier.
 _EQUIVALENT_CRS = ({"EPSG:4326", "OGC:CRS84"},)
+
+
+def feature_geometries_match_source(
+    workspace: Path, path: str, source_path: str, id_field: str,
+    comparison_crs: str, tolerance_m: float = 0.1, project_dir: str = ".",
+) -> AssertionResult:
+    """Verify a selected subset retains the source geometry after reprojection.
+
+    CRS labels and valid polygons alone cannot detect a wrong transformation.
+    Compare in an explicitly chosen metric CRS, allowing numeric roundoff but
+    rejecting misplaced, invented, missing or altered parcel geometries.
+    """
+    root = project_root(workspace, project_dir)
+    if not all((root / name).is_file() for name in (path, source_path)):
+        return failed("candidate or source dataset is missing", code="file_missing")
+    if tolerance_m < 0:
+        return failed("geometry tolerance must be nonnegative", code="invalid_tolerance")
+    con = _connect()
+    if con is None:
+        return not_testable("duckdb spatial not available", code="duckdb_unavailable")
+    try:
+        datasets = []
+        identifier = '"' + id_field.replace('"', '""') + '"'
+        for name in (path, source_path):
+            rel = _read(con, root / name)
+            expression = _geometry_expression(con, rel)
+            if expression is None:
+                return failed(f"{name} has no geometry", code="geometry_column_missing")
+            crs_rows = con.execute(f"SELECT DISTINCT ST_CRS({expression}) FROM {rel}").fetchall()
+            crs = {row[0] for row in crs_rows if row[0]}
+            if len(crs) != 1 or any(not row[0] for row in crs_rows):
+                return failed(f"{name} lacks one known CRS", code="dataset_crs_missing")
+            missing_ids, duplicate_ids = con.execute(
+                f"SELECT COUNT(*) FILTER (WHERE {identifier} IS NULL), "
+                f"COUNT({identifier}) - COUNT(DISTINCT {identifier}) FROM {rel}"
+            ).fetchone()
+            if missing_ids or duplicate_ids:
+                return failed(f"{name} requires unique non-null {id_field}", code="geometry_identity_invalid")
+            escaped_crs = next(iter(crs)).replace("'", "''")
+            target_crs = comparison_crs.replace("'", "''")
+            datasets.append(
+                f"SELECT {identifier} AS feature_id, "
+                f"ST_Transform({expression}, '{escaped_crs}', '{target_crs}', always_xy := true) AS geometry "
+                f"FROM {rel}"
+            )
+        mismatches = con.execute(
+            f"WITH candidate AS ({datasets[0]}), source AS ({datasets[1]}) "
+            "SELECT candidate.feature_id FROM candidate LEFT JOIN source USING (feature_id) "
+            "WHERE source.feature_id IS NULL OR candidate.geometry IS NULL OR source.geometry IS NULL "
+            "OR NOT COALESCE(ST_Covers(ST_Buffer(source.geometry, ?), candidate.geometry) "
+            "AND ST_Covers(ST_Buffer(candidate.geometry, ?), source.geometry), false)",
+            [tolerance_m, tolerance_m],
+        ).fetchall()
+        if mismatches:
+            return failed(
+                f"{path}: {len(mismatches)} geometries differ from their source parcels after reprojection",
+                code="source_geometry_mismatch", feature_ids=[row[0] for row in mismatches],
+            )
+        return passed(f"{path}: selected geometries match {source_path}", tolerance_m=tolerance_m)
+    except Exception as exc:  # noqa: BLE001
+        return not_testable(f"could not compare source geometry: {exc}", code="read_error")
+    finally:
+        con.close()
 
 
 def dataset_crs_matches_storage_crs(

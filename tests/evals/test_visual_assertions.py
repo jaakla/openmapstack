@@ -11,6 +11,7 @@ import struct
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from .helpers import make_workspace, write_project  # noqa: E402  (also wires sys.path for `assertions`)
 
@@ -745,6 +746,14 @@ class BasemapBrowserTests(unittest.TestCase):
 
 
 class PlaywrightUnavailableTests(unittest.TestCase):
+    def test_layout_check_without_browser_is_not_testable(self) -> None:
+        workspace = make_workspace()
+        write_dashboard(workspace, "<div id='map'></div>")
+        with patch.object(visual, "_playwright", side_effect=ImportError("unavailable")):
+            result = visual.dashboard_layout_within_viewport(workspace)
+        self.assertEqual(result.status, "not_testable")
+        self.assertEqual(result.data["code"], "playwright_unavailable")
+
     def test_missing_playwright_is_not_testable(self) -> None:
         workspace = make_workspace()
         write_project(workspace, manifest())
@@ -764,6 +773,128 @@ class PlaywrightUnavailableTests(unittest.TestCase):
             visual._playwright = original
         self.assertEqual(result.status, "not_testable")
         self.assertEqual(result.data["code"], "playwright_unavailable")
+
+
+@unittest.skipUnless(_chromium_available(), "Playwright Chromium is not installed")
+class DashboardLayoutTests(unittest.TestCase):
+    def maplibre_dashboard(self, extra_css="", corner="top-right"):
+        workspace = make_workspace()
+        write_dashboard(workspace, """<!doctype html><style>
+          html,body{margin:0;height:100%}
+          #map{position:absolute;left:100px;top:60px;right:0;bottom:0;overflow:hidden}
+          .maplibregl-ctrl-top-left,.maplibregl-ctrl-top-right,
+          .maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right{
+            position:absolute;pointer-events:none}
+          .maplibregl-ctrl-top-left{top:0;left:0}
+          .maplibregl-ctrl-top-right{top:0;right:0}
+          .maplibregl-ctrl-bottom-left{bottom:0;left:0}
+          .maplibregl-ctrl-bottom-right{bottom:0;right:0}
+          .maplibregl-ctrl{clear:both;pointer-events:auto;transform:translate(0,0)}
+          .maplibregl-ctrl-top-left .maplibregl-ctrl{margin:10px 0 0 10px;float:left}
+          .maplibregl-ctrl-top-right .maplibregl-ctrl{margin:10px 10px 0 0;float:right}
+          .maplibregl-ctrl-bottom-left .maplibregl-ctrl{margin:0 0 10px 10px;float:left}
+          .maplibregl-ctrl-bottom-right .maplibregl-ctrl{margin:0 10px 10px 0;float:right}
+          button{width:29px;height:29px;display:block}
+        """ + extra_css + """</style><div id='map' class='maplibregl-map'>
+          <div class='maplibregl-control-container'><div class='maplibregl-ctrl-""" + corner + """'>
+          <div class='maplibregl-ctrl maplibregl-ctrl-group'><button>+</button></div>
+          </div></div></div>""")
+        return workspace
+
+    def test_standard_maplibre_controls_fit_both_viewports(self):
+        for corner in ("top-left", "top-right", "bottom-left", "bottom-right"):
+            with self.subTest(corner=corner):
+                result = visual.dashboard_layout_within_viewport(self.maplibre_dashboard(corner=corner))
+                self.assertEqual(result.status, "passed", result.detail)
+
+    def test_static_maplibre_control_with_offscreen_parent_fails(self):
+        result = visual.dashboard_layout_within_viewport(
+            self.maplibre_dashboard(".maplibregl-ctrl-top-right{top:-100px}"))
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertEqual(result.data["code"], "dashboard_layout_invalid")
+        self.assertIn("outside the viewport", result.detail)
+
+    def test_static_maplibre_control_clipped_by_map_fails(self):
+        result = visual.dashboard_layout_within_viewport(
+            self.maplibre_dashboard(".maplibregl-ctrl-top-right{top:-25px}"))
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertIn("outside the map", result.detail)
+        self.assertNotIn("outside the viewport", result.detail)
+
+    def test_maplibre_control_outside_mobile_viewport_fails(self):
+        result = visual.dashboard_layout_within_viewport(self.maplibre_dashboard(
+            "@media(max-width:600px){.maplibregl-ctrl-top-right{right:-40px}}"))
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertIn("390x844:", result.detail)
+        self.assertNotIn("1440x900:", result.detail)
+
+    def dashboard(self, extra_css=""):
+        workspace = make_workspace()
+        write_dashboard(workspace, """<!doctype html><style>
+          html,body{margin:0;height:100%} #wrapper{position:relative;height:100%;width:100%}
+          #map{position:absolute;inset:0}.legend{position:absolute;left:10px;bottom:10px}
+          .layer-control{position:absolute;right:10px;top:10px}
+        """ + extra_css + """</style><div id='wrapper'><div id='map'></div>
+          <div class='legend'>Legend</div><div class='layer-control'><button>Layers</button></div></div>""")
+        return workspace
+
+    def test_anchored_overlays_fit_both_viewports(self):
+        result = visual.dashboard_layout_within_viewport(self.dashboard())
+        self.assertEqual(result.status, "passed", result.detail)
+
+    def test_offscreen_clickable_control_fails(self):
+        result = visual.dashboard_layout_within_viewport(self.dashboard(".layer-control{top:-20px}"))
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertEqual(result.data["code"], "dashboard_layout_invalid")
+
+    def test_page_anchored_legend_outside_map_fails(self):
+        result = visual.dashboard_layout_within_viewport(self.dashboard("#map{left:300px}"))
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertIn("outside the map", result.detail)
+
+    def test_sidebar_legend_is_allowed(self):
+        result = visual.dashboard_layout_within_viewport(self.dashboard("#map{left:100px}.legend{position:static;width:80px}"))
+        self.assertEqual(result.status, "passed", result.detail)
+
+    def test_zero_height_map_fails(self):
+        # The common missing-CSS-height defect: full width, 0 px tall, and no
+        # overlay left to fall outside it.
+        workspace = make_workspace()
+        write_dashboard(workspace, "<!doctype html><style>body{margin:0}</style>"
+                                   "<div id='map'></div><aside class='legend'>Legend</aside>")
+        result = visual.dashboard_layout_within_viewport(workspace)
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertEqual(result.data["code"], "dashboard_layout_invalid")
+        self.assertIn("1440x900: map element has zero height", result.detail)
+        self.assertIn("390x844: map element has zero height", result.detail)
+
+    def sidebar_chart_dashboard(self, map_css):
+        workspace = make_workspace()
+        write_dashboard(workspace, "<!doctype html><style>html,body{margin:0;height:100%}"
+                                   "#side{position:absolute;left:0;top:0;width:200px}"
+                                   ".layer-control{position:absolute;right:10px;top:10px}" + map_css + "</style>"
+                                   "<div id='side'><canvas width='180' height='120'></canvas></div>"
+                                   "<div id='map'><div class='layer-control'><button>Layers</button></div></div>")
+        return workspace
+
+    def test_chart_canvas_before_the_map_is_not_the_map(self):
+        result = visual.dashboard_layout_within_viewport(self.sidebar_chart_dashboard(
+            "#map{position:absolute;left:220px;top:0;right:0;bottom:0}"))
+        self.assertEqual(result.status, "passed", result.detail)
+
+    def test_zero_height_map_beside_a_chart_still_fails(self):
+        result = visual.dashboard_layout_within_viewport(self.sidebar_chart_dashboard(
+            "#map{position:absolute;left:220px;top:0;right:0;height:0}"))
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertIn("map element has zero height", result.detail)
+
+    def test_collapsed_canvas_before_the_map_is_not_the_map(self):
+        workspace = make_workspace()
+        write_dashboard(workspace, "<!doctype html><style>html,body{margin:0;height:100%}"
+                                   "#map{position:absolute;inset:0}</style>"
+                                   "<canvas width='300' height='0'></canvas><div id='map'></div>")
+        result = visual.dashboard_layout_within_viewport(workspace)
+        self.assertEqual(result.status, "passed", result.detail)
 
 
 @unittest.skipUnless(_chromium_available(), "Playwright Chromium is not installed")
