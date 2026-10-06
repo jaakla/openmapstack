@@ -235,6 +235,78 @@ def _first_visible(page: Any, selector: str) -> Any | None:
     return None
 
 
+def _dashboard_layout_problems(page: Any) -> list[str]:
+    """Inspect actual bounds; a positive bounding box can still be off-screen."""
+    viewport = page.viewport_size
+    if viewport is None:
+        return ["browser viewport is unavailable"]
+    map_element = _first_visible(page, _MAP_SELECTOR)
+    if map_element is None:
+        return ["map element is absent"]
+    map_box = map_element.bounding_box()
+    problems = []
+
+    def contained(box, container):
+        return (box["x"] >= container["x"] - 1 and box["y"] >= container["y"] - 1
+                and box["x"] + box["width"] <= container["x"] + container["width"] + 1
+                and box["y"] + box["height"] <= container["y"] + container["height"] + 1)
+
+    screen = {"x": 0, "y": 0, **viewport}
+    if not contained(map_box, screen):
+        problems.append("map extends outside the viewport")
+    selectors = _LEGEND_SELECTOR + ', .layer-control, [data-testid="layer-controls"], .maplibregl-ctrl'
+    for element in page.query_selector_all(selectors):
+        box = element.bounding_box()
+        if not box or box["width"] <= 0 or box["height"] <= 0:
+            continue
+        # Ordinary legends may live in a scrollable sidebar. Map overlays must
+        # stay inside the map and viewport, including their clickable children.
+        # MapLibre positions its corner wrappers; the `.maplibregl-ctrl`
+        # children are static but still overlays whose bounds must be checked.
+        overlay = element.evaluate("""e => e.matches('.maplibregl-ctrl') ||
+            ['absolute', 'fixed'].includes(getComputedStyle(e).position)""")
+        if overlay:
+            if not contained(box, screen):
+                problems.append("map legend or controls extend outside the viewport")
+            if not contained(box, map_box):
+                problems.append("map legend or controls extend outside the map")
+    return sorted(set(problems))
+
+
+def dashboard_layout_within_viewport(
+    workspace: Path, dashboard: str = "dashboard.html", project_dir: str = ".",
+    desktop_size: str = "1440x900", mobile_size: str = "390x844",
+) -> Any:
+    """A lightweight layout check usable in live CI without PyQGIS or tiles."""
+    dashboard_path = project_root(workspace, project_dir) / dashboard
+    if not dashboard_path.is_file():
+        return failed(f"{dashboard} does not exist", code="file_missing")
+    try:
+        sync_playwright = _playwright()
+    except ImportError:
+        return not_testable("Playwright is not installed", code="playwright_unavailable")
+    opened = False
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            problems = []
+            for size in (desktop_size, mobile_size):
+                page = browser.new_page(viewport=_viewport(size))
+                page.goto(dashboard_path.as_uri(), wait_until="domcontentloaded")
+                opened = True
+                _settle(page, 300)
+                problems.extend(f"{size}: {problem}" for problem in _dashboard_layout_problems(page))
+                page.close()
+            browser.close()
+        if problems:
+            return failed("; ".join(problems), code="dashboard_layout_invalid", problems=problems)
+        return passed("map and overlays fit desktop and mobile viewports")
+    except Exception as exc:  # noqa: BLE001
+        if opened:
+            return failed(f"layout inspection failed: {exc}", code="browser_check_error")
+        return not_testable(f"browser unavailable: {exc}", code="browser_unavailable")
+
+
 def _screenshot_map(page: Any, output_path: Path) -> str | None:
     element = _first_visible(page, _MAP_SELECTOR)
     if element is None:

@@ -42,7 +42,7 @@ assertions:
   - assert: project.graph_resolves
   - assert: geodata.row_count
     args:
-      path: data/derived/candidates.parquet
+      path: $OUTPUT:candidate_parcels
       equals: 2
   - assert: provenance.every_source_has_provider_and_access
   - assert: provenance.every_source_pinned

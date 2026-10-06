@@ -433,7 +433,9 @@ def build(
         "overrides": overrides,
         "processing": {
             "analysis_crs": analysis_crs,
-            "storage_crs": "EPSG:4326",
+            # Canonical candidate/POI outputs are in the analysis CRS; separate
+            # browser exports below are reprojected to longitude/latitude.
+            "storage_crs": analysis_crs,
             "steps": steps,
         },
         "outputs": outputs,

@@ -54,7 +54,8 @@ on:
 jobs:
   live-benchmark:
     name: live benchmark (${{ matrix.agent }})
-    runs-on: ubuntu-latest
+    # Use distro Python with the matching native PyQGIS bindings.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -75,14 +76,33 @@ jobs:
       - uses: actions/checkout@v4
         if: steps.selection.outputs.run == 'true'
 
-      - uses: actions/setup-python@v5
+      - name: Prepare QGIS-capable Python environment
         if: steps.selection.outputs.run == 'true'
-        with:
-          python-version: "3.12"
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y python3-qgis python3-venv
+          /usr/bin/python3 -m venv --system-site-packages "${RUNNER_TEMP}/openmapstack-eval-venv"
+          echo "${RUNNER_TEMP}/openmapstack-eval-venv/bin" >> "$GITHUB_PATH"
+          echo "QT_QPA_PLATFORM=offscreen" >> "$GITHUB_ENV"
+          echo "QGIS_PREFIX_PATH=/usr" >> "$GITHUB_ENV"
 
       - name: Install eval dependencies
         if: steps.selection.outputs.run == 'true'
-        run: pip install -r evals/requirements.txt
+        run: |
+          pip install -r evals/requirements.txt '.[visual]'
+          python -m playwright install --with-deps chromium
+
+      - name: Verify native QGIS runtime
+        if: steps.selection.outputs.run == 'true'
+        run: |
+          python - <<'PY'
+          from qgis.core import Qgis, QgsApplication, QgsCoordinateReferenceSystem, QgsProviderRegistry
+          app = QgsApplication([], False)
+          app.initQgis()
+          assert "ogr" in QgsProviderRegistry.instance().providerList(), "QGIS OGR provider missing"
+          assert QgsCoordinateReferenceSystem("EPSG:3301").isValid(), "QGIS CRS database unavailable"
+          print(f"QGIS {Qgis.QGIS_VERSION}: headless runtime, OGR and CRS database ready")
+          PY
 
       - name: Prepare controlled DuckDB Spatial directory
         if: steps.selection.outputs.run == 'true'

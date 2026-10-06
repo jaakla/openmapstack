@@ -4,7 +4,7 @@ Kasuta kaasasolevaid kinnistute, teede ja POI kihte kataloogis `data/source/`,
 et leida kinnistud, mis võiksid sobida kavandatavaks kasutuseks. Kaasa
 kinnistud, mis on vähemalt 8 000 ruutmeetrit, mille sihtotstarve on `ARIMAA`,
 `MAATULUNDUSMAA` või `TOOTMISMAA`, ja mis asuvad kuni 2 000 meetri kaugusel
-põhimaanteest. Kirjuta tulemus faili `data/derived/candidate-parcels.parquet`.
+põhimaanteest. Deklareeri tulemus `project.yaml` jaotises `outputs.candidate_parcels`; vali sobiv ruumiandmete vorming ja failinimi.
 
 Tarni selles kataloogis täielik openmapstack-project/v1 projekt koos
 kanoonilise käivitatava töövoo ja valideerimistõenditega. Paigaldatud on

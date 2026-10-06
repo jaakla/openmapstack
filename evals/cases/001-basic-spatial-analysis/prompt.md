@@ -1,2 +1,8 @@
 Create analysis of high potential land development areas around Tartu city. Include parcels that are at least 8,000 square metres, with suitable zoning (ärimaa, maatulundusmaa, tootmismaa), within 2 km from main roads and 25 minutes walking distance from kindergardens and primary level schools (public or private). Create interactive dashboards as result. 
 Use the supplied parcel, road, and POI layers in data/source/
+
+Declare the candidate result under `outputs.candidate_parcels` in project.yaml,
+even if it is empty. Choose a suitable spatial format and filename (GeoJSON,
+GeoPackage or GeoParquet); preserve original parcel IDs and real geometry.
+Declare the actual storage CRS, use a metric CRS for analysis, and verify that
+web coordinates represent the same source features after reprojection.

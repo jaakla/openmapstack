@@ -34,6 +34,13 @@ WORKFLOW_ADDITIONS = (
     " Record every coded attribute the selection depends on as `selection.semantic_predicates`"
     " (`field`, `domain_value`) on the source it filters, even when the source is local and"
     " unfiltered on load; a free-text `selection.filter` does not document it.",
+    # tests/test_guidance_regressions.py native QGIS delivery guidance;
+    # tests/evals/test_qgis_assertions.py native CRS/relocation controls;
+    # live 001 qgis.runtime_load, static_valid and reproducibility checks.
+    "  * When PyQGIS is available, use `QgsProject.write(\"project.qgz\")` and check its return value."
+    " Reopen the saved project from another working directory and require a valid project CRS plus valid layers."
+    " Bare `data/...` strings in hand-written XML are not QGIS's serialized `./data/...` relative paths."
+    " The canonical pipeline must rebuild the QGIS companion on every run; a one-off export is insufficient.\n",
 )
 
 

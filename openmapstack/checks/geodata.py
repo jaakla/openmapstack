@@ -396,6 +396,69 @@ def dataset_crs_is(
 _EQUIVALENT_CRS = ({"EPSG:4326", "OGC:CRS84"},)
 
 
+def feature_geometries_match_source(
+    workspace: Path, path: str, source_path: str, id_field: str,
+    comparison_crs: str, tolerance_m: float = 0.1, project_dir: str = ".",
+) -> AssertionResult:
+    """Verify a selected subset retains the source geometry after reprojection.
+
+    CRS labels and valid polygons alone cannot detect a wrong transformation.
+    Compare in an explicitly chosen metric CRS, allowing numeric roundoff but
+    rejecting misplaced, invented, missing or altered parcel geometries.
+    """
+    root = project_root(workspace, project_dir)
+    if not all((root / name).is_file() for name in (path, source_path)):
+        return failed("candidate or source dataset is missing", code="file_missing")
+    if tolerance_m < 0:
+        return failed("geometry tolerance must be nonnegative", code="invalid_tolerance")
+    con = _connect()
+    if con is None:
+        return not_testable("duckdb spatial not available", code="duckdb_unavailable")
+    try:
+        datasets = []
+        identifier = '"' + id_field.replace('"', '""') + '"'
+        for name in (path, source_path):
+            rel = _read(con, root / name)
+            expression = _geometry_expression(con, rel)
+            if expression is None:
+                return failed(f"{name} has no geometry", code="geometry_column_missing")
+            crs_rows = con.execute(f"SELECT DISTINCT ST_CRS({expression}) FROM {rel}").fetchall()
+            crs = {row[0] for row in crs_rows if row[0]}
+            if len(crs) != 1 or any(not row[0] for row in crs_rows):
+                return failed(f"{name} lacks one known CRS", code="dataset_crs_missing")
+            missing_ids, duplicate_ids = con.execute(
+                f"SELECT COUNT(*) FILTER (WHERE {identifier} IS NULL), "
+                f"COUNT({identifier}) - COUNT(DISTINCT {identifier}) FROM {rel}"
+            ).fetchone()
+            if missing_ids or duplicate_ids:
+                return failed(f"{name} requires unique non-null {id_field}", code="geometry_identity_invalid")
+            escaped_crs = next(iter(crs)).replace("'", "''")
+            target_crs = comparison_crs.replace("'", "''")
+            datasets.append(
+                f"SELECT {identifier} AS feature_id, "
+                f"ST_Transform({expression}, '{escaped_crs}', '{target_crs}', always_xy := true) AS geometry "
+                f"FROM {rel}"
+            )
+        mismatches = con.execute(
+            f"WITH candidate AS ({datasets[0]}), source AS ({datasets[1]}) "
+            "SELECT candidate.feature_id FROM candidate LEFT JOIN source USING (feature_id) "
+            "WHERE source.feature_id IS NULL OR candidate.geometry IS NULL OR source.geometry IS NULL "
+            "OR NOT COALESCE(ST_Covers(ST_Buffer(source.geometry, ?), candidate.geometry) "
+            "AND ST_Covers(ST_Buffer(candidate.geometry, ?), source.geometry), false)",
+            [tolerance_m, tolerance_m],
+        ).fetchall()
+        if mismatches:
+            return failed(
+                f"{path}: {len(mismatches)} geometries differ from their source parcels after reprojection",
+                code="source_geometry_mismatch", feature_ids=[row[0] for row in mismatches],
+            )
+        return passed(f"{path}: selected geometries match {source_path}", tolerance_m=tolerance_m)
+    except Exception as exc:  # noqa: BLE001
+        return not_testable(f"could not compare source geometry: {exc}", code="read_error")
+    finally:
+        con.close()
+
+
 def dataset_crs_matches_storage_crs(
     workspace: Path,
     path: str,
