@@ -6,6 +6,9 @@ on:
       verify-import-run:
         description: Existing LangSmith import workflow run ID to verify read-only (skips upload)
         default: ''
+      exclude-import-run:
+        description: Previous successful import run ID whose trials should be skipped
+        default: ''
       source-run:
         description: Existing eval workflow run ID (no agents will be rerun)
         required: true
@@ -114,7 +117,7 @@ jobs:
           SOURCE_AGENT: ${{ inputs.agent }}
         run: gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name "eval-benchmark-$SOURCE_AGENT-$SOURCE_RUN" --dir saved-evidence
       - name: Build commit-matched fixture reference for the pilot
-        if: inputs.reference && inputs.case == '001-basic-spatial-analysis'
+        if: inputs.reference && (inputs.case == '' || inputs.case == '001-basic-spatial-analysis')
         env:
           SOURCE_AGENT: ${{ inputs.agent }}
           OPENMAPSTACK_SPATIAL_EXTENSION_DIR: ${{ runner.temp }}/langsmith-reference-spatial
@@ -142,6 +145,12 @@ jobs:
           manifest = {'task_commit': os.environ['TASK_COMMIT'], 'provenance': 'Regenerated fixture control from the recorded task commit. Illustrates one valid layout; recorded acceptance criteria remain authoritative.'}
           Path('reference-artifacts/001-basic-spatial-analysis/reference.json').write_text(json.dumps(manifest))
           PY
+      - name: Download previous import identities to avoid duplicate trials
+        if: inputs.exclude-import-run != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMPORT_RUN: ${{ inputs.exclude-import-run }}
+        run: gh run download "$IMPORT_RUN" --repo "$GITHUB_REPOSITORY" --name "langsmith-review-$IMPORT_RUN" --dir previous-import
       - name: Prepare and import selected trials
         env:
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
@@ -164,6 +173,7 @@ jobs:
           if [ -n "$TRIAL" ]; then selection+=(--trial "$TRIAL"); fi
           if [ -n "$ARM" ]; then selection+=(--arm "$ARM"); fi
           if [ -d reference-artifacts ]; then selection+=(--references reference-artifacts); fi
+          if [ -f previous-import/upload.json ]; then selection+=(--exclude-imported previous-import/upload.json); fi
           python evals/integrations/langsmith.py "saved-evidence/eval-benchmark-results-$SOURCE_AGENT.json" \
             --artifact-root saved-evidence --output langsmith-review \
             --dataset-name "$DATASET" --experiment-name "$SOURCE_AGENT-$ARM-$SOURCE_RUN-import-$GITHUB_RUN_ID" \

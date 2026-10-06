@@ -99,6 +99,21 @@ class LangSmithReportTests(unittest.TestCase):
         self.assertTrue(reference["available"])
         self.assertIn("Frozen reference", reference["html"])
 
+    def test_remaining_import_skips_known_trials_and_rejects_different_sources(self):
+        pilot = self.prepare()
+        remaining = self.prepare([self.trial(), self.trial(trial=2)], exclude_imported=pilot)
+        self.assertEqual([row['inputs']['trial'] for row in remaining['results']], [2])
+        self.assertEqual(remaining['experiment_metadata']['excluded_previously_imported_rows'], 1)
+        self.assertEqual(remaining['experiment_metadata']['source_outcomes']['passed'], 2)
+        with self.assertRaisesRegex(ValueError, 'already imported'):
+            self.prepare(exclude_imported=pilot)
+        with self.assertRaisesRegex(ValueError, 'same dataset and source run/model'):
+            self.prepare(exclude_imported={**pilot, 'dataset_name': 'other-dataset'})
+        with self.assertRaisesRegex(ValueError, 'same dataset and source run/model'):
+            self.prepare(exclude_imported=pilot, config={'model': 'different-model'})
+        with self.assertRaisesRegex(ValueError, 'result row IDs'):
+            self.prepare(exclude_imported={**pilot, 'results': [{}]})
+
     def test_path_escape_missing_evidence_and_size_limits(self):
         for path in ("../outside", "/etc"):
             with self.subTest(path=path), self.assertRaisesRegex(ValueError, "escapes"):
