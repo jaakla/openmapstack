@@ -34,6 +34,9 @@ class AgentRunResult:
     final_message: str | None = None
     permissions: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
+    # Adapters classify provider errors; the shared runner consumes this
+    # provider-neutral policy instead of parsing vendor event streams.
+    failure: dict[str, Any] | None = None
 
     def normalized(self, *, include_streams: bool = True) -> dict[str, Any]:
         """Return the vendor-neutral record persisted by the eval runner."""
@@ -52,6 +55,7 @@ class AgentRunResult:
             "final_message": self.final_message,
             "permissions": self.permissions,
             "metadata": self.metadata,
+            "failure": self.failure,
         }
         if include_streams:
             payload.update(

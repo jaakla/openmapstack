@@ -250,6 +250,7 @@ def prepare(summary: dict[str, Any], *, artifact_root: Path, dataset_name: str, 
             "experiment_start_time": imported_at, "experiment_end_time": finished_at,
             "experiment_metadata": {"source_schema": summary["schema"], "timestamp_source": "import_time", "run_config": config,
                                     "source_outcomes": summary["outcomes"], "source_score_types": summary["score_types"],
+                                    "source_selection": summary["selection"], "source_run_incomplete": summary.get("run_incomplete", False),
                                     "excluded_previously_imported_rows": len(seen & excluded_ids)},
             "results": rows}
 

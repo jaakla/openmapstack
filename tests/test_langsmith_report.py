@@ -85,6 +85,18 @@ class LangSmithReportTests(unittest.TestCase):
         selected = self.prepare([self.trial(), self.trial(arm="plain")], arm="plain")
         self.assertEqual(len(selected["results"]), 1)
 
+    def test_provider_blocked_trials_remain_in_metadata_without_result_scores(self):
+        payload = self.prepare([
+            self.trial(status="setup_failed", assertions=[], setup_error={"message": "quota reached"}),
+            self.trial(trial=2, status="skipped", assertions=[], artifact_bundle=None,
+                       skip_category="provider_blocked", reason="not attempted after quota_exhausted"),
+        ])
+        self.assertEqual(len(payload["results"]), 1)
+        self.assertNotIn("score", payload["results"][0]["evaluation_scores"][0])
+        self.assertTrue(payload["experiment_metadata"]["source_run_incomplete"])
+        self.assertEqual(payload["experiment_metadata"]["source_selection"]["trials_not_attempted"], 1)
+        self.assertFalse(self.prepare()["experiment_metadata"]["source_run_incomplete"])
+
     def test_references_must_be_explicit_and_commit_matched(self):
         references = self.root / "references"
         directory = references / "001-case"

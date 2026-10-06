@@ -1330,6 +1330,9 @@ def run_case(
                 message = f"agent {agent_name!r} failed"
                 if agent_result.returncode is not None:
                     message += f" with status {agent_result.returncode}"
+                failure = agent_run.get("failure")
+                if failure:
+                    message += f": {failure['message']}"
                 raise SetupFailure("agent_execution", message, agent_run)
 
         if "clean_rerun" in execution_config:
@@ -1663,6 +1666,7 @@ def _paired_arms_summary(results: list[dict[str, Any]]) -> dict[str, Any] | None
 
 
 def build_summary(results: list[dict[str, Any]], run_config: dict[str, Any]) -> dict[str, Any]:
+    not_attempted = sum(r.get("skip_category") == "provider_blocked" for r in results)
     ran = [r for r in results if r.get("status") != "skipped"]
     passed = [r for r in ran if r.get("status") == "passed"]
     assertion_failures = [r for r in ran if r.get("status") == "assertions_failed"]
@@ -1697,7 +1701,8 @@ def build_summary(results: list[dict[str, Any]], run_config: dict[str, Any]) -> 
         "selection": {
             "result_records": len(results),
             "trials_run": len(ran),
-            "case_definitions_skipped": len(results) - len(ran),
+            "case_definitions_skipped": len(results) - len(ran) - not_attempted,
+            "trials_not_attempted": not_attempted,
         },
         "outcomes": {
             "passed": len(passed),
@@ -1705,6 +1710,7 @@ def build_summary(results: list[dict[str, Any]], run_config: dict[str, Any]) -> 
             "setup_failed": len(setup_failures),
         },
         "run_setup_failed": False,
+        "run_incomplete": bool(not_attempted),
         "setup_errors": [],
         "score_types": score_types,
         "agent_benchmark": _agent_benchmark_summary(results),
@@ -1933,6 +1939,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     results: list[dict[str, Any]] = []
+    stopped_agents: dict[str, dict[str, Any]] = {}
     paired = len(arms) > 1
     for case_dir in case_dirs:
         case_def = _load_case(case_dir)
@@ -1941,6 +1948,18 @@ def main(argv: list[str] | None = None) -> int:
             trial_seed = args.seed + trial - 1 if args.seed is not None else None
             trial_started = time.monotonic()
             arm_segment = (arm,) if paired else ()
+            selected_agent = args.agent or (case_def.get("live") or {}).get("agent", "claude_code")
+            stop = stopped_agents.get(selected_agent) if args.mode == "live" and "live" in case_def["modes"] else None
+            if stop is not None:
+                results.append({
+                    "id": case_def["id"], "trial": trial, "case_type": case_def["case_type"],
+                    "seed": trial_seed, "arm": arm, "mode": args.mode, "score_type": selected_score_type,
+                    "supported_modes": case_def["modes"], "status": "skipped", "skipped": True,
+                    "skip_category": "provider_blocked", "blocked_by": stop,
+                    "reason": f"not attempted after {stop['failure']['category']} in {stop['case']} trial={stop['trial']} arm={stop['arm']}",
+                    "duration_s": 0.0, "agent_run": None, "assertions": [], "dimension_totals": {}, "hard_failures": [],
+                })
+                continue
             try:
                 result = run_case(
                     case_dir,
@@ -2021,6 +2040,12 @@ def main(argv: list[str] | None = None) -> int:
             elif result["status"] == "setup_failed":
                 error = result["setup_error"]
                 print(f"  -- {error['stage']}: {error['message']}")
+                failure = (result.get("agent_run") or {}).get("failure")
+                if args.mode == "live" and failure and failure.get("scope") == "provider" and failure.get("retryable") is False:
+                    stopped_agents[selected_agent] = {
+                        "agent": selected_agent, "case": result["id"], "trial": trial, "arm": arm, "failure": failure,
+                    }
+                    print(f"STOP   {selected_agent}: {failure['category']}; further trials using this adapter will not be attempted")
             else:
                 print()
 
@@ -2098,6 +2123,8 @@ def main(argv: list[str] | None = None) -> int:
     skipped = summary["selection"]["case_definitions_skipped"]
     if skipped:
         print(f"Skipped case definitions: {skipped}")
+    if summary["run_incomplete"]:
+        print(f"Run incomplete: {summary['selection']['trials_not_attempted']} trials not attempted after a provider failure")
 
     if summary["run_setup_failed"] or summary["outcomes"]["setup_failed"]:
         return 2

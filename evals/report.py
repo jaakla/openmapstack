@@ -154,6 +154,8 @@ def markdown_summary(summary: dict[str, Any]) -> str:
             capability = score.get("capability") or {}
             lines.append(f"| {cell(name)} | {score['passed']} / {score['graded_trials']} | {score['setup_failed']} | {capability.get('assertions_not_testable', 0)} | {capability.get('unmet_soft_gates', 0)} |")
     errors = Counter(failure_detail(r) for r in summary["results"] if r["status"] == "setup_failed")
+    if summary.get("run_incomplete"):
+        lines.extend(["", f"**Run incomplete: {summary['selection']['trials_not_attempted']} trials not attempted after a provider failure.**"])
     if summary.get("run_setup_failed"):
         lines.extend(["", "**Run setup failed.**", "", *[cell(e.get("message", e)) for e in summary.get("setup_errors", [])]])
     if errors:

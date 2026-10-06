@@ -409,6 +409,25 @@ and assertion implementation exceptions are setup failures. Assertions are not
 graded after such a failure, so unrelated breakage cannot satisfy a negative
 case that expects assertion status `failed`.
 
+Live adapters can report an optional normalized `agent_run.failure` containing
+`category`, `scope` (`provider` or `trial`), `retryable`, and a redacted `message`.
+The Claude adapter recognizes terminal API quota/credit exhaustion and
+authentication/permission failures. A non-retryable failure with provider scope
+stops further invocations of that adapter across cases, repetitions, and arms;
+other adapters remain eligible. Ordinary task failures, per-trial budgets,
+timeouts, and temporary provider errors do not trigger this stop.
+
+The triggering trial remains `setup_failed`, with its provider diagnosis and
+retained artifacts. Remaining affected trials are `skipped` with
+`skip_category: provider_blocked` and a `blocked_by` reference, without invoking
+an agent or pretending that assertions ran. `selection.trials_not_attempted`
+counts them separately from unsupported case definitions; `run_incomplete` is
+true when any such trials remain. They are excluded from executed/graded
+denominators, and the run exits `2`. CLI and CI review summaries call out the
+incomplete run. LangSmith experiment metadata retains the source run's
+incomplete flag and selection counts; unattempted trials are not imported as
+scored results. Report exports and LangSmith imports do not retry agents.
+
 ## How a case runs
 
 For each case directory under `evals/cases/<id>/`:
