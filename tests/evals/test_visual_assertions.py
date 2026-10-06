@@ -856,6 +856,26 @@ class DashboardLayoutTests(unittest.TestCase):
         result = visual.dashboard_layout_within_viewport(self.dashboard("#map{left:100px}.legend{position:static;width:80px}"))
         self.assertEqual(result.status, "passed", result.detail)
 
+    def test_zero_height_map_fails(self):
+        # The common missing-CSS-height defect: full width, 0 px tall, and no
+        # overlay left to fall outside it.
+        workspace = make_workspace()
+        write_dashboard(workspace, "<!doctype html><style>body{margin:0}</style>"
+                                   "<div id='map'></div><aside class='legend'>Legend</aside>")
+        result = visual.dashboard_layout_within_viewport(workspace)
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertEqual(result.data["code"], "dashboard_layout_invalid")
+        self.assertIn("1440x900: map element has zero height", result.detail)
+        self.assertIn("390x844: map element has zero height", result.detail)
+
+    def test_collapsed_canvas_before_the_map_is_not_the_map(self):
+        workspace = make_workspace()
+        write_dashboard(workspace, "<!doctype html><style>html,body{margin:0;height:100%}"
+                                   "#map{position:absolute;inset:0}</style>"
+                                   "<canvas width='300' height='0'></canvas><div id='map'></div>")
+        result = visual.dashboard_layout_within_viewport(workspace)
+        self.assertEqual(result.status, "passed", result.detail)
+
 
 @unittest.skipUnless(_chromium_available(), "Playwright Chromium is not installed")
 class BrowserErrorClassificationTests(unittest.TestCase):

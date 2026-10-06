@@ -225,10 +225,11 @@ _WARNINGS_SELECTOR = '[data-testid="warnings"], #warnings, .warnings'
 _RESET_SELECTOR = '[data-testid="canonical-reset"], #reset'
 
 
-def _first_visible(page: Any, selector: str) -> Any | None:
+def _first_visible(page: Any, selector: str, *, require_height: bool = False) -> Any | None:
     for element in page.query_selector_all(selector):
         try:
-            if element.bounding_box() and element.bounding_box()["width"] > 0:
+            box = element.bounding_box()
+            if box and box["width"] > 0 and (box["height"] > 0 or not require_height):
                 return element
         except Exception:  # noqa: BLE001
             continue
@@ -240,8 +241,12 @@ def _dashboard_layout_problems(page: Any) -> list[str]:
     viewport = page.viewport_size
     if viewport is None:
         return ["browser viewport is unavailable"]
-    map_element = _first_visible(page, _MAP_SELECTOR)
+    map_element = _first_visible(page, _MAP_SELECTOR, require_height=True)
     if map_element is None:
+        # A map container without a CSS height collapses to 0 px. It still has
+        # a width, and a zero-height box satisfies every containment test below.
+        if _first_visible(page, _MAP_SELECTOR) is not None:
+            return ["map element has zero height"]
         return ["map element is absent"]
     map_box = map_element.bounding_box()
     problems = []
