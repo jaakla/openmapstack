@@ -756,6 +756,13 @@ the declared output is missing. Supported spatial formats remain readable by
 the existing geodata checks. Storage CRS must match the actual dataset metadata,
 while metric analysis still requires a suitable CRS.
 
+Live benchmark CI uses Ubuntu 24.04's `python3-qgis` system package and a
+`--system-site-packages` virtual environment created with `/usr/bin/python3`.
+This keeps the native QGIS bindings and Python interpreter compatible. A
+preflight verifies the OGR provider and CRS database before any model call.
+Case 001's QGIS runtime check is a hard gate in live mode; fixture mode
+continues to report missing PyQGIS honestly as `not_testable`.
+
 `geodata.feature_geometries_match_source` compares candidate geometry against
 source geometry by stable ID after explicit x/y reprojection to the case's metric
 CRS. `visual.dashboard_layout_within_viewport` checks real desktop/mobile bounds
