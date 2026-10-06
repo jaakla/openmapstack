@@ -260,8 +260,9 @@ def upload(payload: dict[str, Any], *, endpoint: str, api_key: str, workspace_id
                 # Validation bodies may include the whole rejected input. Only
                 # retain bounded field names/types, or a top-level explanation.
                 if isinstance(detail, list):
-                    hint = json.dumps([{'loc': item.get('loc'), 'type': item.get('type')}
-                                       for item in detail[:8] if isinstance(item, dict)])
+                    hint = json.dumps([({'loc': item.get('loc'), 'type': item.get('type')}
+                                        if isinstance(item, dict) else item[:300])
+                                       for item in detail[:8] if isinstance(item, (dict, str))])
                 elif isinstance(detail, str):
                     hint = detail
                 hint = hint.replace(api_key, '[redacted]')[:600]
