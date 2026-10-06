@@ -53,7 +53,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN: ${{ inputs.source-run }}
           SOURCE_AGENT: ${{ inputs.agent }}
-        run: gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name "eval-benchmark-results-$SOURCE_AGENT" --dir saved-evidence
+        run: gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name "eval-benchmark-$SOURCE_AGENT-$SOURCE_RUN" --dir saved-evidence
       - name: Build commit-matched fixture reference for the pilot
         if: inputs.reference && inputs.case == '001-basic-spatial-analysis'
         env:
