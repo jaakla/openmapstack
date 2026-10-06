@@ -155,6 +155,25 @@ class LangSmithReportTests(unittest.TestCase):
             self.assertEqual(langsmith.main([str(source), "--output", str(self.root / "upload"), "--experiment-name", "pilot", "--upload"]), 2)
         self.assertFalse((self.root / "upload").exists())
 
+    def test_validation_error_reports_fields_without_rejected_inputs_or_key(self):
+        opener = MagicMock()
+        body = {'detail': [{'loc': ['body', 'results', 0, 'start_time'], 'type': 'datetime_parsing',
+                            'input': 'private-dashboard-content secret-token', 'msg': 'private-dashboard-content'}]}
+        opener.open.side_effect = HTTPError('https://eu.api.smith.langchain.com', 422, 'Invalid', {},
+                                           io.BytesIO(json.dumps(body).encode()))
+        with patch.object(langsmith, 'build_opener', return_value=opener):
+            with self.assertRaisesRegex(ValueError, 'datetime_parsing') as caught:
+                langsmith.upload({}, endpoint='https://eu.api.smith.langchain.com', api_key='secret-token')
+        self.assertNotIn('private-dashboard-content', str(caught.exception))
+        self.assertNotIn('secret-token', str(caught.exception))
+
+        opener.open.side_effect = HTTPError('https://eu.api.smith.langchain.com', 422, 'Invalid', {},
+                                           io.BytesIO(json.dumps({'detail': 'Invalid workspace secret-token'}).encode()))
+        with patch.object(langsmith, 'build_opener', return_value=opener):
+            with self.assertRaisesRegex(ValueError, 'Invalid workspace') as caught:
+                langsmith.upload({}, endpoint='https://eu.api.smith.langchain.com', api_key='secret-token')
+        self.assertNotIn('secret-token', str(caught.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

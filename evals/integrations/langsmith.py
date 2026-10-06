@@ -253,7 +253,21 @@ def upload(payload: dict[str, Any], *, endpoint: str, api_key: str, workspace_id
         # useful without logging the token or entire imported project.
         hints = {401: "check the API key and region", 403: "check workspace permissions and LANGSMITH_WORKSPACE_ID",
                  413: "select fewer trials or smaller artifacts", 429: "wait before retrying"}
-        raise ValueError(f"LangSmith HTTP {error.code}: {hints.get(error.code, 'inspect the request in LangSmith; upload was not retried')}") from None
+        hint = hints.get(error.code, 'inspect the request in LangSmith; upload was not retried')
+        if error.code == 422:
+            try:
+                detail = json.loads(error.read(65536)).get('detail')
+                # Validation bodies may include the whole rejected input. Only
+                # retain bounded field names/types, or a top-level explanation.
+                if isinstance(detail, list):
+                    hint = json.dumps([{'loc': item.get('loc'), 'type': item.get('type')}
+                                       for item in detail[:8] if isinstance(item, dict)])
+                elif isinstance(detail, str):
+                    hint = detail
+                hint = hint.replace(api_key, '[redacted]')[:600]
+            except (ValueError, OSError):
+                pass
+        raise ValueError(f"LangSmith HTTP {error.code}: {hint}") from None
 
 
 def main(argv: list[str] | None = None) -> int:
