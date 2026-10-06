@@ -14,6 +14,7 @@ extension) and report ``not_testable`` when it is unavailable, never a pass.
 from __future__ import annotations
 
 import csv
+import datetime
 import json
 import math
 import re
@@ -128,8 +129,36 @@ def not_empty(workspace: Path, path: str, project_dir: str = ".") -> AssertionRe
 
 _NUMBER = re.compile(r"^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$")
 _INTEGER = re.compile(r"^[+-]?\d+$")
-_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_DATETIME = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$")
+_DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
+# Seconds, fraction and UTC offset are optional. The offset may be `Z`, `+03`,
+# `+0300` or `+03:00`; DuckDB writes TIMESTAMPTZ to CSV as `... 12:00:00+00`.
+_DATETIME = re.compile(
+    r"^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-](\d{2})(?::?(\d{2}))?)?$"
+)
+
+
+def _is_date(text: str) -> bool:
+    match = _DATE.match(text)
+    if not match:
+        return False
+    try:
+        datetime.date(*map(int, match.groups()))
+    except ValueError:
+        return False
+    return True
+
+
+def _is_datetime(text: str) -> bool:
+    """An ISO 8601 date and time of day whose components exist on the calendar."""
+    match = _DATETIME.match(text)
+    if not match:
+        return False
+    year, month, day, hour, minute, second, offset_hours, offset_minutes = match.groups()
+    try:
+        datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second or 0))
+    except ValueError:
+        return False
+    return int(offset_hours or 0) <= 23 and int(offset_minutes or 0) <= 59
 
 
 def _blank(value: Any) -> bool:
@@ -161,9 +190,10 @@ def _conforms(value: Any, kind: str) -> bool:
         return bool(_NUMBER.match(str(value).strip()))
     text = value.isoformat() if hasattr(value, "isoformat") else str(value).strip()
     if kind == "date":
-        return bool(_DATE.match(text[:10])) and (len(text) == 10 or bool(_DATETIME.match(text)))
+        # XLSX and Parquet readers may return a date cell as a midnight datetime.
+        return _is_date(text) or _is_datetime(text)
     if kind == "datetime":
-        return bool(_DATETIME.match(text)) or bool(_DATE.match(text))
+        return _is_datetime(text)
     return True
 
 

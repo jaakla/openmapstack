@@ -64,18 +64,25 @@ def file_inventory(root: Path, paths: Iterable[str | Path]) -> list[dict[str, st
 
 
 def declared_output_paths(project: dict[str, Any]) -> list[str]:
+    """Every declared output path, including a table's download files.
+
+    Downloads are declared outputs (project-spec.md s.2.5), so run records must
+    hash them and sample runs must not overwrite them.
+    """
+    from .checks.tables import download_paths
+
     outputs = project.get("outputs") or {}
     if not isinstance(outputs, dict):
         return []
-    return sorted(
-        {
-            Path(output["path"]).as_posix()
-            for output in outputs.values()
-            if isinstance(output, dict)
-            and isinstance(output.get("path"), str)
-            and output["path"].strip()
-        }
-    )
+    paths: set[str] = set()
+    for output in outputs.values():
+        if not isinstance(output, dict) or not isinstance(output.get("path"), str) or not output["path"].strip():
+            continue
+        paths.add(Path(output["path"]).as_posix())
+        downloads = output.get("downloads")
+        if isinstance(downloads, list):
+            paths.update(download_paths(output["path"], [f for f in downloads if isinstance(f, str)]).values())
+    return sorted(paths)
 
 
 def declared_input_paths(root: Path, project: dict[str, Any]) -> list[str]:

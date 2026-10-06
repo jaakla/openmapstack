@@ -15,8 +15,10 @@ import json
 import shutil
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from openmapstack.checks import presentation as presentation_checks
+from openmapstack.checks import rerun as rerun_checks
 from openmapstack.checks import tables
 from openmapstack.schema import project_schema_errors as validation_errors
 from openmapstack.validation import validate_project
@@ -150,6 +152,39 @@ class TableCheckTests(unittest.TestCase):
         result = tables.columns_declared(self.workspace, path="data/derived/fmt.csv", columns=COLUMNS)
         self.assertEqual((result.status, result.data["code"]), ("failed", "table_type_mismatch"))
 
+    def test_dates_and_datetimes_must_exist_on_the_calendar(self) -> None:
+        columns = [{"name": "day", "type": "date"}, {"name": "observed_at", "type": "datetime"}]
+        cases = {
+            ("2026-10-06", "2026-10-06 12:00:00+00"): "passed",
+            ("2026-10-06", "2026-10-06T12:00:00Z"): "passed",
+            ("2026-10-06", "2026-10-06T12:00:00.5+03:00"): "passed",
+            ("2026-99-99", "2026-10-06T12:00:00Z"): "failed",
+            ("2026-02-30", "2026-10-06T12:00:00Z"): "failed",
+            ("2026-10-06", "2026-10-06T25:61:00Z"): "failed",
+            ("2026-10-06", "2026-10-06T12:00:00+24:00"): "failed",
+            ("2026-10-06", "2026-10-06"): "failed",  # a datetime needs its time of day
+        }
+        for (day, observed_at), status in cases.items():
+            with self.subTest(day=day, observed_at=observed_at):
+                _write_csv(self.workspace / "data/derived/dates.csv", ["day", "observed_at"], [(day, observed_at)])
+                result = tables.columns_declared(self.workspace, path="data/derived/dates.csv", columns=columns)
+                self.assertEqual(result.status, status, result.detail)
+
+    def test_duckdb_written_dates_and_timestamps_conform(self) -> None:
+        try:
+            import duckdb
+        except ImportError:
+            self.skipTest("duckdb unavailable")
+        target = self.workspace / "data/derived/stamps.csv"
+        duckdb.connect().execute(
+            "COPY (SELECT DATE '2026-10-06' AS day, TIMESTAMP '2026-10-06 12:00:00' AS local_time, "
+            f"TIMESTAMPTZ '2026-10-06 12:00:00+00' AS observed_at) TO '{target}' (FORMAT csv, HEADER true)"
+        )
+        columns = [{"name": "day", "type": "date"}, {"name": "local_time", "type": "datetime"},
+                   {"name": "observed_at", "type": "datetime"}]
+        result = tables.columns_declared(self.workspace, path="data/derived/stamps.csv", columns=columns)
+        self.assertEqual(result.status, "passed", result.detail)
+
     def test_undeclared_columns_fail(self) -> None:
         result = tables.columns_declared(self.workspace, path="data/derived/summary.csv", columns=[])
         self.assertEqual(result.data["code"], "table_columns_undeclared")
@@ -206,6 +241,31 @@ class VerifyPlanTests(unittest.TestCase):
         runs = [run for run in result.checks if run.name == "tables.downloads_consistent"]
         self.assertEqual(runs[0].result.status, "failed")
 
+    def test_a_missing_document_output_fails_verify(self) -> None:
+        workspace = self._workspace()
+        project = _table_project()
+        project["outputs"]["report"] = {"path": "report.html", "format": "HTML", "kind": "document", "generated_by": "export"}
+        write_project(workspace, project)
+        result = verify_project(workspace / "project.yaml")
+        run = next(run for run in result.checks if run.name == "project.declared_files_exist")
+        self.assertEqual(run.result.status, "failed")
+        self.assertEqual(run.result.data["missing"], ["report.html"])
+
+    def test_verify_rerun_compares_tables_and_their_downloads(self) -> None:
+        workspace = self._workspace()
+        header = [c["name"] for c in COLUMNS]
+
+        def changed_rerun(project_root, rerun_root, timeout_s, **kwargs):
+            shutil.copytree(project_root, rerun_root, dirs_exist_ok=True)
+            _write_json(rerun_root / "data/derived/summary.json", header, [("tuglase", 1.0, 643), ROWS[1]])
+            return {"status": "passed"}
+
+        with patch("openmapstack.verify.perform_clean_rerun", side_effect=changed_rerun):
+            result = verify_project(workspace / "project.yaml", rerun=True)
+        run = next(run for run in result.checks if run.name == "rerun.tables_semantically_equal")
+        self.assertEqual(run.args["paths"], ["data/derived/summary.csv", "data/derived/summary.json"])
+        self.assertEqual((run.result.status, run.result.data["mismatches"]), ("failed", ["data/derived/summary.json"]))
+
     def test_an_undeclared_kind_keeps_the_old_geodata_plan(self) -> None:
         workspace = self._workspace()
         project = _table_project()
@@ -215,6 +275,40 @@ class VerifyPlanTests(unittest.TestCase):
         result = verify_project(workspace / "project.yaml")
         self.assertTrue(any(run.name == "geodata.geometry_all_valid" for run in result.checks))
         self.assertFalse(any(run.name.startswith("tables.") for run in result.checks))
+
+
+class RerunTableTests(unittest.TestCase):
+    """A clean rerun must reproduce a table's values, not only its geodata."""
+
+    def setUp(self) -> None:
+        self.workspace = make_workspace()
+        self.rerun = make_workspace()
+        self.header = [c["name"] for c in COLUMNS]
+        for root in (self.workspace, self.rerun):
+            _write_csv(root / "data/derived/summary.csv", self.header, ROWS)
+
+    def check(self, paths=("data/derived/summary.csv",)):
+        return rerun_checks.tables_semantically_equal(self.workspace, rerun_workspace=str(self.rerun), paths=list(paths))
+
+    def test_identical_and_reordered_rows_are_equal(self) -> None:
+        self.assertEqual(self.check().status, "passed")
+        _write_csv(self.rerun / "data/derived/summary.csv", self.header, list(reversed(ROWS)))
+        self.assertEqual(self.check().status, "passed")
+
+    def test_a_changed_value_fails(self) -> None:
+        _write_csv(self.rerun / "data/derived/summary.csv", self.header, [("tuglase", 12891.6, 643), ROWS[1]])
+        result = self.check()
+        self.assertEqual((result.status, result.data["code"]), ("failed", "output_semantically_changed"))
+
+    def test_a_table_missing_from_the_rerun_fails(self) -> None:
+        (self.rerun / "data/derived/summary.csv").unlink()
+        self.assertEqual(self.check().data["code"], "output_missing")
+
+    @unittest.skipUnless(HAS_EXCEL, "DuckDB excel extension unavailable")
+    def test_a_rewritten_xlsx_with_the_same_rows_is_equal(self) -> None:
+        for root in (self.workspace, self.rerun):
+            _write_xlsx(root / "data/derived/summary.xlsx", self.header, ROWS)
+        self.assertEqual(self.check(["data/derived/summary.xlsx"]).status, "passed")
 
 
 class ValidateDeclarationTests(unittest.TestCase):

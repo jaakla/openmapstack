@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .spatial import connect_spatial
+from .tables import read_table
 
 from . import failed, load_json, load_project_yaml, not_testable, passed, project_root
 
@@ -289,6 +290,50 @@ def outputs_semantically_equal(
     if mismatches:
         return failed(f"semantic outputs changed across clean rerun: {mismatches}", mismatches=mismatches, code="output_semantically_changed")
     return passed(f"all {len(paths)} outputs are semantically equal across the clean rerun")
+
+
+def _table_snapshot(path: Path) -> dict[str, Any]:
+    columns, rows = read_table(path)
+    return {"columns": columns, "rows": sorted(_stable_json([_normalize_number(v) for v in row]) for row in rows)}
+
+
+def tables_semantically_equal(
+    workspace: Path,
+    rerun_workspace: str,
+    paths: list[str],
+    project_dir: str = ".",
+) -> Any:
+    """Compare `kind: table` outputs and their downloads by value across a clean rerun.
+
+    Rows are an unordered multiset, as in the geodata snapshots. An XLSX
+    file's embedded write time or a different CSV quoting style is not a
+    change; a changed column, value or row is.
+    """
+    root = project_root(workspace, project_dir)
+    rerun_root = Path(rerun_workspace)
+    if not rerun_root.exists():
+        return not_testable(f"rerun workspace {rerun_workspace} does not exist", code="rerun_workspace_missing")
+    missing: list[str] = []
+    mismatches: list[str] = []
+    errors: dict[str, str] = {}
+    for relative in paths:
+        original = root / relative
+        rerun = rerun_root / relative
+        if not original.is_file() or not rerun.is_file():
+            missing.append(relative)
+            continue
+        try:
+            if _table_snapshot(original) != _table_snapshot(rerun):
+                mismatches.append(relative)
+        except Exception as exc:  # noqa: BLE001
+            errors[relative] = f"{type(exc).__name__}: {exc}"
+    if missing:
+        return failed(f"tables missing in one of the two runs: {missing}", missing=missing, code="output_missing")
+    if errors:
+        return not_testable("could not read one or more tables", errors=errors, code="normalize_error")
+    if mismatches:
+        return failed(f"table values changed across clean rerun: {mismatches}", mismatches=mismatches, code="output_semantically_changed")
+    return passed(f"all {len(paths)} tables hold the same values across the clean rerun")
 
 
 def outputs_hash_stable(

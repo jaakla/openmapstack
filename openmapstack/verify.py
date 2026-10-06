@@ -144,12 +144,13 @@ class VerifyResult:
         return payload
 
 
-def _declared_output_paths(project: dict[str, Any], kind: str = "geodata") -> list[tuple[str, str, str | None]]:
+def _declared_output_paths(project: dict[str, Any], kind: str | None = "geodata") -> list[tuple[str, str, str | None]]:
     """Return (output id, project-relative path, declared EPSG or None) for outputs of one kind.
 
     The kind is the declared ``outputs.<name>.kind``; an undeclared kind is
     ``geodata`` (``presentation._output_kind``), so an unreadable format stays
     in the geodata plan as ``not_testable`` rather than being skipped.
+    ``kind=None`` returns every declared output.
     """
     outputs = project.get("outputs")
     if not isinstance(outputs, dict):
@@ -161,7 +162,7 @@ def _declared_output_paths(project: dict[str, Any], kind: str = "geodata") -> li
         path = spec.get("path")
         if not isinstance(path, str) or not path.strip():
             continue
-        if presentation_checks._output_kind(spec) != kind:
+        if kind is not None and presentation_checks._output_kind(spec) != kind:
             continue
         match = _EPSG.search(str(spec.get("format", "")))
         found.append((str(name), path, f"EPSG:{match.group(1)}" if match else None))
@@ -225,7 +226,8 @@ def verify_project(
         project_checks.status_agrees_with_validation_report,
         root,
     )
-    declared = [path for _, path, _ in _declared_output_paths(manifest)]
+    # Existence applies to every kind; only the format-specific plans filter.
+    declared = [path for _, path, _ in _declared_output_paths(manifest, kind=None)]
     if declared:
         _run(runs, "project.declared_files_exist", project_checks.declared_files_exist, root, files=declared)
     if get_in(manifest, "runtime", "implementation", "parameters") is not None:
@@ -420,6 +422,24 @@ def _verify_clean_rerun(
                 root,
                 rerun_workspace=str(rerun_root),
                 paths=outputs,
+            )
+        # Tables are not geodata: compare them, and their downloads, by value.
+        outputs_spec = manifest.get("outputs") if isinstance(manifest.get("outputs"), dict) else {}
+        tables: list[str] = []
+        for name, path, _ in _declared_output_paths(manifest, kind="table"):
+            formats = (outputs_spec.get(name) or {}).get("downloads")
+            formats = [f for f in formats if isinstance(f, str)] if isinstance(formats, list) else []
+            for relative in [path, *table_checks.download_paths(path, formats).values()]:
+                if relative not in tables:
+                    tables.append(relative)
+        if tables:
+            _run(
+                runs,
+                "rerun.tables_semantically_equal",
+                rerun_checks.tables_semantically_equal,
+                root,
+                rerun_workspace=str(rerun_root),
+                paths=tables,
             )
         _run(
             runs,
