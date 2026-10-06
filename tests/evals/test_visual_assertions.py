@@ -11,6 +11,7 @@ import struct
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from .helpers import make_workspace, write_project  # noqa: E402  (also wires sys.path for `assertions`)
 
@@ -745,6 +746,14 @@ class BasemapBrowserTests(unittest.TestCase):
 
 
 class PlaywrightUnavailableTests(unittest.TestCase):
+    def test_layout_check_without_browser_is_not_testable(self) -> None:
+        workspace = make_workspace()
+        write_dashboard(workspace, "<div id='map'></div>")
+        with patch.object(visual, "_playwright", side_effect=ImportError("unavailable")):
+            result = visual.dashboard_layout_within_viewport(workspace)
+        self.assertEqual(result.status, "not_testable")
+        self.assertEqual(result.data["code"], "playwright_unavailable")
+
     def test_missing_playwright_is_not_testable(self) -> None:
         workspace = make_workspace()
         write_project(workspace, manifest())
@@ -764,6 +773,37 @@ class PlaywrightUnavailableTests(unittest.TestCase):
             visual._playwright = original
         self.assertEqual(result.status, "not_testable")
         self.assertEqual(result.data["code"], "playwright_unavailable")
+
+
+@unittest.skipUnless(_chromium_available(), "Playwright Chromium is not installed")
+class DashboardLayoutTests(unittest.TestCase):
+    def dashboard(self, extra_css=""):
+        workspace = make_workspace()
+        write_dashboard(workspace, """<!doctype html><style>
+          html,body{margin:0;height:100%} #wrapper{position:relative;height:100%;width:100%}
+          #map{position:absolute;inset:0}.legend{position:absolute;left:10px;bottom:10px}
+          .layer-control{position:absolute;right:10px;top:10px}
+        """ + extra_css + """</style><div id='wrapper'><div id='map'></div>
+          <div class='legend'>Legend</div><div class='layer-control'><button>Layers</button></div></div>""")
+        return workspace
+
+    def test_anchored_overlays_fit_both_viewports(self):
+        result = visual.dashboard_layout_within_viewport(self.dashboard())
+        self.assertEqual(result.status, "passed", result.detail)
+
+    def test_offscreen_clickable_control_fails(self):
+        result = visual.dashboard_layout_within_viewport(self.dashboard(".layer-control{top:-20px}"))
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertEqual(result.data["code"], "dashboard_layout_invalid")
+
+    def test_page_anchored_legend_outside_map_fails(self):
+        result = visual.dashboard_layout_within_viewport(self.dashboard("#map{left:300px}"))
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertIn("outside the map", result.detail)
+
+    def test_sidebar_legend_is_allowed(self):
+        result = visual.dashboard_layout_within_viewport(self.dashboard("#map{left:100px}.legend{position:static;width:80px}"))
+        self.assertEqual(result.status, "passed", result.detail)
 
 
 @unittest.skipUnless(_chromium_available(), "Playwright Chromium is not installed")

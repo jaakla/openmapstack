@@ -749,6 +749,19 @@ case author omitted it and requires the baseline to cover the complete
 
 `validation.report_evidence_recomputes` independently derives supported row,
 geometry-validity, duplicate-ID, and null-ID counters from actual geodata.
+Live cases that name a semantic result use `$OUTPUT:candidate_parcels` to read its
+path from `outputs.candidate_parcels` in project.yaml. This also resolves nested
+validation evidence and clean-rerun paths; it never guesses another file when
+the declared output is missing. Supported spatial formats remain readable by
+the existing geodata checks. Storage CRS must match the actual dataset metadata,
+while metric analysis still requires a suitable CRS.
+
+`geodata.feature_geometries_match_source` compares candidate geometry against
+source geometry by stable ID after explicit x/y reprojection to the case's metric
+CRS. `visual.dashboard_layout_within_viewport` checks real desktop/mobile bounds
+of the map and its overlays in live case 001; live CI installs Chromium for it.
+Neither check substitutes for the fuller visual/QGIS integration suite.
+
 `geodata.dataset_crs_is` reads real dataset CRS metadata rather than trusting
 the manifest. `geodata.dataset_crs_matches_storage_crs` compares that metadata
 with the project's declared `processing.storage_crs`, for tasks that leave the

@@ -30,6 +30,6 @@ assertions:
 - assert: validation.run_record_matches
 - assert: geodata.row_count
   args:
-    path: data/derived/candidates.parquet
+    path: $OUTPUT:candidate_parcels
     equals: 0
 - assert: validation.warning_or_failed_propagates_to_status

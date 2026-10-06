@@ -34,7 +34,7 @@ assertions:
   - assert: project.graph_resolves
   # scenario road brings P3 into range; without it P3 is excluded (case 001)
   - assert: geodata.feature_present
-    args: { path: data/derived/candidate-parcels.parquet, id_field: cadastral_id, id: P3 }
+    args: { path: $OUTPUT:candidate_parcels, id_field: cadastral_id, id: P3 }
   - assert: presentation.distinguishable_layer_semantics
   - assert: presentation.required_layer_groups_exist
     args: { groups: [analysis, user_overrides] }

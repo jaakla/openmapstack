@@ -31,5 +31,5 @@ assertions:
 # The prompt fixes no output CRS; the project must write what it declares.
 - assert: geodata.dataset_crs_matches_storage_crs
   args:
-    path: data/derived/candidates.parquet
+    path: $OUTPUT:candidate_parcels
 - assert: geodata.crs_not_used_for_metrics
