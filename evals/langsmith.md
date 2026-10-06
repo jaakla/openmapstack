@@ -119,5 +119,14 @@ the HTTPS GitHub Pages URL is the portable option.
 
 The first CI pilot imports only one trial. After checking the view, clear `case`
 and `trial` in the manual workflow to import all attempted trials for the selected
-arm. Source outcomes and score-type denominators remain in experiment metadata;
+arm. To import only the remaining trials, set `exclude-import-run` to the prior
+successful import workflow run ID. It reads that run's `upload.json` and skips
+matching trial identities from the same dataset/source run/model. Locally, use
+`--exclude-imported /path/to/prior/upload.json`. The previous pilot stays in its
+original experiment; the remaining trials appear in a new experiment.
+Source outcomes and score-type denominators remain in experiment metadata;
 filtering a pilot does not alter the original run's score.
+
+To verify an existing import without uploading again, set `verify-import-run` to
+its workflow run ID. The read-only job checks workspace, dataset, example, and
+experiment access using the configured region and secret.

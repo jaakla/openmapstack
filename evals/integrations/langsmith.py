@@ -180,10 +180,22 @@ def review_row(result: dict[str, Any], root: Path, config: dict[str, Any], refer
 
 def prepare(summary: dict[str, Any], *, artifact_root: Path, dataset_name: str, experiment_name: str,
             case: str | None = None, trial: int | None = None, arm: str | None = None,
-            references: Path | None = None, imported_at: str | None = None) -> dict[str, Any]:
+            references: Path | None = None, imported_at: str | None = None,
+            exclude_imported: dict[str, Any] | None = None) -> dict[str, Any]:
     schema = json.loads((ROOT / "evals/schemas/results-v2.schema.json").read_text())
     Draft202012Validator(schema).validate(summary)
     config = summary["run_config"]
+    excluded_ids: set[str] = set()
+    if exclude_imported is not None:
+        previous_config = exclude_imported.get('experiment_metadata', {}).get('run_config', {})
+        if exclude_imported.get('dataset_name') != dataset_name or any(
+                previous_config.get(key) != config.get(key) for key in ('run_id', 'skill_commit', 'agent', 'model')):
+            raise ValueError('previous import must use the same dataset and source run/model')
+        previous_rows = exclude_imported.get('results')
+        if not isinstance(previous_rows, list) or any(not isinstance(row, dict) or not isinstance(row.get('row_id'), str) for row in previous_rows):
+            raise ValueError('previous import must contain result row IDs')
+        excluded_ids = {row['row_id'] for row in previous_rows
+                        if arm is None or row.get('run_metadata', {}).get('arm') == arm}
     results = [r for r in summary["results"] if r["status"] != "skipped"
                and (case is None or r["id"] == case) and (trial is None or r["trial"] == trial)
                and (arm is None or r.get("arm") == arm)]
@@ -205,6 +217,8 @@ def prepare(summary: dict[str, Any], *, artifact_root: Path, dataset_name: str, 
         if row_id in seen:
             raise ValueError("duplicate trial identity in selected results")
         seen.add(row_id)
+        if row_id in excluded_ids:
+            continue
         scores = [{"key": "trial_success", "value": result["status"],
                    **({"score": int(result["status"] == "passed")} if result["status"] in {"passed", "assertions_failed"} else {})}]
         for index, check in enumerate(review["checks"]):
@@ -223,6 +237,8 @@ def prepare(summary: dict[str, Any], *, artifact_root: Path, dataset_name: str, 
                              "score_type": result.get("score_type"), "arm": result.get("arm"), "run_id": config.get("run_id")},
             **({"error": review["diagnosis"] or "Trial setup failed"} if result["status"] == "setup_failed" else {}),
         })
+    if not rows:
+        raise ValueError('all selected trials were already imported')
     # LangSmith requires a strictly positive experiment interval. This is the
     # preparation interval, never an invented historical execution duration.
     finished_at = max(datetime.now(timezone.utc),
@@ -233,7 +249,8 @@ def prepare(summary: dict[str, Any], *, artifact_root: Path, dataset_name: str, 
             "experiment_description": "Imported retained eval evidence; no agent execution or regrading. Timestamps describe import, not execution.",
             "experiment_start_time": imported_at, "experiment_end_time": finished_at,
             "experiment_metadata": {"source_schema": summary["schema"], "timestamp_source": "import_time", "run_config": config,
-                                    "source_outcomes": summary["outcomes"], "source_score_types": summary["score_types"]},
+                                    "source_outcomes": summary["outcomes"], "source_score_types": summary["score_types"],
+                                    "excluded_previously_imported_rows": len(seen & excluded_ids)},
             "results": rows}
 
 
@@ -288,6 +305,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--trial", type=int)
     parser.add_argument("--arm")
     parser.add_argument("--references", type=Path, help="explicit commit-matched reference artifacts, never inferred from today's fixtures")
+    parser.add_argument("--exclude-imported", type=Path, help="previous upload.json from this dataset/source run; skip its trial row IDs")
     parser.add_argument("--upload", action="store_true", help="upload to LangSmith using LANGSMITH_API_KEY")
     parser.add_argument("--endpoint", default=os.environ.get("LANGSMITH_ENDPOINT", "https://api.smith.langchain.com"))
     args = parser.parse_args(argv)
@@ -299,7 +317,8 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("set LANGSMITH_API_KEY in your environment before --upload; do not put it in a command argument")
         payload = prepare(json.loads(args.results.read_text()), artifact_root=args.artifact_root,
                           dataset_name=args.dataset_name, experiment_name=args.experiment_name,
-                          case=args.case, trial=args.trial, arm=args.arm, references=args.references)
+                          case=args.case, trial=args.trial, arm=args.arm, references=args.references,
+                          exclude_imported=json.loads(args.exclude_imported.read_text()) if args.exclude_imported else None)
         args.output.mkdir(parents=True)
         (args.output / "upload.json").write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         # JSON in script elements must not allow </script> from generated HTML.
