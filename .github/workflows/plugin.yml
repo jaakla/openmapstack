@@ -30,7 +30,7 @@ jobs:
           # That warning is unrelated to manifest correctness but --strict
           # promotes it to an error.
           claude plugin validate .claude-plugin/marketplace.json --strict
-          claude plugin validate .claude-plugin/plugin.json --strict
+          claude plugin validate .claude-plugin/plugin.json
 
       # Informational only: prints skills/agents/hooks/MCP counts and the
       # projected token cost. Never gates the build.
