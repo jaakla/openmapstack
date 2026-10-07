@@ -145,6 +145,40 @@ python3 evals/run.py --mode fixture --case 018-coordinate-order-boundaries \
   --case 931-leaflet-latlng-coordinate-swapped --case 932-leaflet-geojson-coordinate-swapped
 ```
 
+## Selectable delivery contract
+
+Cases `019`–`023` cover the explicit new-project dashboard default, QGIS-only,
+Observable-only, combined delivery and hosted-export evidence. Each uses two
+explicitly synthetic rectangles in EPSG:3301: only `large` qualifies at 15000 m²,
+and its independently known area is 20000 m². The canonical pipeline rebuilds
+every selected view/receipt from the staged immutable fixture in a clean workspace.
+`delivery.selection_is` is a known-answer check for the requested target set;
+`delivery.evidence_matches` reads actual embedded metadata and binds the view
+bytes to shared semantics and analytical output hashes.
+
+Mutations `934`–`939` reject unknown targets, missing selected artifacts, stale
+embedded metadata even with a rewritten receipt, unpinned sources, geographic
+metric CRS and unresolved presentation lineage. Every mutation has a healthy
+control twin. Legacy v1 compatibility is covered by the existing contract cases
+and `tests/test_delivery.py`; fixture/example source identity is also tested.
+
+The five positives also declare live tasks to evaluate shipped skill behavior.
+They do not authorize a paid run. Fixture passes establish the contract/checker
+behavior, not agent adherence. Browser/native checks in fixture mode are soft
+gates and unavailable runtimes remain `not_testable` in capability reporting.
+The export fixture demonstrates hosted evidence requirements; it neither calls
+Observable nor proves publication/current remote state. Real adapters belong to
+[#80](https://github.com/jaakla/openmapstack-skills/issues/80).
+
+```bash
+python3 evals/run.py --mode fixture --case 019-dashboard-delivery \
+  --case 020-qgis-only-delivery --case 021-observable-only-delivery \
+  --case 022-combined-delivery --case 023-hosted-delivery-evidence \
+  --case 934-unknown-delivery-target --case 935-selected-delivery-missing \
+  --case 936-stale-delivery-metadata --case 937-delivery-unpinned-source \
+  --case 938-delivery-wrong-metric-crs --case 939-delivery-unresolved-layer
+```
+
 ## Visual integration (PyQGIS + browser)
 
 Fixture CI proves the deterministic contracts; it deliberately cannot prove

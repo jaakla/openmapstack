@@ -2,6 +2,13 @@
 
 QGIS is the open desktop GIS — full cartographic production, the Processing toolbox (a unified front-end for GDAL/GRASS/SAGA/WhiteboxTools/OTB), a mature plugin ecosystem (1500+ plugins), and a PyQGIS scripting API. It also has multiple MCP integrations now, which enable agentic / LLM-driven QGIS workflows.
 
+QGIS is an optional delivery integration for projects declaring
+`delivery.schema: openmapstack-delivery/v1`. Generate and validate it only when
+selected. Keep its datasets, styles, provenance and overrides tied to the
+canonical analysis; a desktop-only selection needs no web dashboard. Legacy
+manifests without `delivery` retain their existing companion obligations.
+See `project-spec.md` section 2.0 for migration and evidence requirements.
+
 ## When QGIS is the right tool
 
 * Cartographic production — print maps, atlases, styling

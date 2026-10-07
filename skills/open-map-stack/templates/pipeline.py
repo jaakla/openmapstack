@@ -21,6 +21,8 @@ from pathlib import Path
 import duckdb
 import yaml
 
+from openmapstack.delivery import metadata_json, write_evidence
+
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "data" / "derived"
 RUNS = ROOT / "runs"
@@ -229,13 +231,17 @@ def main() -> None:
             {"id": "overrides_applied", "status": "passed"},
             {"id": "manifest_graph_resolves", "status": "passed"},
             {"id": "view_controls_match_pipeline", "status": "passed"},
-            {"id": "qgis_project_static_valid", "status": "passed"},
             {"id": "manifest_report_parity", "status": "passed"},
             {"id": "example_range_check", "status": "passed"},
-            {"id": "qgis_runtime_load", "status": "not_testable",
-             "reason": "PyQGIS is not installed in this environment"},
         ],
     }
+    # Generate only delivery.targets: default dashboard; external targets are
+    # explicit. Embed metadata_json(ROOT, project, target) in each web view's
+    # <script id="openmapstack-view" type="application/json">. QGIS uses the
+    # custom property openmapstack.delivery. Expose source provenance/warnings
+    # visibly too; metadata is evidence, not a substitute for the visible view.
+    # Once the declared analytical outputs and views exist:
+    # write_evidence(ROOT, project)
     # STEP 7 — the pipeline, not a hand edit, records the run in project.yaml.
     finalize_run(report, started.isoformat())
 

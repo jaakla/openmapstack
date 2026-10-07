@@ -31,7 +31,11 @@ CLI setup and the worked example's runtime requirements.
    applying it. Never fabricate missing authoritative geometry or overwrite a
    source to make validation pass.
 3. Declare one canonical executable pipeline and ordered, resolvable steps.
-   Derive maps, QGIS projects and reports from that pipeline and manifest;
+   Record `delivery.schema: openmapstack-delivery/v1` for new projects; use the
+   built-in dashboard by default, or the user's explicit external-only/combined
+   selection. QGIS and Observable are optional targets. Existing manifests
+   without `delivery` retain legacy v1 behavior until explicitly migrated.
+   Derive selected views from that pipeline and manifest;
    avoid independent presentation logic that silently changes the analysis.
 4. Execute relevant checks, retain machine-readable results and run evidence,
    and perform a clean rerun. Check whether the `openmapstack` CLI is installed
@@ -41,14 +45,14 @@ CLI setup and the worked example's runtime requirements.
    for the clean rerun. Make that `verify --rerun` your last step and do not
    deliver until it passes; a passing `validate` alone is not enough. The
    canonical pipeline must produce every file under `data/derived`,
-   `project.qgz`, the run record, and the manifest's `runs.latest` and
+   every selected deliverable, the run record, and the manifest's `runs.latest` and
    `project.status`, never a one-off script or a hand edit: a rerun writes a
    new run record, so a hand-patched pointer breaks it.
    Missing tools or unknown data semantics remain visible limitations. A stated
    intention to validate is not validation.
 5. Deliver the project, source/override policy, runtime instructions and
    substantive method limitations together. Preserve the full presentation
-   and QGIS obligations in the workflow reference; a dashboard alone is not
+   obligations for the selected targets in the workflow reference; a view alone is not
    the project.
 
 ## Focused supporting guidance
