@@ -33,6 +33,7 @@ from .checks import metamorphic as metamorphic_checks
 from .checks import overrides as overrides_checks
 from .checks import presentation as presentation_checks
 from .checks import delivery as delivery_checks
+from .checks import integration as integration_checks
 from .checks import visual as visual_checks
 from . import delivery
 from .checks import project as project_checks
@@ -334,6 +335,10 @@ def verify_project(
         if spec.get("downloads"):
             _run(runs, "tables.downloads_consistent", table_checks.downloads_consistent, root, path=path, formats=spec.get("downloads"))
 
+    if "integrations" in manifest:
+        _run(runs, "integration.bindings_valid", integration_checks.bindings_valid, root)
+        _run(runs, "integration.evidence_matches", integration_checks.evidence_matches, root)
+
     # -- presentation and QGIS: the product matches what the manifest claims
     selected_targets = []
     if "delivery" in manifest:
@@ -358,7 +363,8 @@ def verify_project(
                     page = get_in(manifest, "outputs", target.get("output"), "path")
                     if isinstance(page, str):
                         _run(runs, f"delivery.{target['id']}.table_downloads_linked",
-                             presentation_checks.table_downloads_linked, root, dashboard=page)
+                             presentation_checks.table_downloads_linked, root, dashboard=page,
+                             allow_identical_copies=target.get("kind") == "observable")
     for name, fn in (
         ("layers_use_semantic_roles", presentation_checks.layers_use_semantic_roles),
         ("controls_match_pipeline", presentation_checks.controls_match_pipeline),

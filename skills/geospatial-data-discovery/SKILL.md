@@ -45,6 +45,11 @@ coverage/time, relevant fields and predicates, access/pin strategy, completeness
 evidence and material limitations. Compare alternatives when they change the
 answer; do not download an entire dataset just to establish its existence.
 
+When the user has dlt, Dagster, dbt, QGIS or Observable in their stack, read
+`references/established-stack.md` for ownership and integration boundaries.
+Preserve their chosen tools; retain source pins, GIS correctness and reproducible
+evidence. Do not duplicate their SQL, ingestion or scheduler definitions.
+
 ## Boundaries and resources
 
 Use `references/formats-and-crs.md` when inspecting coordinate systems, formats

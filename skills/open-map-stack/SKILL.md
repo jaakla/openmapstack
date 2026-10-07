@@ -67,6 +67,11 @@ correctness and clean reruns are required for every selection.
 For a bounded one-shot SQL, CRS or conversion question, the relevant domain
 reference is sufficient; a full project artifact and its methodology are not needed.
 
+When the user has dlt, Dagster, dbt, QGIS or Observable in their stack, read
+`references/established-stack.md` for ownership and integration boundaries.
+Preserve their chosen tools; retain source pins, GIS correctness and reproducible
+evidence. Do not duplicate their SQL, ingestion or scheduler definitions.
+
 ## Modules — read the relevant reference(s) before starting work
 
 | If the task involves... | Read |

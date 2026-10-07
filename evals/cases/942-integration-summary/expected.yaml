@@ -1,0 +1,17 @@
+id: 942-integration-summary
+case_type: mutation
+modes:
+- fixture
+score_types:
+  fixture: mutation_tests
+project_dir: project
+hard_gate: true
+mutation:
+  control_generator: '{python} {evals_dir}/fixtures/established-stack/gen.py {project_dir}'
+fixture:
+  generator: '{python} {evals_dir}/fixtures/established-stack/gen.py {project_dir}
+    --break summary'
+assertions:
+- assert: integration.bindings_valid
+  expect: failed
+  expect_code: integration_binding_invalid

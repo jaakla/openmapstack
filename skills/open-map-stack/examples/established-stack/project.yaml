@@ -1,0 +1,265 @@
+schema: openmapstack-project/v1
+delivery:
+  schema: openmapstack-delivery/v1
+  targets:
+  - id: dashboard
+    kind: dashboard
+    mode: local
+    output: dashboard
+    inputs:
+    - candidates
+    - areas
+    - scenarios
+    evidence: dashboard_evidence
+project:
+  id: established-stack-dashboard
+  title: Established-stack synthetic spatial example
+  question: Which synthetic polygons have net area at least 15000 square metres?
+  created_at: '2026-10-07T00:00:00Z'
+  updated_at: '2026-10-07T00:00:00Z'
+  status: draft
+  author:
+    name: OpenMapStack example maintainers
+    email: examples@example.invalid
+  generated_with:
+    tool: OpenMapStack
+    url: https://github.com/jaakla/openmapstack-skills
+interpretation:
+  objective: Run one spatial method through selected external tools with reproducible
+    delivery.
+  assumptions:
+  - id: synthetic
+    statement: Synthetic polygons in EPSG:3301 include a hole.
+    rationale: A hand-derived net-area oracle verifies the spatial method; this is
+      not a factual parcel study.
+sources:
+  parcels:
+    role: authoritative_input
+    provider: OpenMapStack synthetic fixture
+    dataset: Three synthetic WKT polygons
+    source_url: https://example.invalid/synthetic-parcels
+    access:
+      method: local
+      retrieved_at: '2026-10-07T00:00:00Z'
+      file:
+        name: parcels.csv
+        format: CSV with WKT
+        row_count: 3
+        column_count: 3
+    version:
+      identifier: synthetic-spatial-v1
+      published_at: '2026-10-07'
+    pin:
+      class: local_snapshot
+      path: data/source/parcels.csv
+      sha256: sha256:091894715e416020dd8824d91ac64aa81c5f54f5909d77498b8a50c780b9f1a9
+      captured_at: '2026-10-07T00:00:00Z'
+    selection:
+      filter: All three synthetic polygons; no API pagination
+    schema:
+      crs: EPSG:3301
+      key: id
+      columns:
+      - id
+      - wkt
+      - updated_at
+    license:
+      name: CC0-1.0
+      url: https://creativecommons.org/publicdomain/zero/1.0/
+    rationale: Explicitly synthetic input permits an offline hand-derivable correctness
+      oracle.
+overrides: []
+processing:
+  analysis_crs: EPSG:3301
+  storage_crs: EPSG:3301
+  steps:
+  - id: load
+    operation: read
+    source: parcels
+    output: raw
+    integration: ingestion
+  - id: measured
+    operation: area
+    inputs:
+    - raw
+    output: measured_result
+    integration: analysis
+  - id: candidates
+    operation: sql_model
+    inputs:
+    - measured_result
+    output: candidates_result
+    integration: analysis
+    minimum_area_m2: 15000
+    exploratory_area_m2: 30000
+  - id: scenarios
+    operation: sql_model
+    inputs:
+    - candidates_result
+    - measured_result
+    output: scenarios_result
+    integration: analysis
+  - id: export
+    operation: export
+    inputs:
+    - candidates_result
+    - scenarios_result
+    output: analytical_outputs
+  - id: render
+    operation: render
+    input: analytical_outputs
+    output: views
+outputs:
+  candidates:
+    path: data/derived/candidates.geojson
+    format: GeoJSON EPSG:3301
+    generated_by: export
+  areas:
+    path: data/derived/areas.csv
+    format: CSV
+    kind: table
+    generated_by: export
+    table:
+      key:
+      - id
+      columns:
+      - name: id
+        type: string
+      - name: area_m2
+        type: number
+        unit: "m\xB2"
+    downloads:
+    - csv
+  scenarios:
+    path: data/derived/scenarios.csv
+    format: CSV
+    kind: table
+    generated_by: export
+    role: exploratory_companion
+    note: Precomputed canonical and exploratory thresholds; canonical remains the
+      accepted result.
+    table:
+      key:
+      - scenario
+      columns:
+      - name: scenario
+        type: string
+      - name: minimum_area_m2
+        type: number
+        unit: "m\xB2"
+      - name: feature_count
+        type: integer
+        unit: features
+      - name: area_m2
+        type: number
+        unit: "m\xB2"
+  dashboard:
+    path: dashboard.html
+    format: HTML
+    kind: document
+    generated_by: render
+  dashboard_evidence:
+    path: delivery/dashboard-evidence.json
+    format: JSON
+    kind: document
+    generated_by: render
+  integration_evidence:
+    path: delivery/integration-evidence.json
+    format: JSON
+    kind: document
+    generated_by: render
+  tool_run:
+    path: delivery/tool-run.json
+    format: JSON
+    kind: document
+    generated_by: render
+validation:
+  required:
+  - selected_area
+  - delivery_dashboard
+  domain_checks: []
+presentation:
+  intent: report
+  primary_view: report
+  layout:
+    type: report
+  provenance_ui:
+    show_assumptions: true
+  tables:
+  - output: areas
+    downloads:
+    - csv
+warnings:
+- id: synthetic
+  severity: info
+  issue: Synthetic data
+  statement: Synthetic example only; no real cadastral or planning conclusions.
+  mitigation: Use authoritative pinned data for real studies.
+runtime:
+  implementation:
+    preferred_engine: duckdb-spatial
+    pipeline: pipeline.py
+    dependencies:
+    - analysis.py
+    - ingest.py
+    - delivery.py
+    - orchestration.py
+    - parameters.json
+    - dbt
+    - observable
+    - requirements-base.txt
+    - requirements-dlt.txt
+    - requirements-dbt.txt
+    - requirements-dagster.txt
+    - requirements-composed.txt
+  environment:
+    python: '3.12'
+    duckdb: 1.5.6
+runs:
+  latest:
+    id: run-20261007-000000
+    started_at: '2026-10-07T00:00:00Z'
+    completed_at: '2026-10-07T00:00:00Z'
+    status: passed
+    inputs_hash: ''
+    outputs_hash: ''
+    validation_report:
+      path: validation/latest-report.json
+integrations:
+  schema: openmapstack-integrations/v1
+  bindings:
+  - id: ingestion
+    owner: file
+    role: ingestion
+    definition: ingest.py
+    steps:
+    - load
+    sha256: sha256:110b1a489188390477b8b28a29e0d19ac14d0c2c86103df5ced82233d44e74ce
+    steps_sha256: sha256:4b6276b2aacf9c2cbb96a580beb6075974c4a450e7928dd4909935d2b05e37a8
+  - id: analysis
+    owner: sql
+    role: transformation
+    definition: dbt
+    steps:
+    - measured
+    - candidates
+    - scenarios
+    sha256: sha256:bcbf9cbdb192e23b0f2148a1125eae7f51b1d9649c8731fca78443c8b5013092
+    steps_sha256: sha256:20dd830dbe60daa7bbd47a00bb153c4c35d37048560b5de5df184dd976e8d1e3
+  - id: orchestration
+    owner: python
+    role: orchestration
+    definition: orchestration.py
+    steps: []
+    sha256: sha256:e09f5a0cfdd17003b781bfe12602301e8cf5160da5350aa396e68e3bffec3e3e
+    steps_sha256: sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+  - id: dashboard
+    owner: dashboard
+    role: presentation
+    definition: delivery.py
+    steps: []
+    sha256: sha256:080ab57439250eeb263fd8a144f4e2fa75dce9358be1641ae32dc3fb7c55b026
+    steps_sha256: sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+  evidence: integration_evidence
+  run_evidence: tool_run
+  bundles: []

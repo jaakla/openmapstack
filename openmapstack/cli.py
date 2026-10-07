@@ -989,6 +989,7 @@ def _inspection(project_file: Path, project: dict[str, Any], validation: Validat
         "steps": step_items,
         "outputs": output_items,
         "delivery": delivery.inspection(project),
+        "integrations": project.get("integrations"),
         "warnings": warnings,
         "latest_run": get_in(project, "runs", "latest"),
         "validation": validation.to_dict(),

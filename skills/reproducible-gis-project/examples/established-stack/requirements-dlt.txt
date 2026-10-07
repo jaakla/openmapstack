@@ -1,0 +1,2 @@
+-r requirements-base.txt
+dlt[duckdb]==1.31.0

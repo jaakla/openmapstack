@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import json
+import contextlib
+import functools
+import http.server
+import threading
 import zipfile
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
@@ -118,6 +122,24 @@ def evidence_matches(workspace: Path, target_id: str, project_dir: str = ".") ->
                             "analytical_outputs": expected["metadata"]["analytical_outputs"]})
 
 
+@contextlib.contextmanager
+def _serve_bundle(path: Path):
+    """Module-based static apps require HTTP; bind only loopback, then stop."""
+    class QuietHandler(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, format, *args):
+            pass
+    handler = functools.partial(QuietHandler, directory=str(path.parent))
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}/{path.name}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
 def web_view_loads(workspace: Path, target_id: str, project_dir: str = ".") -> AssertionResult:
     """Smoke-test a local web deliverable without imposing dashboard tabs on BI."""
     project = load_project_yaml(workspace, project_dir)
@@ -148,29 +170,33 @@ def web_view_loads(workspace: Path, target_id: str, project_dir: str = ".") -> A
             problems: list[str] = []
             page.on("pageerror", lambda error: problems.append(str(error)))
             page.on("console", lambda message: problems.append(message.text) if message.type == "error" else None)
-            page.goto(path.resolve().as_uri(), wait_until="networkidle", timeout=15000)
-            text = page.locator("body").inner_text().strip()
-            if not text:
-                problems.append("view has no visible content")
-            # Generic metadata has a documented provenance surface shared by
-            # all web targets, independently of their layout or chart library.
-            if page.locator('[data-openmapstack-provenance]').count() != 1:
-                problems.append("view must expose one provenance surface")
-            else:
-                provenance = page.locator('[data-openmapstack-provenance]')
-                if not provenance.is_visible():
-                    problems.append("provenance is not visible")
-                visible = provenance.inner_text()
-                for source in (project.get("sources") or {}).values():
-                    if str(source.get("provider", "")) not in visible:
-                        problems.append("source provider missing from visible provenance")
-                for warning in project.get("warnings") or []:
-                    statement = warning.get("statement")
-                    if statement and str(statement) not in text:
-                        problems.append("declared warning is not visible")
-            if problems:
-                return failed("; ".join(problems), code="delivery_view_unhealthy")
-            return passed(f"{target_id}: view loads and exposes provenance/warnings")
+            with contextlib.ExitStack() as stack:
+                url = stack.enter_context(_serve_bundle(path)) if target["kind"] == "observable" else path.resolve().as_uri()
+                page.goto(url, wait_until="networkidle", timeout=15000)
+                text = page.locator("body").inner_text().strip()
+                if not text:
+                    problems.append("view has no visible content")
+                # Generic metadata has a documented provenance surface shared by
+                # all web targets, independently of their layout or chart library.
+                if page.locator('[data-openmapstack-provenance]').count() != 1:
+                    problems.append("view must expose one provenance surface")
+                else:
+                    provenance = page.locator('[data-openmapstack-provenance]')
+                    if not provenance.is_visible():
+                        problems.append("provenance is not visible")
+                    visible = provenance.inner_text()
+                    for source in (project.get("sources") or {}).values():
+                        if str(source.get("provider", "")) not in visible:
+                            problems.append("source provider missing from visible provenance")
+                    for warning in project.get("warnings") or []:
+                        statement = warning.get("statement")
+                        if statement and str(statement) not in text:
+                            problems.append("declared warning is not visible")
+                if problems:
+                    return failed("; ".join(problems), code="delivery_view_unhealthy")
+                return passed(f"{target_id}: view loads and exposes provenance/warnings")
+        except OSError as exc:
+            return not_testable(f"local HTTP capability unavailable: {exc}", code="local_server_unavailable")
         except Exception as exc:
             return failed(f"view runtime failed: {exc}", code="delivery_view_unhealthy")
         finally:

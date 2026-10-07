@@ -1,0 +1,9 @@
+name: spatial_example
+version: '1.0'
+config-version: 2
+profile: spatial_example
+model-paths: [models]
+test-paths: [tests]
+models:
+  spatial_example:
+    +materialized: table
