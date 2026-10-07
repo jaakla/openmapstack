@@ -6,7 +6,7 @@ project:
     walking distance to city-owned kindergarten and school), and land-use criteria in Tartu, and show
     them on an interactive map with education POIs and catchment areas.
   created_at: 2026-08-25 08:15:03+03:00
-  updated_at: '2026-10-07T20:11:18.710103+00:00'
+  updated_at: '2026-10-07T21:10:16.835307+00:00'
   status: warning
 interpretation:
   objective: Find cadastral parcels in Tartu satisfying stated land-use, minimum size (>= 2 ha), primary
@@ -41,8 +41,8 @@ sources:
     portal_page: https://geoportaal.maaruum.ee/eng/spatial-data/cadastral-data-p310.html
     access:
       method: http(s) bulk download
-      downloaded_at: '2026-10-07T20:09:08.194267+00:00'
-      retrieved_at: '2026-10-07T20:09:08.194267+00:00'
+      downloaded_at: '2026-10-07T21:09:25.400573+00:00'
+      retrieved_at: '2026-10-07T21:09:25.400573+00:00'
       file:
         archive_name: Tartu_maakond_KATASTER_GPKG.zip
         extracted_file: Tartu_maakond_KATASTER_GPKG.gpkg
@@ -114,8 +114,8 @@ sources:
     portal_page: https://geoportaal.maaruum.ee/est/ruumiandmed/eesti-topograafia-andmekogu/laadi-etak-andmed-alla-p609.html
     access:
       method: WFS 2.0.0 (GetFeature)
-      downloaded_at: '2026-10-07T20:09:11.218987+00:00'
-      retrieved_at: '2026-10-07T20:09:11.218987+00:00'
+      downloaded_at: '2026-10-07T21:09:26.631688+00:00'
+      retrieved_at: '2026-10-07T21:09:26.631688+00:00'
       file:
         name: etak_main_roads.geojson
         layer_name: etak:e_501_tee_j
@@ -169,8 +169,8 @@ sources:
     portal_page: https://geohub.tartulv.ee/
     access:
       method: ArcGIS REST FeatureServer / GeoJSON
-      downloaded_at: '2026-10-07T20:09:16.584527+00:00'
-      retrieved_at: '2026-10-07T20:09:16.584527+00:00'
+      downloaded_at: '2026-10-07T21:09:29.401147+00:00'
+      retrieved_at: '2026-10-07T21:09:29.401147+00:00'
       file:
         name: tartu_municipal_education.geojson
         table_name: education_pois
@@ -221,8 +221,8 @@ sources:
     portal_page: https://download.geofabrik.de/europe/estonia.html
     access:
       method: http(s) bulk download
-      retrieved_at: '2026-10-07T20:09:45.464281+00:00'
-      downloaded_at: '2026-10-07T20:09:45.464281+00:00'
+      retrieved_at: '2026-10-07T21:09:44.984175+00:00'
+      downloaded_at: '2026-10-07T21:09:44.984175+00:00'
     version:
       identifier: estonia-260901.osm.pbf
       published_at: '2026-09-04'
@@ -756,13 +756,13 @@ runtime:
     osmium: 4.3.1
 runs:
   latest:
-    id: run-20261007-200904
-    started_at: '2026-10-07T20:09:04.276136+00:00'
-    completed_at: '2026-10-07T20:11:18.710103+00:00'
+    id: run-20261007-210921
+    started_at: '2026-10-07T21:09:21.704883+00:00'
+    completed_at: '2026-10-07T21:10:16.835307+00:00'
     status: warning
-    inputs_hash: sha256:0ffde03b7ffdcbec47062eaf9c79a4e61a09be7439d098a4fdba418a7405b207
+    inputs_hash: sha256:40a0843fe515a3406c8ef71df7b81c3846f3001592f926d00dde6a317b5a59b4
     outputs_hash: sha256:fed291ef271cb5863d3d6a8e3b67686b5f2064f8234c2df7a5180ab6051e6153
     record:
-      path: runs/run-20261007-200904.json
+      path: runs/run-20261007-210921.json
     validation_report:
       path: validation/latest-report.json
