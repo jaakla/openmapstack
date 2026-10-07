@@ -1,10 +1,11 @@
 """Shipped corrections that a live acceptance run caught must not silently revert.
 
-The 0.4.0 acceptance run (see `docs/release-0.4.0.md`) found two task-outcome
-failures that traced to shipped guidance rather than to the adapter or model:
-an agent claimed a plain `geom` GiST index serves a `::geography` predicate, and
-another treated a WFS `resultType=hits` total as proof of completeness. Both
-sentences were corrected, and both reruns then passed.
+The 0.4.0 acceptance run (see `docs/release-0.4.0.md` at tag `v0.4.0`) found
+two task-outcome failures that traced to shipped guidance rather than to the
+adapter or model: an agent claimed a plain `geom` GiST index serves a
+`::geography` predicate, and another treated a WFS `resultType=hits` total as
+proof of completeness. Both sentences were corrected, and both reruns then
+passed.
 
 Nothing else in the repository can notice if that wording goes away. The routing
 eval grades *selection* only -- `evals/routing.py` reports `task_success` as
