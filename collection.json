@@ -15,6 +15,7 @@
       "shared_references": [
         "project-workflow.md",
         "project-spec.md",
+        "design-language.md",
         "formats-and-crs.md",
         "user-data-sources.md",
         "data-sources.md",
