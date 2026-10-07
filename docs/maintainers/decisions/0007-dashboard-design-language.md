@@ -1,6 +1,6 @@
 # 0007 — Dashboards follow a versioned design language, not a shared renderer
 
-- Status: Proposed
+- Status: Accepted (2026-10-07; the decisions in points 6–9 were made by the maintainer)
 - Date: 2026-10-07
 - Related: [#6](https://github.com/jaakla/openmapstack-skills/issues/6), [#69](https://github.com/jaakla/openmapstack-skills/issues/69); `examples/tartu-development/`; `examples/nyc-private-mobility/`; [jaakla/tartu-sillad](https://github.com/jaakla/tartu-sillad); `openmapstack/checks/visual.py`; [0003](0003-shared-clean-rerun.md); [0005](0005-standalone-skill-distribution.md)
 
@@ -40,7 +40,7 @@ What does not hold is the link between claims and delivery:
 
 The constraints recorded in [0003](0003-shared-clean-rerun.md) and [0005](0005-standalone-skill-distribution.md) still apply. A project rebuilds from its own declared files and imports nothing from a skill path or the `openmapstack` package at run time.
 
-## Decision (proposed)
+## Decision
 
 1. **Ship a design language, not a renderer.** The skills carry a versioned reference that defines:
    - **Principles.** The answer comes first. The state the analysis ran in is visible and restorable. Source, result, override and hypothetical data stay distinguishable. A colour means one thing on the map, in charts and in tables. The view re-applies published rules and never re-measures. Provenance is one step away. The view works on a phone and in both themes.
@@ -48,7 +48,7 @@ The constraints recorded in [0003](0003-shared-clean-rerun.md) and [0005](0005-s
    - **Component grammar chosen by state semantics.** Independent on/off uses a switch. A few named, mutually exclusive states use a segmented control. An ordered value uses a range. Set membership uses chips. Comparison with a reference uses an explicit difference view. A selection opens a dismissible details card.
    - **Token roles with standard names.** Neutral, semantic-role, entity-identity and ramp tokens, each under a custom-property name the language fixes. Each project picks its own values within contrast and theme rules. The shared names are the one piece of consistency that costs a project nothing, and they let checks find the colours a theme or contrast rule applies to.
    - **The build seam.** A template file, one JSON payload, and substitution in the pipeline.
-2. **Ad-hoc additions are expected.** A project may invent a component when the grammar has none. It composes the component from the token roles and interaction rules and names it in the page's design header. A new component that moves the view away from the state the analysis ran in must be declared in `presentation.controls`, using an existing kind or a generic custom kind with `id`, `canonical` and states, so the checks can operate it. A purely presentational addition, such as a chart, needs no declaration. A view made of several pages declares each page with its scope, so the checks open every page and apply its own claims.
+2. **Ad-hoc additions are expected.** A project may invent a component when the grammar has none. It composes the component from the token roles and interaction rules and names it in the page's design header. A new component that moves the view away from the state the analysis ran in must be declared in the view's controls, using an existing kind or a generic custom kind with `id`, `canonical` and states, so the checks can operate it. A purely presentational addition, such as a chart, needs no declaration. A project made of several pages declares them in a top-level `views:` list (point 7), so the checks open every page and apply its own claims.
 3. **Checks verify claims through a state protocol, not DOM shape.**
    - Each declared control carries `data-oms-control="<manifest id>"`.
    - It exposes state through native semantics: `checked`, `aria-pressed`, `value` or `aria-selected`.
@@ -57,6 +57,10 @@ The constraints recorded in [0003](0003-shared-clean-rerun.md) and [0005](0005-s
    This is close to what agents already write unprompted. The controls on both tartu-sillad pages already expose their state through `aria-pressed`, `value` or ARIA tabs; only the `data-oms-control` link to the manifest id is missing. `visual.dashboard_loads_in_browser` is generalised to this protocol. It checks that every declared control exists and has an effect, that reset restores the declared state, and that off-canonical labelling appears wherever the archetype requires it. No second verifier is added.
 4. **The language evolves by promotion.** New patterns come from real projects, in this repository or outside it. A pattern that recurs independently, or that the maintainer judges broadly useful, joins the language with a specimen and, if it carries a claim, a check. The language version then increases, and checks apply the rules of the version a project follows.
 5. **Specimens, not templates.** The worked examples demonstrate the archetypes. A small optional kit with tokens and base component CSS may be extracted once two specimens share the same code. It stays a convenience and never becomes a required dependency.
+6. **The manifest records the language version.** `presentation.design_language` names the version a project's views follow, and the browser check applies that version's rules. A project without the field keeps today's checks, so existing projects do not fail retroactively and later language versions do not fail older projects.
+7. **Pages are top-level `views:`.** Each entry names its `id`, the HTML `output` it is, its `archetype`, its `scope`, and whether it is the `entry` page; exactly one is. A view may carry a `presentation` block that overrides top-level `presentation` keys for that page only. A project without `views:` has one implicit view, its dashboard. To keep one meaning for "views", the precomputed-variant switches that were `presentation.controls.views` become `presentation.controls.variants`; the old key never shipped in a release, so there is no alias.
+8. **Controls declare whether they leave the published results.** A control with `effect: published` switches only between results the run published, such as the scenarios a report compares side by side; it needs no exploratory label. Every other control is `effect: exploratory`, the default: leaving its canonical position shows the exploratory label and offers a reset. This applies to every archetype, so a report that adds a sensitivity selector still says so.
+9. **`openmapstack verify` runs the browser check when it can.** When Playwright and Chromium are installed, `verify` runs `visual.dashboard_loads_in_browser` for every declared view. Without them the check is `not_testable` with an install hint, never a pass, and the package gains no hard dependency.
 
 ## Consequences
 
@@ -65,6 +69,7 @@ The constraints recorded in [0003](0003-shared-clean-rerun.md) and [0005](0005-s
 - Automatic checks can only judge claims and measurable rules: controls, reset, theme, contrast and mobile layout. Conformance to the language beyond that needs a human or visual review rubric.
 - `SKILL.md` must route agents to the language reference. That is a shipped behavior change and needs live-eval evidence, which requires authorizing the model, trial count and spending cap.
 - #6 changes scope from "extract a renderer" to "publish the language and generalise the checker". #69's checker items become point 3.
+- tartu-sillad's own keys (`entrypoint`, `screening_view`, `detail_view`, `scope`) and its `presentation.controls.views` migrate to `views:` and `presentation.controls.variants`.
 
 ## Alternatives considered
 
@@ -80,10 +85,7 @@ Claims stay unverifiable. tartu-sillad's missing reset and #69's missing control
 
 This reproduces the template problem at a smaller scale. Point 5 keeps a kit possible later, as an optional convenience.
 
-## Open questions for review
+## Open questions
 
-- Should a manifest record the language version it follows, for example `presentation.design_language`?
-- What should the key for pages be called? `presentation.controls.views` already means precomputed variant switches, so pages need another name, for example `presentation.pages`, which would replace tartu-sillad's `entrypoint`, `screening_view` and `detail_view`.
-- Should `verify` run the browser check when Playwright is available?
-- What does "canonical" mean in the report archetype? One option: the initial selection, with no off-canonical label required when every scenario shown is a published result.
 - What should the report specimen be? A trimmed public copy of tartu-sillad needs its unresolved source licence (its `source_license_resolved` warning) settled first.
+- What evidence is enough to promote a pattern? For example: used in at least two projects, and reproduced from the guidance in one live-agent trial.
