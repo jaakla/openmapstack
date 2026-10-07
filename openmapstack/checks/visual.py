@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from . import AssertionResult, failed, get_in, load_project_yaml, not_testable, passed, project_root
+from .presentation import DESIGN_LANGUAGES, declared_controls, declared_views
 
 # A rendered map is considered blank when fewer than this fraction of
 # pixels differ from the modal (background) color. Genuine sparse vector
@@ -402,9 +403,11 @@ def _toggle_changes_render(
     toggled: Path,
     settle_ms: int,
     no_effect_detail: str = "toggle does not change the rendered map (layer absent or indistinguishable)",
+    switch: Any = None,
 ) -> tuple[str | None, float | None]:
     """Switch ``control`` off, confirm the rendered map actually changes, and
-    switch it back on again.
+    switch it back on again. ``switch(on)`` overrides how the control is
+    operated; by default it is a checkbox.
 
     The restore runs in a ``finally`` block: a screenshot failure mid-check
     must not leave the layer hidden, because every later comparison — and
@@ -414,11 +417,14 @@ def _toggle_changes_render(
     Returns ``(problem, differing_fraction)``; ``problem`` is None when the
     toggle demonstrably changes the render.
     """
+    if switch is None:
+        def switch(on: bool) -> None:
+            control.check() if on else control.uncheck()
     error = _stable_screenshot(page, baseline, settle_ms)
     if error:
         return error, None
     try:
-        control.uncheck()
+        switch(False)
         _settle(page, settle_ms)
         error = _stable_screenshot(page, toggled, settle_ms)
         if error:
@@ -428,8 +434,77 @@ def _toggle_changes_render(
             return f"{no_effect_detail} (only {fraction:.4%} of pixels differ)", fraction
         return None, fraction
     finally:
-        control.check()
+        switch(True)
         _settle(page, settle_ms)
+
+
+def _panel_and_basemap_problems(
+    page: Any,
+    problems: "_Problems",
+    *,
+    presentation: dict,
+    warnings: list,
+    requested_urls: list[str],
+    reveal: bool = False,
+) -> None:
+    """Declared legend, provenance and warnings panels are visible; a declared
+    basemap is really requested and attributed. With ``reveal`` a panel on an
+    inactive tab is first brought into view through its tab."""
+
+    def visible(selector: str) -> Any | None:
+        element = _first_visible(page, selector)
+        if element is None and reveal:
+            hidden = page.query_selector(selector)
+            if hidden is not None and _reveal(page, hidden):
+                element = _first_visible(page, selector)
+        return element
+
+    legend_visible = bool(get_in(presentation, "legend.visible"))
+    provenance_declared = bool(presentation.get("provenance_ui"))
+    # Declared panels are actually visible.
+    if legend_visible and visible(_LEGEND_SELECTOR) is None:
+        problems.add("legend_absent", "manifest declares legend visible but no legend is rendered")
+    if provenance_declared and visible(_PROVENANCE_SELECTOR) is None:
+        problems.add("provenance_absent", "manifest declares provenance_ui but no provenance panel is rendered")
+    if warnings:
+        panel = visible(_WARNINGS_SELECTOR)
+        body_text = page.inner_text("body")
+        for w in warnings:
+            warning_id = str(w.get("id", ""))
+            if panel is None:
+                problems.add("warning_not_visible", f"manifest warning {warning_id} has no visible warning panel")
+                break
+            if warning_id and warning_id not in body_text:
+                problems.add("warning_not_visible", f"manifest warning {warning_id} not visible in the rendered product")
+
+    # A declared interactive basemap is real.
+    # A manifest that presents a map must declare its background
+    # map; that omission is caught by the v1 schema
+    # (project-spec.md s. 3), which every case checks in every
+    # mode. What only a browser can prove is the rest: that the
+    # declared tiles are really requested and the required
+    # attribution is really visible.
+    basemap = get_in(presentation, "map.basemap")
+    if basemap:
+        # Match any tile under the basemap's URL template:
+        # "https://host/{z}/{x}/{y}.png" -> "https://host/".
+        tile_prefix = ((basemap.get("tiles") or [basemap.get("url") or ""])[0] or "").split("{z}")[0]
+        tile_requests = [url for url in requested_urls if tile_prefix and url.startswith(tile_prefix)]
+        if _first_visible(page, f'{_MAP_SELECTOR}, .maplibregl-canvas') is None:
+            problems.add("basemap_absent", "manifest declares a basemap but no interactive map canvas is rendered")
+        if not tile_requests:
+            problems.add(
+                "basemap_absent",
+                f"manifest declares basemap {basemap.get('id')!r} but the product never "
+                f"requested its tiles ({tile_prefix}...) — the background map is not interactive",
+            )
+        attribution = basemap.get("attribution")
+        if attribution and attribution not in page.inner_text("body"):
+            problems.add(
+                "basemap_absent",
+                f"basemap attribution {attribution!r} required by the manifest is not visible "
+                "in the rendered product",
+            )
 
 
 def _checkbox_states(page: Any) -> dict[str, bool]:
@@ -438,6 +513,360 @@ def _checkbox_states(page: Any) -> dict[str, bool]:
             [...document.querySelectorAll('input[type="checkbox"]')]
             .map(cb => [cb.dataset.layerGroup || cb.dataset.scenario || cb.id || cb.name || '', cb.checked])
         )"""
+    )
+
+
+# ---------------------------------------------------------------------------
+# State protocol (design language openmapstack-views, ADR 0007)
+# ---------------------------------------------------------------------------
+
+# Marks, outermost first, the tabs whose panels contain the element, so the
+# checker can click them the way a reader would.
+_MARK_OWNING_TABS_JS = """(element) => {
+  const panels = [];
+  for (let p = element.closest('[role="tabpanel"]'); p; p = p.parentElement && p.parentElement.closest('[role="tabpanel"]')) {
+    panels.unshift(p);
+  }
+  let n = 0;
+  for (const panel of panels) {
+    let tab = panel.id ? document.querySelector('[role="tab"][aria-controls="' + CSS.escape(panel.id) + '"]') : null;
+    if (!tab && panel.getAttribute('aria-labelledby')) tab = document.getElementById(panel.getAttribute('aria-labelledby'));
+    if (tab && tab.getAttribute('role') === 'tab') tab.setAttribute('data-oms-check-tab', String(n++));
+  }
+  return n;
+}"""
+
+_CONTROL_STATE_JS = """(e) => {
+  if (e.matches('input[type="checkbox"]')) return {kind: 'checkbox', state: e.checked};
+  if (e.matches('input[type="range"]')) return {kind: 'range', state: e.value, min: e.min || '0', max: e.max || '100'};
+  if (e.matches('select')) return {kind: 'select', state: e.value,
+    options: [...e.options].filter((o) => !o.disabled).map((o) => o.value)};
+  const buttons = [...e.querySelectorAll('[data-oms-value]')];
+  if (buttons.length) {
+    const on = (b) => ['aria-pressed', 'aria-checked', 'aria-selected'].some((a) => b.getAttribute(a) === 'true');
+    return {kind: 'group', state: buttons.filter(on).map((b) => b.dataset.omsValue).sort(),
+      values: buttons.map((b) => b.dataset.omsValue)};
+  }
+  return {kind: 'unknown', tag: e.tagName.toLowerCase()};
+}"""
+
+# The page's text with the exploratory label left out, so that the label
+# appearing does not by itself count as the control changing the view.
+_PAGE_TEXT_JS = """() => {
+  const copy = document.body.cloneNode(true);
+  copy.querySelectorAll('[data-oms-exploratory], script, style').forEach((e) => e.remove());
+  return copy.textContent.replace(/\\s+/g, ' ');
+}"""
+
+
+def _reveal(page: Any, element: Any, settle_ms: int = 150) -> bool:
+    """Open the tabs that hide ``element``; True when it is then visible."""
+    try:
+        if element.is_visible():
+            return True
+        count = element.evaluate(_MARK_OWNING_TABS_JS)
+        for index in range(count):
+            page.click(f'[data-oms-check-tab="{index}"]', timeout=3000)
+            page.wait_for_timeout(settle_ms)
+        return element.is_visible()
+    except Exception:  # noqa: BLE001
+        return False
+    finally:
+        try:
+            page.evaluate("() => document.querySelectorAll('[data-oms-check-tab]').forEach((t) => t.removeAttribute('data-oms-check-tab'))")
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _find_revealed(page: Any, selector: str) -> tuple[Any | None, bool]:
+    """``(element, present)``: the first visible match, after opening the
+    owning tab of the first match when none is visible."""
+    matches = page.query_selector_all(selector)
+    if not matches:
+        return None, False
+    for element in matches:
+        if element.is_visible():
+            return element, True
+    return (matches[0] if _reveal(page, matches[0]) else None), True
+
+
+def _alternative_state(info: dict) -> Any:
+    """A state the control can be moved to, or None when it has only one."""
+    kind = info["kind"]
+    if kind == "checkbox":
+        return not info["state"]
+    if kind == "select":
+        return next((o for o in info["options"] if o != info["state"]), None)
+    if kind == "range":
+        if info["min"] == info["max"]:
+            return None
+        return info["max"] if info["state"] != info["max"] else info["min"]
+    if kind == "group":
+        off = [v for v in info["values"] if v not in info["state"]]
+        return off[0] if off else (info["values"][0] if info["values"] else None)
+    return None
+
+
+def _set_control(control: Any, info: dict, value: Any) -> None:
+    """Operate a protocol control the way a reader would."""
+    kind = info["kind"]
+    if kind == "checkbox":
+        try:
+            control.set_checked(bool(value), timeout=3000)
+        except Exception:  # noqa: BLE001  - a switch that hides its input behind a styled track
+            control.evaluate("(e, v) => { if (e.checked !== v) e.click(); }", bool(value))
+    elif kind == "select":
+        control.select_option(value=str(value), timeout=3000)
+    elif kind == "range":
+        control.evaluate("""(e, v) => { e.value = v;
+          e.dispatchEvent(new Event('input', {bubbles: true}));
+          e.dispatchEvent(new Event('change', {bubbles: true})); }""", str(value))
+    elif kind == "group":
+        control.query_selector(f'[data-oms-value="{value}"]').click(timeout=3000)
+
+
+def _restore_control(control: Any, initial: dict) -> None:
+    if initial["kind"] != "group":
+        _set_control(control, initial, initial["state"])
+        return
+    for value in initial["values"]:
+        current = control.evaluate(_CONTROL_STATE_JS)["state"]
+        if (value in initial["state"]) != (value in current):
+            control.query_selector(f'[data-oms-value="{value}"]').click(timeout=3000)
+
+
+def _page_state(page: Any) -> str | None:
+    return page.evaluate("() => document.documentElement.dataset.omsState || null")
+
+
+def _protocol_page_problems(
+    page: Any,
+    problems: "_Problems",
+    *,
+    view: dict,
+    shot_prefix: Path,
+    settle_ms: int,
+    evidence: dict,
+) -> None:
+    """Every declared control and layer group of one page, operated through
+    the state protocol of design-language.md s. 5."""
+    presentation = view["presentation"]
+    controls = declared_controls(presentation)
+    exploratory = [c for c in controls if c["effect"] != "published"]
+    has_map = _first_visible(page, _MAP_SELECTOR) is not None
+
+    if exploratory and (_page_state(page) != "canonical" or _first_visible(page, "[data-oms-exploratory]")):
+        problems.add("not_canonical_at_open",
+                     "page does not open in the canonical state (html data-oms-state is not 'canonical' "
+                     "or the exploratory label is already shown)")
+
+    for group in get_in(presentation, "map.layer_groups", []) or []:
+        group_id = group.get("id")
+        toggle, present = _find_revealed(page, f'[data-oms-layer-group="{group_id}"]')
+        if toggle is None:
+            problems.add("layer_group_not_rendered", f"layer group {group_id} has "
+                         + ("no reachable toggle" if present else "no toggle with data-oms-layer-group"))
+            continue
+        if not has_map:
+            continue
+        info = toggle.evaluate(_CONTROL_STATE_JS)
+        if info["kind"] == "checkbox":
+            def switch(on: bool, toggle=toggle, info=info) -> None:
+                _set_control(toggle, info, on)
+        else:
+            def switch(on: bool, toggle=toggle) -> None:
+                if (toggle.get_attribute("aria-pressed") == "true") != on:
+                    toggle.click(timeout=3000)
+        problem, fraction = _toggle_changes_render(
+            page, toggle, switch=switch, settle_ms=settle_ms,
+            baseline=shot_prefix.with_name(f"{shot_prefix.name}-group-{group_id}-before.png"),
+            toggled=shot_prefix.with_name(f"{shot_prefix.name}-group-{group_id}-after.png"),
+        )
+        if problem is not None:
+            problems.add("layer_group_not_rendered", f"layer group {group_id}: {problem}")
+        elif fraction is not None:
+            evidence.setdefault("toggle_diff_fraction", {})[f"group:{group_id}"] = fraction
+
+    for control in controls:
+        control_id = control["id"]
+        element, present = _find_revealed(page, f'[data-oms-control="{control_id}"]')
+        if element is None:
+            problems.add("control_absent", f"declared control {control_id} has "
+                         + ("no control a reader can reach" if present else "no element with data-oms-control"))
+            continue
+        initial = element.evaluate(_CONTROL_STATE_JS)
+        target = _alternative_state(initial)
+        if initial["kind"] == "unknown" or target is None:
+            problems.add("control_inoperable", f"control {control_id} exposes no second state through "
+                         "checked, value or aria-pressed")
+            continue
+        text_before = page.evaluate(_PAGE_TEXT_JS)
+        _set_control(element, initial, target)
+        _settle(page, settle_ms)
+        if element.evaluate(_CONTROL_STATE_JS)["state"] == initial["state"]:
+            problems.add("control_inoperable", f"control {control_id} does not change state when operated")
+            continue
+        changed = page.evaluate(_PAGE_TEXT_JS) != text_before
+        if not changed and has_map:
+            # Map-only effect: compare the map in both states. Screenshots are
+            # costly to decode, so only controls that change no text pay.
+            map_before = shot_prefix.with_name(f"{shot_prefix.name}-control-{control_id}-before.png")
+            map_after = shot_prefix.with_name(f"{shot_prefix.name}-control-{control_id}-after.png")
+            after_error = _stable_screenshot(page, map_after, settle_ms)
+            _restore_control(element, initial)
+            _settle(page, settle_ms)
+            before_error = _stable_screenshot(page, map_before, settle_ms)
+            _set_control(element, initial, target)
+            _settle(page, settle_ms)
+            if after_error is None and before_error is None:
+                changed = images_differ(map_before, map_after)[0]
+        if not changed:
+            problems.add("control_no_effect", f"control {control_id} changes neither the page text nor the map")
+        if control["effect"] == "published":
+            _restore_control(element, initial)
+            _settle(page, settle_ms)
+            continue
+        if _page_state(page) != "exploratory" or _first_visible(page, "[data-oms-exploratory]") is None:
+            problems.add("exploratory_label_missing",
+                         f"leaving the canonical position of {control_id} shows no exploratory label "
+                         "(visible data-oms-exploratory and html data-oms-state='exploratory')")
+        reset = _first_visible(page, "[data-oms-reset]")
+        if reset is None:
+            problems.add("canonical_reset_failed", f"no reset (data-oms-reset) is reachable after changing {control_id}")
+            _restore_control(element, initial)
+            _settle(page, settle_ms)
+            continue
+        reset.click(timeout=3000)
+        _settle(page, settle_ms)
+        restored = element.evaluate(_CONTROL_STATE_JS)["state"] == initial["state"]
+        if not restored or _page_state(page) != "canonical" or _first_visible(page, "[data-oms-exploratory]"):
+            problems.add("canonical_reset_failed",
+                         f"reset after changing {control_id} does not restore the canonical state")
+            if not restored:
+                _restore_control(element, initial)
+                _settle(page, settle_ms)
+
+
+def _protocol_check(
+    proj: dict,
+    root: Path,
+    *,
+    dashboard: str,
+    label: str,
+    screenshot_dir: Path,
+    desktop_size: str,
+    mobile_size: str,
+    settle_ms: int,
+) -> AssertionResult:
+    """``dashboard_loads_in_browser`` for a project that declares a design
+    language: every declared page, every declared control."""
+    views = declared_views(proj)
+    if not proj.get("views"):
+        views[0]["path"] = dashboard
+    missing = [v["path"] for v in views if not (root / v["path"]).is_file()]
+    if missing:
+        return failed(f"declared page(s) do not exist: {missing}", code="file_missing", missing=missing)
+    try:
+        sync_playwright = _playwright()
+    except ImportError:
+        return not_testable("Playwright is not installed in this execution environment", code="playwright_unavailable")
+
+    warnings = proj.get("warnings") or []
+    problems = _Problems()
+    evidence: dict[str, Any] = {}
+    opened = False
+    try:
+        with sync_playwright() as p:
+            try:
+                browser = p.chromium.launch()
+            except Exception as exc:  # noqa: BLE001
+                return not_testable(f"headless browser unavailable in this environment: {exc}", code="browser_unavailable")
+            try:
+                for view in views:
+                    page_problems = _Problems()
+                    uri = (root / view["path"]).as_uri()
+                    shot_prefix = screenshot_dir / f"{label}-{view['id']}"
+                    context = browser.new_context(viewport=_viewport(desktop_size))
+                    page = context.new_page()
+                    page_errors: list[str] = []
+                    console_errors: list[str] = []
+                    requested_urls: list[str] = []
+                    page.on("pageerror", lambda exc, errors=page_errors: errors.append(str(exc)))
+                    page.on("console", lambda msg, errors=console_errors: errors.append(msg.text) if msg.type == "error" else None)
+                    page.on("request", lambda request, urls=requested_urls: urls.append(request.url))
+                    page.goto(uri, wait_until="domcontentloaded")
+                    opened = True
+                    _settle(page, settle_ms)
+                    if page_errors:
+                        page_problems.add("browser_page_error", f"{len(page_errors)} page error(s): {page_errors[:3]}")
+                    if console_errors:
+                        page_problems.add("browser_console_error", f"{len(console_errors)} console error(s): {console_errors[:3]}")
+
+                    map_required = bool(view["presentation"].get("map"))
+                    if _first_visible(page, _MAP_SELECTOR) is None:
+                        if map_required:
+                            page_problems.add("map_absent", "no visible map element")
+                    else:
+                        shot = shot_prefix.with_name(f"{shot_prefix.name}-desktop.png")
+                        error = _screenshot_map(page, shot)
+                        if error:
+                            page_problems.add("map_screenshot_failed", f"desktop map screenshot: {error}")
+                        else:
+                            stats = image_stats(shot)
+                            evidence[f"{view['id']}:desktop_map_stats"] = stats
+                            if _is_blank(stats):
+                                page_problems.add("blank_map", "map renders blank on desktop")
+
+                    _panel_and_basemap_problems(
+                        page, page_problems, presentation=view["presentation"], warnings=warnings,
+                        requested_urls=requested_urls, reveal=True,
+                    )
+                    _protocol_page_problems(
+                        page, page_problems, view=view, shot_prefix=shot_prefix,
+                        settle_ms=settle_ms, evidence=evidence,
+                    )
+                    context.close()
+
+                    if map_required:
+                        mobile_context = browser.new_context(viewport=_viewport(mobile_size))
+                        mobile = mobile_context.new_page()
+                        mobile.goto(uri, wait_until="domcontentloaded")
+                        _settle(mobile, settle_ms)
+                        map_element = _first_visible(mobile, _MAP_SELECTOR, require_height=True)
+                        width = _viewport(mobile_size)["width"]
+                        if map_element is None:
+                            page_problems.add("map_absent", "no visible map on the mobile viewport")
+                        else:
+                            box = map_element.bounding_box()
+                            evidence[f"{view['id']}:mobile_map_width"] = box["width"]
+                            if box["width"] < width / 2:
+                                page_problems.add(
+                                    "mobile_map_cramped",
+                                    f"the map is {box['width']:.0f} px wide on a {width} px screen; "
+                                    "it must keep at least half the width",
+                                )
+                            shot = shot_prefix.with_name(f"{shot_prefix.name}-mobile.png")
+                            if _screenshot_map(mobile, shot) is None and _is_blank(image_stats(shot)):
+                                page_problems.add("blank_map", "map renders blank on the mobile viewport")
+                        mobile_context.close()
+
+                    for code, message in zip(page_problems.codes, page_problems.messages):
+                        problems.add(code, f"[{view['id']}] {message}")
+            finally:
+                browser.close()
+    except Exception as exc:  # noqa: BLE001
+        if opened:
+            return failed(f"browser validation crashed while inspecting an opened page: {type(exc).__name__}: {exc}",
+                          code="browser_check_error")
+        return not_testable(f"browser validation could not run: {type(exc).__name__}: {exc}", code="browser_error")
+
+    if problems:
+        return failed("; ".join(problems.messages), code=problems.primary_code,
+                      problems=problems.messages, problem_codes=problems.codes, evidence=evidence)
+    return passed(
+        f"{len(views)} page(s) load cleanly; every declared control, layer group, panel and reset "
+        "works through the state protocol",
+        evidence=evidence,
     )
 
 
@@ -468,6 +897,14 @@ def dashboard_loads_in_browser(
     proj = load_project_yaml(workspace, project_dir)
     if proj is None:
         return failed("project.yaml missing", code="manifest_missing")
+    label = re.sub(r"[^A-Za-z0-9_.-]+", "_", project_dir.strip("./")) or "project"
+    if get_in(proj, "presentation.design_language") in DESIGN_LANGUAGES:
+        with tempfile.TemporaryDirectory(prefix="openmapstack-visual-") as tmp:
+            return _protocol_check(
+                proj, project_root(workspace, project_dir), dashboard=dashboard, label=label,
+                screenshot_dir=workspace / screenshots_dir if screenshots_dir else Path(tmp),
+                desktop_size=desktop_size, mobile_size=mobile_size, settle_ms=settle_ms,
+            )
     dashboard_path = project_root(workspace, project_dir) / dashboard
     if not dashboard_path.exists():
         return failed(f"{dashboard} does not exist", code="file_missing")
@@ -479,13 +916,10 @@ def dashboard_loads_in_browser(
             "Playwright is not installed in this execution environment", code="playwright_unavailable"
         )
 
-    label = re.sub(r"[^A-Za-z0-9_.-]+", "_", project_dir.strip("./")) or "project"
 
     warnings = proj.get("warnings") or []
     layer_groups = get_in(proj, "presentation.map.layer_groups", []) or []
     scenarios = get_in(proj, "presentation.controls.scenarios", []) or []
-    legend_visible = bool(get_in(proj, "presentation.legend.visible"))
-    provenance_declared = bool(get_in(proj, "presentation.provenance_ui"))
     canonical_reset = bool(get_in(proj, "presentation.controls.canonical_reset"))
 
     # Screenshot comparisons (toggle effects, scenario distinguishability,
@@ -564,50 +998,10 @@ def dashboard_loads_in_browser(
                         if _is_blank(stats):
                             problems.add("blank_map", "map renders blank on desktop")
 
-                # --- declared panels actually visible --------------------
-                if legend_visible and _first_visible(page, _LEGEND_SELECTOR) is None:
-                    problems.add("legend_absent", "manifest declares legend visible but no legend is rendered")
-                if provenance_declared and _first_visible(page, _PROVENANCE_SELECTOR) is None:
-                    problems.add("provenance_absent", "manifest declares provenance_ui but no provenance panel is rendered")
-                if warnings:
-                    panel = _first_visible(page, _WARNINGS_SELECTOR)
-                    body_text = page.inner_text("body")
-                    for w in warnings:
-                        warning_id = str(w.get("id", ""))
-                        if panel is None:
-                            problems.add("warning_not_visible", f"manifest warning {warning_id} has no visible warning panel")
-                            break
-                        if warning_id and warning_id not in body_text:
-                            problems.add("warning_not_visible", f"manifest warning {warning_id} not visible in the rendered product")
-
-                # --- declared interactive basemap is real -----------------
-                # A manifest that presents a map must declare its background
-                # map; that omission is caught by the v1 schema
-                # (project-spec.md s. 3), which every case checks in every
-                # mode. What only a browser can prove is the rest: that the
-                # declared tiles are really requested and the required
-                # attribution is really visible.
-                basemap = get_in(proj, "presentation.map.basemap")
-                if basemap:
-                    # Match any tile under the basemap's URL template:
-                    # "https://host/{z}/{x}/{y}.png" -> "https://host/".
-                    tile_prefix = ((basemap.get("tiles") or [basemap.get("url") or ""])[0] or "").split("{z}")[0]
-                    tile_requests = [url for url in requested_urls if tile_prefix and url.startswith(tile_prefix)]
-                    if _first_visible(page, f'{_MAP_SELECTOR}, .maplibregl-canvas') is None:
-                        problems.add("basemap_absent", "manifest declares a basemap but no interactive map canvas is rendered")
-                    if not tile_requests:
-                        problems.add(
-                            "basemap_absent",
-                            f"manifest declares basemap {basemap.get('id')!r} but the product never "
-                            f"requested its tiles ({tile_prefix}...) — the background map is not interactive",
-                        )
-                    attribution = basemap.get("attribution")
-                    if attribution and attribution not in page.inner_text("body"):
-                        problems.add(
-                            "basemap_absent",
-                            f"basemap attribution {attribution!r} required by the manifest is not visible "
-                            "in the rendered product",
-                        )
+                _panel_and_basemap_problems(
+                    page, problems, presentation=proj.get("presentation") or {},
+                    warnings=warnings, requested_urls=requested_urls,
+                )
 
                 # --- layer toggles must affect the render ----------------
                 checkboxes = page.query_selector_all('input[type="checkbox"][data-layer-group]')

@@ -27,8 +27,8 @@ pages to section 5. A view that does not declare a version is checked as before.
   the pipeline computed. It does not compute distances, areas or buffers.
 - **Provenance is one step away.** Every page has the credits block and a way from a
   number or feature to its source, run and assumptions.
-- **It works on a phone and in both themes.** The map keeps a usable share of a
-  390-pixel-wide screen, and every token has a light and a dark value.
+- **It works on a phone and in both themes.** On a 390-pixel-wide screen the map keeps
+  at least half the width, and every token has a light and a dark value.
 - **The reader's language.** Labels, dates and numbers follow the language and locale
   of the view, including decimal separators and thousands grouping.
 
@@ -128,7 +128,8 @@ With the version declared, `visual.dashboard_loads_in_browser` opens every page 
 - an exploratory control shows the label and sets the page state;
 - the reset restores every control and the canonical state.
 
-Layer-group toggles must change the rendered map.
+Layer-group toggles must change the rendered map, and on a 390-pixel-wide screen a
+page that declares a map shows it at least half the screen wide.
 
 ## 6. Adding a component
 

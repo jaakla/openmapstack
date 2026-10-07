@@ -1330,5 +1330,203 @@ class EveryLayerDeclaresCrsTests(unittest.TestCase):
         self.assertEqual(every_layer_declares_crs(workspace).data["code"], "no_layers")
 
 
+
+# ---------------------------------------------------------------------------
+# State protocol (design language openmapstack-views/0.1)
+# ---------------------------------------------------------------------------
+
+# A page that follows design-language.md s. 5. The minimum-area filter and
+# the analysis layer toggle sit on the inactive Map tab, so a passing run
+# proves the checker reaches controls the way a reader does. Each failure test
+# breaks exactly one thing through the %%TOKEN%% substitutions.
+PROTOCOL_PAGE = """<!DOCTYPE html>
+<html lang="en" data-oms-state="canonical"><head><meta charset="utf-8"><title>protocol</title>
+<style>
+body { margin: 0; display: flex; font: 14px sans-serif; }
+#sidebar { width: 320px; flex: none; }
+#map { flex: 0 1 400px; min-width: 0; height: 300px; }
+#map svg { width: 100%; height: 100%; }
+%%MOBILE_CSS%%
+</style></head>
+<body>
+<div id="sidebar">
+  <div data-oms-exploratory hidden>Exploratory view, not the published result
+    <button type="button" data-oms-reset>Reset</button></div>
+  <div data-testid="warnings">W-1: education source licence unresolved</div>
+  <div role="tablist">
+    <button role="tab" id="tab-a" aria-controls="panel-a" aria-selected="true">Analysis</button>
+    <button role="tab" id="tab-m" aria-controls="panel-m" aria-selected="false">Map</button>
+    <button role="tab" id="tab-p" aria-controls="panel-p" aria-selected="false">Provenance</button>
+  </div>
+  <section role="tabpanel" id="panel-a">
+    <p id="count"></p><p id="kpi"></p><p id="hl"></p>
+    <div role="group" data-oms-control="mode">
+      <button type="button" data-oms-value="walk" aria-pressed="true">Walk</button>
+      <button type="button" data-oms-value="bike" aria-pressed="false">Bike</button>
+    </div>
+    <select %%HALF_LIFE_HOOK%%><option>5</option><option selected>10</option><option>20</option></select>
+    <button type="button" data-oms-layer-group="context" aria-pressed="true">Context</button>
+    <div data-testid="legend">Legend</div>
+  </section>
+  <section role="tabpanel" id="panel-m" hidden>
+    <input type="range" %%MIN_AREA_HOOK%% min="20" max="60" step="20" value="20">
+    <label><input type="checkbox" data-oms-layer-group="analysis" checked> Analysis</label>
+  </section>
+  <section role="tabpanel" id="panel-p" hidden><div data-testid="provenance">Sources and run</div></section>
+  %%ORPHAN_PANEL%%
+</div>
+<div id="map" data-testid="map"><svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">
+  <rect id="context" x="0" y="200" width="400" height="100" fill="rgb(200,200,200)"/>
+  <g id="analysis"><rect x="20" y="20" width="120" height="90" fill="rgb(34,160,107)"/>
+  <rect id="small" x="200" y="40" width="40" height="40" fill="rgb(34,160,107)"/></g>
+</svg></div>
+<script>
+const canonical = {min_area: "20", half_life: "10"};
+const state = {min_area: "20", mode: "walk", half_life: "10"};
+const halfLife = document.querySelector("select");
+const minArea = document.querySelector('input[type="range"]');
+function render() {
+  document.getElementById("small").style.display = Number(state.min_area) > 20 ? "none" : "";
+  document.getElementById("count").textContent = (Number(state.min_area) > 20 ? 2 : 3) + " candidates";
+  document.getElementById("kpi").textContent = (state.mode === "walk" ? 120 : 340) + " h saved";
+  %%HALF_LIFE_RENDER%%
+  const exploratory = Object.keys(canonical).some((k) => state[k] !== canonical[k]);
+  %%LABEL_RENDER%%
+}
+document.querySelectorAll('[role="tab"]').forEach((tab) => tab.addEventListener("click", () => {
+  document.querySelectorAll('[role="tab"]').forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+  document.querySelectorAll('[role="tabpanel"]').forEach((p) => { p.hidden = p.id !== tab.getAttribute("aria-controls"); });
+}));
+document.querySelectorAll("[data-oms-value]").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("[data-oms-value]").forEach((o) => o.setAttribute("aria-pressed", String(o === b)));
+  state.mode = b.dataset.omsValue; render();
+}));
+halfLife.addEventListener("change", () => { state.half_life = halfLife.value; render(); });
+minArea.addEventListener("input", () => { state.min_area = minArea.value; render(); });
+document.querySelector('[data-oms-layer-group="analysis"]').addEventListener("change", (e) => {
+  document.getElementById("analysis").style.display = e.target.checked ? "" : "none"; });
+const context = document.querySelector('[data-oms-layer-group="context"]');
+context.addEventListener("click", () => {
+  const on = context.getAttribute("aria-pressed") !== "true";
+  context.setAttribute("aria-pressed", String(on));
+  document.getElementById("context").style.display = on ? "" : "none"; });
+document.querySelector("[data-oms-reset]").addEventListener("click", () => {
+  %%RESET%%
+  render();
+});
+render();
+</script></body></html>
+"""
+
+PROTOCOL_PARTS = {
+    "MOBILE_CSS": "@media (max-width: 600px) { body { flex-direction: column; } #sidebar { width: auto; } #map { flex: none; width: 100%; } }",
+    "HALF_LIFE_HOOK": 'data-oms-control="half_life"',
+    "MIN_AREA_HOOK": 'data-oms-control="min_area"',
+    "ORPHAN_PANEL": "",
+    "HALF_LIFE_RENDER": 'document.getElementById("hl").textContent = "Half-life " + state.half_life + " min";',
+    "LABEL_RENDER": 'document.documentElement.dataset.omsState = exploratory ? "exploratory" : "canonical";\n'
+                    '  document.querySelector("[data-oms-exploratory]").hidden = !exploratory;',
+    "RESET": 'state.min_area = minArea.value = canonical.min_area; state.half_life = halfLife.value = canonical.half_life;',
+}
+
+
+def protocol_page(**parts: str) -> str:
+    html = PROTOCOL_PAGE
+    for key, value in {**PROTOCOL_PARTS, **parts}.items():
+        html = html.replace(f"%%{key}%%", value)
+    return html
+
+
+def protocol_manifest(**extra) -> dict:
+    project = manifest(warnings=[{"id": "W-1", "statement": "licence unresolved"}], groups=[
+        {"id": "analysis", "title": "Analysis"}, {"id": "context", "title": "Context"}])
+    project["presentation"]["design_language"] = "openmapstack-views/0.1"
+    project["presentation"]["controls"] = {
+        "filters": [{"id": "min_area", "type": "range", "canonical": 20}],
+        "variants": [
+            {"id": "mode", "options": ["walk", "bike"], "canonical": "walk", "effect": "published"},
+            {"id": "half_life", "options": [5, 10, 20], "canonical": 10},
+        ],
+    }
+    project.update(extra)
+    return project
+
+
+@unittest.skipUnless(_chromium_available(), "Playwright Chromium is not installed")
+class StateProtocolBrowserTests(unittest.TestCase):
+    def check(self, html: str | None = None, project: dict | None = None, pages: dict | None = None):
+        workspace = make_workspace()
+        write_project(workspace, project or protocol_manifest())
+        for name, page in (pages or {"dashboard.html": html or protocol_page()}).items():
+            write_dashboard(workspace, page, filename=name)
+        return visual.dashboard_loads_in_browser(workspace, settle_ms=150)
+
+    def assertFailsWith(self, result, code: str, fragment: str) -> None:
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertIn(code, result.data["problem_codes"], result.detail)
+        self.assertIn(fragment, result.detail)
+
+    def test_healthy_page_passes_with_controls_on_an_inactive_tab(self) -> None:
+        result = self.check()
+        self.assertEqual(result.status, "passed", result.detail)
+        self.assertIn("group:analysis", result.data["evidence"]["toggle_diff_fraction"])
+
+    def test_control_without_its_hook_fails(self) -> None:
+        result = self.check(protocol_page(HALF_LIFE_HOOK=""))
+        self.assertFailsWith(result, "control_absent", "half_life has no element with data-oms-control")
+
+    def test_control_on_a_panel_no_tab_opens_fails(self) -> None:
+        orphan = '<section role="tabpanel" id="panel-x" hidden><select data-oms-control="half_life"><option>10</option><option>20</option></select></section>'
+        result = self.check(protocol_page(HALF_LIFE_HOOK="", ORPHAN_PANEL=orphan))
+        self.assertFailsWith(result, "control_absent", "half_life has no control a reader can reach")
+
+    def test_control_that_changes_nothing_fails(self) -> None:
+        result = self.check(protocol_page(HALF_LIFE_RENDER=""))
+        self.assertFailsWith(result, "control_no_effect", "control half_life changes neither")
+
+    def test_exploratory_change_without_label_fails_but_published_needs_none(self) -> None:
+        result = self.check(protocol_page(LABEL_RENDER=""))
+        self.assertFailsWith(result, "exploratory_label_missing", "min_area")
+        self.assertNotIn("of mode", result.detail)
+
+    def test_reset_that_does_not_restore_fails(self) -> None:
+        result = self.check(protocol_page(RESET="state.half_life = halfLife.value = canonical.half_life;"))
+        self.assertFailsWith(result, "canonical_reset_failed", "after changing min_area")
+
+    def test_page_that_opens_off_canonical_fails(self) -> None:
+        html = protocol_page().replace('const state = {min_area: "20"', 'const state = {min_area: "40"')
+        result = self.check(html)
+        self.assertFailsWith(result, "not_canonical_at_open", "canonical state")
+
+    def test_fixed_sidebar_that_squeezes_the_mobile_map_fails(self) -> None:
+        result = self.check(protocol_page(MOBILE_CSS=""))
+        self.assertFailsWith(result, "mobile_map_cramped", "at least half the width")
+
+    def test_every_declared_page_is_checked(self) -> None:
+        project = protocol_manifest(views=[
+            {"id": "screening", "output": "screening", "archetype": "workspace", "entry": True},
+            {"id": "detail", "output": "report", "archetype": "report"},
+        ])
+        project["outputs"] = {"screening": {"path": "index.html"}, "report": {"path": "report.html"}}
+        result = self.check(project=project, pages={
+            "index.html": protocol_page(), "report.html": protocol_page(MIN_AREA_HOOK="")})
+        self.assertFailsWith(result, "control_absent", "[detail] declared control min_area")
+        self.assertNotIn("[screening]", result.detail)
+
+    def test_missing_declared_page_fails(self) -> None:
+        project = protocol_manifest(views=[{"id": "screening", "output": "screening", "entry": True}])
+        project["outputs"] = {"screening": {"path": "index.html"}}
+        result = self.check(project=project, pages={"dashboard.html": protocol_page()})
+        self.assertEqual((result.status, result.data["code"]), ("failed", "file_missing"))
+
+    def test_without_a_language_version_the_legacy_check_applies(self) -> None:
+        project = protocol_manifest()
+        del project["presentation"]["design_language"]
+        result = self.check(project=project)
+        # The protocol page has no data-layer-group checkboxes, which the
+        # legacy check requires.
+        self.assertFailsWith(result, "layer_toggles_absent", "no layer toggles")
+
+
 if __name__ == "__main__":
     unittest.main()
