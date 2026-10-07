@@ -434,6 +434,7 @@ validation:
   - name: education_ownership_check
     expression: ownership = 'municipal' AND active = true
 presentation:
+  design_language: openmapstack-views/0.1
   intent: analytical_workspace
   primary_view: map
   layout:
