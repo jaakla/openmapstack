@@ -1,5 +1,5 @@
 {
-  "run_id": "run-20260928-205521",
+  "run_id": "run-20261007-200904",
   "schema": "openmapstack-project/v1",
   "status": "warning",
   "checks": [
@@ -183,8 +183,8 @@
         {
           "source_id": "school:2EDAF563-D685-4EE1-89EF-DE2A21AD5AF4",
           "minutes": 40,
-          "area_before_m2": 18244885.93114644,
-          "area_after_m2": 18244885.931146447,
+          "area_before_m2": 18244885.931147274,
+          "area_after_m2": 18244885.93114729,
           "method": "ST_CollectionExtract(ST_MakeValid(geometry), 3)"
         }
       ],
@@ -216,6 +216,6 @@
       "detail": "1 scenario road geometry loaded from data/overrides/planned-road.geojson"
     }
   ],
-  "inputs_hash": "sha256:a32c8758adbf5b77c00ee5d5d6b71159a69fd7b7eeb1dc83ecad57fbcf502471",
-  "outputs_hash": "sha256:9a7dc21e8e6ab6efb2d739cdc0f73e25aeca0a6e07db6c60dc22dc1197c3ba22"
+  "inputs_hash": "sha256:0ffde03b7ffdcbec47062eaf9c79a4e61a09be7439d098a4fdba418a7405b207",
+  "outputs_hash": "sha256:fed291ef271cb5863d3d6a8e3b67686b5f2064f8234c2df7a5180ab6051e6153"
 }
