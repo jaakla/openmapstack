@@ -66,6 +66,9 @@ Interaction rules:
   selection highlights the entry.
 - When one control appears in several places (a travel-mode switch in three panels),
   every copy shows the same state and carries the same manifest id.
+- Free-text search over a list is a find tool, not a declared control: its states
+  cannot be enumerated. If it hides entries of the published result, a non-empty
+  search still marks the page exploratory, and the reset clears it.
 - Tables follow project-spec.md s. 3, Tabular results.
 
 ## 4. Tokens: names fixed, values free
