@@ -1519,6 +1519,14 @@ class StateProtocolBrowserTests(unittest.TestCase):
         result = self.check(project=project, pages={"dashboard.html": protocol_page()})
         self.assertEqual((result.status, result.data["code"]), ("failed", "file_missing"))
 
+    def test_unreachable_remote_script_is_not_testable_not_a_product_failure(self) -> None:
+        # .invalid never resolves, here or in CI: this is a machine without
+        # the network the page needs, which says nothing about the product.
+        html = protocol_page().replace(
+            "<title>protocol</title>", '<title>protocol</title><script src="https://cdn.example.invalid/lib.js"></script>')
+        result = self.check(html)
+        self.assertEqual((result.status, result.data["code"]), ("not_testable", "dependency_unreachable"))
+
     def test_without_a_language_version_the_legacy_check_applies(self) -> None:
         project = protocol_manifest()
         del project["presentation"]["design_language"]

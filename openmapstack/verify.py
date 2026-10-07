@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .checks import AssertionResult, not_testable
+from .checks import AssertionResult, failed, not_testable
 from .checks import geodata as geodata_checks
 from .checks import metamorphic as metamorphic_checks
 from .checks import overrides as overrides_checks
@@ -38,6 +38,7 @@ from .checks import qgis as qgis_checks
 from .checks import rerun as rerun_checks
 from .checks import tables as table_checks
 from .checks import validation as validation_checks
+from .checks import visual as visual_checks
 from .expectations import evaluate_expectation
 from .project import get_in, load_project
 from .rerun import perform_clean_rerun
@@ -341,6 +342,15 @@ def verify_project(
         ("edit_targets_reference_real_sources", presentation_checks.edit_targets_reference_real_sources),
     ):
         _run(runs, f"presentation.{name}", fn, root)
+    # The browser check runs for projects that opt into a design-language
+    # version (ADR 0007); without a browser it is not_testable, never passed.
+    language = get_in(manifest, "presentation", "design_language")
+    if language in presentation_checks.DESIGN_LANGUAGES:
+        _run(runs, "visual.dashboard_loads_in_browser", visual_checks.dashboard_loads_in_browser, root)
+    elif language is not None:
+        runs.append(CheckRun("visual.dashboard_loads_in_browser", failed(
+            f"presentation.design_language {language!r} is not a known version "
+            f"{sorted(presentation_checks.DESIGN_LANGUAGES)}", code="design_language_unknown"), {}))
     if (root / "project.qgz").is_file():
         for name, fn in (
             ("static_valid", qgis_checks.static_valid),

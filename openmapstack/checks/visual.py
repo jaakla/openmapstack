@@ -520,6 +520,8 @@ def _checkbox_states(page: Any) -> dict[str, bool]:
 # State protocol (design language openmapstack-views, ADR 0007)
 # ---------------------------------------------------------------------------
 
+_BROWSER_HINT = "install openmapstack[visual] and run `python -m playwright install chromium`"
+
 # Marks, outermost first, the tabs whose panels contain the element, so the
 # checker can click them the way a reader would.
 _MARK_OWNING_TABS_JS = """(element) => {
@@ -769,7 +771,8 @@ def _protocol_check(
     try:
         sync_playwright = _playwright()
     except ImportError:
-        return not_testable("Playwright is not installed in this execution environment", code="playwright_unavailable")
+        return not_testable(f"Playwright is not installed in this execution environment; {_BROWSER_HINT}",
+                            code="playwright_unavailable")
 
     warnings = proj.get("warnings") or []
     problems = _Problems()
@@ -780,7 +783,8 @@ def _protocol_check(
             try:
                 browser = p.chromium.launch()
             except Exception as exc:  # noqa: BLE001
-                return not_testable(f"headless browser unavailable in this environment: {exc}", code="browser_unavailable")
+                return not_testable(f"headless browser unavailable in this environment ({_BROWSER_HINT}): {exc}",
+                                    code="browser_unavailable")
             try:
                 for view in views:
                     page_problems = _Problems()
@@ -794,9 +798,21 @@ def _protocol_check(
                     page.on("pageerror", lambda exc, errors=page_errors: errors.append(str(exc)))
                     page.on("console", lambda msg, errors=console_errors: errors.append(msg.text) if msg.type == "error" else None)
                     page.on("request", lambda request, urls=requested_urls: urls.append(request.url))
+                    unreachable: list[str] = []
+                    page.on("requestfailed", lambda request, out=unreachable: out.append(request.url)
+                            if request.url.startswith(("http://", "https://"))
+                            and request.resource_type in ("script", "stylesheet") else None)
                     page.goto(uri, wait_until="domcontentloaded")
                     opened = True
                     _settle(page, settle_ms)
+                    if unreachable:
+                        # The page's own code or styles never arrived: what
+                        # follows would grade this machine's network, not the
+                        # product. Basemap tiles are images and do not count.
+                        return not_testable(
+                            f"page {view['id']} could not fetch its remote scripts or styles from here: "
+                            f"{unreachable[:3]}", code="dependency_unreachable", unreachable=unreachable,
+                        )
                     if page_errors:
                         page_problems.add("browser_page_error", f"{len(page_errors)} page error(s): {page_errors[:3]}")
                     if console_errors:

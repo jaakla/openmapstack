@@ -23,6 +23,7 @@ from openmapstack.checks.qgis import groups_match_manifest
 from openmapstack.cli import main
 from openmapstack.verify import CheckRun, VerifyResult, verify_project
 from tests.evals.helpers import make_workspace, minimal_project, write_project
+from tests.evals.test_visual_assertions import _chromium_available, protocol_manifest, protocol_page
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = REPO_ROOT / "examples" / "tartu-development"
@@ -121,6 +122,49 @@ class VerifyPlanTests(unittest.TestCase):
         self.assertEqual(run.result.status, "not_testable")
         self.assertEqual(run.result.data.get("code"), "check_error")
         self.assertNotEqual(result.status, "passed")
+
+
+class VerifyBrowserPlanTests(unittest.TestCase):
+    """verify runs the browser check only for projects that declare a
+    design-language version (ADR 0007)."""
+
+    def project(self, language: str | None) -> Path:
+        workspace = make_workspace()
+        project = protocol_manifest()
+        if language is None:
+            del project["presentation"]["design_language"]
+        else:
+            project["presentation"]["design_language"] = language
+        write_project(workspace, project)
+        (workspace / "dashboard.html").write_text(protocol_page(), encoding="utf-8")
+        return workspace / "project.yaml"
+
+    def test_projects_without_a_language_version_keep_their_plan(self) -> None:
+        result = verify_project(self.project(None))
+        self.assertIsNone(_status_of(result, "visual.dashboard_loads_in_browser"))
+
+    def test_without_playwright_the_check_is_not_testable_with_a_hint(self) -> None:
+        with patch("openmapstack.checks.visual._playwright", side_effect=ImportError("no playwright")):
+            result = verify_project(self.project("openmapstack-views/0.1"))
+        run = next(r for r in result.checks if r.name == "visual.dashboard_loads_in_browser")
+        self.assertEqual((run.result.status, run.result.data["code"]), ("not_testable", "playwright_unavailable"))
+        self.assertIn("openmapstack[visual]", run.result.detail)
+        self.assertNotEqual(result.status, "passed")
+
+    def test_an_unknown_language_version_fails(self) -> None:
+        result = verify_project(self.project("openmapstack-views/9"))
+        run = next(r for r in result.checks if r.name == "visual.dashboard_loads_in_browser")
+        self.assertEqual((run.result.status, run.result.data["code"]), ("failed", "design_language_unknown"))
+
+    @unittest.skipUnless(_chromium_available(), "Playwright Chromium is not installed")
+    def test_a_declared_page_is_checked_in_a_real_browser(self) -> None:
+        project_file = self.project("openmapstack-views/0.1")
+        self.assertEqual(_status_of(verify_project(project_file), "visual.dashboard_loads_in_browser"), "passed")
+        (project_file.parent / "dashboard.html").write_text(
+            protocol_page(HALF_LIFE_HOOK=""), encoding="utf-8")
+        run = next(r for r in verify_project(project_file).checks if r.name == "visual.dashboard_loads_in_browser")
+        self.assertEqual(run.result.status, "failed")
+        self.assertIn("control_absent", run.result.data["problem_codes"])
 
 
 class VerifyStatusTests(unittest.TestCase):

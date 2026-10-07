@@ -61,6 +61,7 @@ checker where applicable.
 | `presentation.layers_use_semantic_roles` | always | declared map layers carry semantic roles | no layers produces a warning | 001, 006 |
 | `presentation.controls_match_pipeline` | always | canonical controls agree with processing expressions and overrides; variant switches open at one of their options and show declared columns | controls without an addressable matching step are currently outside the predicate | 001, 003, 006 |
 | `presentation.edit_targets_reference_real_sources` | always | editing targets resolve to declared sources | none; no targets is valid | 001, 003, 006 |
+| `visual.dashboard_loads_in_browser` | `presentation.design_language` is declared | every page in `views:` (or the dashboard) loads without errors and every declared control, layer group, panel and reset works through the state protocol of `design-language.md` s. 5, on whichever tab it sits; the mobile map keeps half the screen width | Playwright with Chromium (`openmapstack[visual]`); missing Playwright or browser, and remote scripts or styles that cannot be fetched from this machine, are `not_testable`; an unknown language version fails | direct state-protocol browser tests |
 | `qgis.static_valid` | `project.qgz` exists | archive, document, and local datasource structure are valid; local datasources are relative paths | none | 001, 910, 913 |
 | `qgis.datasources_portable` | `project.qgz` exists | local file datasources use an allowlisted format every QGIS build reads (GeoPackage, GeoJSON, FlatGeobuf, Shapefile, GeoTIFF) | other formats warn (`datasource_format_not_portable`); remote/provider datasources are out of scope; malformed QGIS document fails | 001 |
 | `qgis.styles_declared` | `project.qgz` exists | vector layers declare renderers/styles | malformed QGIS document fails | 001, 006, 912 |
@@ -90,8 +91,10 @@ address them without guessing:
   backend-specific evidence;
 - cross-project presentation consistency requires an explicit comparison
   project;
-- browser/dashboard behaviour and cartographic rendering are not currently in
-  the `verify` plan; Playwright being installed does not imply they ran;
+- browser behaviour of a project that declares no `presentation.design_language`
+  stays out of the plan: the pre-language check assumes one DOM shape and would
+  fail working dashboards for markup alone (ADR 0007); cartographic rendering is
+  not in the plan either;
 - validation evidence recomputation requires machine-readable declarations
   mapping report fields to artifacts and metrics;
 - clean-rerun checks run only when the user supplies `--rerun`, and declared
