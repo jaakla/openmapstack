@@ -21,7 +21,9 @@
         "validation-and-ops.md",
         "qgis.md",
         "installation.md",
-        "companion-skills.md"
+        "companion-skills.md",
+        "web-delivery.md",
+        "services-and-scale.md"
       ]
     },
     {

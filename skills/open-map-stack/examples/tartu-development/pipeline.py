@@ -3267,7 +3267,7 @@ const POIS = __POIS__;
       + acc("layers", "Layers & legend", layerRows(), true, String(VIEW.layerGroups.length))
       + acc("basemap", "Basemap", '<div class="chips">' + basemaps
         + '</div><details class="layer-lineage" id="basemapLineage"><summary>View lineage</summary>'
-        + lineageHtml([{ name: "Source", items: ["CARTO / OpenStreetMap basemap"] }])
+        + lineageHtml([{ name: "Source", items: [VIEW.basemap.attribution] }])
         + '</details>', false);
   }
 
@@ -3794,10 +3794,8 @@ const POIS = __POIS__;
   }
 
   // ------------------------------------------------------------------- map --
-  const BASEMAPS = {
-    dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-    light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-  };
+  const BASEMAP = VIEW.basemap;
+  const BASEMAPS = { light: BASEMAP.url, dark: BASEMAP.dark_url || BASEMAP.url };
   function currentTheme() {
     const attr = document.documentElement.getAttribute("data-theme");
     if (attr) return attr;
@@ -3807,10 +3805,10 @@ const POIS = __POIS__;
 
   const map = new maplibregl.Map({
     container: "map",
-    style: basemapUrl(),
+    style: { version: 8, sources: {}, layers: [] },
     bounds: VIEW.bounds,
     fitBoundsOptions: { padding: 48 },
-    attributionControl: { compact: true },
+    attributionControl: { compact: true, customAttribution: BASEMAP.attribution },
   });
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: "metric" }), "bottom-right");
@@ -4256,13 +4254,56 @@ const POIS = __POIS__;
 
   function updateBasemapSource() {
     const selected = state.basemap === "auto" ? currentTheme() : state.basemap;
-    $("#basemapLineage .lineage-stage li").textContent = "CARTO "
-      + (selected === "dark" ? "Dark Matter" : "Positron")
-      + " · © OpenStreetMap contributors, © CARTO · " + BASEMAPS[selected];
+    $("#basemapLineage .lineage-stage li").textContent = BASEMAP.id + " · " + selected
+      + " · " + BASEMAP.attribution + " · " + (BASEMAPS[selected] || BASEMAP.tiles.join(", "))
+      + (BASEMAP.tilejson ? " · " + BASEMAP.tilejson : "");
   }
-  function setBasemap() {
+  let basemapRequest = 0;
+  async function setBasemap() {
+    const request = ++basemapRequest;
     updateBasemapSource();
-    map.setStyle(basemapUrl(), { diff: false });
+    try {
+      let style;
+      if (BASEMAP.kind === "vector-style") {
+        const url = basemapUrl();
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Basemap style HTTP " + response.status);
+        style = await response.json();
+        // Inline style objects lose their document base URL. Keep custom
+        // providers' relative assets and TileJSON sources working too.
+        const absolute = (value) => new URL(value, url).href.replace(/%7B/gi, "{").replace(/%7D/gi, "}");
+        if (style.glyphs) style.glyphs = absolute(style.glyphs);
+        if (typeof style.sprite === "string") style.sprite = absolute(style.sprite);
+        for (const source of Object.values(style.sources || {})) {
+          if (source.type !== "vector" && source.type !== "raster") continue;
+          if (source.url) source.url = absolute(source.url);
+          if (source.tiles) source.tiles = source.tiles.map(absolute);
+          source.attribution = BASEMAP.attribution;
+          if (BASEMAP.tilejson && source.type === "vector") {
+            source.url = BASEMAP.tilejson;
+            delete source.tiles;
+          }
+        }
+      } else {
+        style = { version: 8,
+          sources: { background: { type: "raster", tiles: BASEMAP.tiles || [BASEMAP.url],
+            tileSize: 256, attribution: BASEMAP.attribution } },
+          layers: [{ id: "background", type: "raster", source: "background" }] };
+      }
+      // Provider styles can use names such as "pois" or "candidates" too.
+      // Keep their IDs separate from this project's analytical overlays.
+      const basemapId = (id) => "basemap-" + id;
+      style.sources = Object.fromEntries(Object.entries(style.sources || {})
+        .map(([id, source]) => [basemapId(id), source]));
+      style.layers = style.layers.map((layer) => ({ ...layer, id: basemapId(layer.id),
+        ...(layer.source ? { source: basemapId(layer.source) } : {}),
+        ...(layer.ref ? { ref: basemapId(layer.ref) } : {}) }));
+      if (style.terrain) style.terrain.source = basemapId(style.terrain.source);
+      // A slower earlier fetch must not replace the user's latest theme.
+      if (request === basemapRequest) map.setStyle(style, { diff: false });
+    } catch (error) {
+      if (request === basemapRequest) console.error("Basemap could not load:", error);
+    }
   }
   $$("[data-basemap]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -4285,6 +4326,7 @@ const POIS = __POIS__;
 
   rebuildDraftPreview();
   map.on("style.load", () => { addOverlays(); refresh(); });
+  setBasemap();
   refresh();
 })();
 </script>
@@ -4431,6 +4473,7 @@ def render_dashboard(con: duckdb.DuckDBPyConnection, validation: dict, manifest:
         "bounds": bounds,
         "provenanceUI": pres.get("provenance_ui", {}),
         "interaction": pres["map"].get("interaction", {}),
+        "basemap": pres["map"]["basemap"],
         "editing": pres.get("editing", {}),
     }
 

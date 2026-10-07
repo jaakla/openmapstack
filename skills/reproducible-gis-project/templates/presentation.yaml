@@ -87,11 +87,14 @@ presentation:
     basemap:
       # Required whenever a map is presented (project-spec.md s. 3): the
       # dashboard must really request these tiles and really show this
-      # attribution. Prefer an official regional service where one exists.
-      id: osm-standard
-      kind: raster-xyz               # raster-xyz | raster-wms | vector-style
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"]
-      attribution: "© OpenStreetMap contributors"
+      # attribution. Honor user choices and prefer an appropriate local/regional basemap.
+      # Otherwise use this global fallback; see references/web-delivery.md.
+      id: goplex-protomaps
+      kind: vector-style             # raster-xyz | raster-wms | vector-style
+      url: https://tiles.goplex.ee/styles/5.7.2/white.json
+      dark_url: https://tiles.goplex.ee/styles/5.7.2/dark.json
+      tilejson: https://tiles.goplex.ee/planet-20261006.json
+      attribution: "© OpenStreetMap contributors, Protomaps tiles by goplex.ee"
       default_visible: true
     layer_groups:
       - id: analysis

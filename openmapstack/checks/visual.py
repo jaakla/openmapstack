@@ -21,6 +21,7 @@ import struct
 import zlib
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin
 
 from . import AssertionResult, failed, get_in, load_project_yaml, not_testable, passed, project_root
 
@@ -441,6 +442,55 @@ def _checkbox_states(page: Any) -> dict[str, bool]:
     )
 
 
+def _basemap_tile_templates(basemap: dict, responses: dict) -> list[str]:
+    """Resolve only observed basemap style/TileJSON responses, without new IO.
+
+    Metadata and fonts are not tile evidence. Relative source and tile URLs
+    resolve against their containing document, as they do in a web renderer.
+    """
+    templates = list(basemap.get("tiles") or [])
+    visited: set[str] = set()
+
+    def document(url: str) -> None:
+        if url in visited:
+            return
+        visited.add(url)
+        response = responses.get(url)
+        if response is None or not response.ok:
+            return
+        try:
+            data = response.json()
+        except Exception:  # A non-JSON response cannot establish tile URLs.
+            return
+        if not isinstance(data, dict):
+            return
+        templates.extend(urljoin(url, tile) for tile in data.get("tiles", []) if isinstance(tile, str))
+        for source in (data.get("sources") or {}).values():
+            if not isinstance(source, dict) or source.get("type") not in {"vector", "raster"}:
+                continue
+            templates.extend(urljoin(url, tile) for tile in source.get("tiles", []) if isinstance(tile, str))
+            if source.get("url"):
+                document(urljoin(url, source["url"]))
+
+    if basemap.get("kind") == "vector-style":
+        for field in ("url", "dark_url"):
+            if basemap.get(field):
+                document(basemap[field])
+    if basemap.get("tilejson"):
+        document(basemap["tilejson"])
+    if not templates and basemap.get("kind") != "vector-style" and basemap.get("url"):
+        templates.append(basemap["url"])
+    return list(dict.fromkeys(templates))
+
+
+def _matches_tile_url(url: str, template: str) -> bool:
+    # Match the complete template, not a shared host/path prefix that could
+    # also match a style, TileJSON, sprite, or unrelated provider resource.
+    parts = re.split(r"(\{[^{}]+\})", template)
+    pattern = "".join(r"[^/?&]+" if part.startswith("{") else re.escape(part) for part in parts)
+    return re.fullmatch(pattern, url) is not None
+
+
 def dashboard_loads_in_browser(
     workspace: Path,
     project_dir: str = ".",
@@ -520,12 +570,14 @@ def dashboard_loads_in_browser(
                 page_errors: list[str] = []
                 console_errors: list[str] = []
                 requested_urls: list[str] = []
+                responses: dict[str, Any] = {}
                 page.on("pageerror", lambda exc: page_errors.append(str(exc)))
                 page.on(
                     "console",
                     lambda msg: console_errors.append(msg.text) if msg.type == "error" else None,
                 )
                 page.on("request", lambda request: requested_urls.append(request.url))
+                page.on("response", lambda response: responses.__setitem__(response.url, response))
                 # `domcontentloaded` rather than the default `load`: a slow or
                 # unreachable third-party subresource must not decide whether
                 # the dashboard is judged at all. `_settle` then gives tiles
@@ -589,17 +641,17 @@ def dashboard_loads_in_browser(
                 # attribution is really visible.
                 basemap = get_in(proj, "presentation.map.basemap")
                 if basemap:
-                    # Match any tile under the basemap's URL template:
-                    # "https://host/{z}/{x}/{y}.png" -> "https://host/".
-                    tile_prefix = ((basemap.get("tiles") or [basemap.get("url") or ""])[0] or "").split("{z}")[0]
-                    tile_requests = [url for url in requested_urls if tile_prefix and url.startswith(tile_prefix)]
+                    templates = _basemap_tile_templates(basemap, responses)
+                    tile_requests = [url for url in requested_urls
+                                     if any(_matches_tile_url(url, template) for template in templates)]
+                    evidence["basemap_tile_requests"] = tile_requests
                     if _first_visible(page, f'{_MAP_SELECTOR}, .maplibregl-canvas') is None:
                         problems.add("basemap_absent", "manifest declares a basemap but no interactive map canvas is rendered")
                     if not tile_requests:
                         problems.add(
                             "basemap_absent",
                             f"manifest declares basemap {basemap.get('id')!r} but the product never "
-                            f"requested its tiles ({tile_prefix}...) — the background map is not interactive",
+                            f"requested its tiles ({templates!r}) — the background map is not interactive",
                         )
                     attribution = basemap.get("attribution")
                     if attribution and attribution not in page.inner_text("body"):

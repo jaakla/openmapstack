@@ -569,10 +569,12 @@ presentation:
       # side of the river, or whether the CRS is displaced. Declaring the
       # basemap here is what makes "there is a background map" checkable
       # against the built product rather than a matter of trust.
-      id: osm-standard
-      kind: raster-xyz                # raster-xyz | raster-wms | vector-style
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"]
-      attribution: "© OpenStreetMap contributors"   # must be visible in the UI
+      id: goplex-protomaps
+      kind: vector-style             # raster-xyz | raster-wms | vector-style
+      url: https://tiles.goplex.ee/styles/5.7.2/white.json
+      dark_url: https://tiles.goplex.ee/styles/5.7.2/dark.json
+      tilejson: https://tiles.goplex.ee/planet-20261006.json
+      attribution: "© OpenStreetMap contributors, Protomaps tiles by goplex.ee"
       default_visible: true
       note: "Reference/background map; not an analysis input."
     layer_groups:
@@ -641,7 +643,7 @@ presentation:
             options: [ARIMAA, MAATULUNDUSMAA, TOOTMISMAA]
 ```
 
-**`presentation.map.basemap` is required whenever `presentation.map` is present**, and its `tiles`/`url` and `attribution` are load-bearing rather than decorative. The dashboard must really request tiles from the declared endpoint and really display the declared attribution; `visual.dashboard_loads_in_browser` fails with `basemap_absent` when the manifest omits the basemap, when no tile request to the declared URL is ever issued, or when the attribution is not visible in the rendered product. Use an official regional service where one exists (Estonia: Maa- ja Ruumiamet WMS) and OSM/Carto XYZ otherwise; see `references/data-sources.md`.
+**`presentation.map.basemap` is required whenever `presentation.map` is present**, and its `tiles`/`url` and `attribution` are load-bearing rather than decorative. The dashboard must really request tiles from the declared endpoint and really display the declared attribution; `visual.dashboard_loads_in_browser` fails with `basemap_absent` when the manifest omits the basemap, when no tile request to the declared URL is ever issued, or when the attribution is not visible in the rendered product. Honor an explicit user choice, then prefer an appropriate local or official regional basemap (Estonia: Maa- ja Ruumiamet WMS). Otherwise use the preconfigured goplex.ee Protomaps vector fallback described in `web-delivery.md`. For `kind: vector-style`, `url` names the light MapLibre style; optional `dark_url` preserves automatic/manual theme switching, and optional `tilejson` pins its vector source. A style/TileJSON fetch alone is not tile evidence: the browser check resolves the observed metadata to actual tile templates. The dashboard may supply the manifest attribution itself.
 
 `presentation.map.engine_preference` is a closed enum:
 
@@ -1068,7 +1070,7 @@ project.yaml
    <provider encoding="UTF-8">ogr</provider>
    ```
    **Use formats every QGIS build reads:** GeoPackage, GeoJSON or FlatGeobuf. GDAL's Parquet and Arrow drivers are optional build components that Debian/Ubuntu QGIS packages omit, so a layer on GeoParquet opens invalid there and the map draws nothing while every static check passes. Keep GeoParquet for analysis and export a QGIS-facing copy. `openmapstack validate` warns as `qgis.datasource_formats`.
-3. **Tiled Raster Basemaps:** Always include an official tiled basemap matching the project region, and prefer one that answers unauthenticated requests. CARTO's raster XYZ tiles (`basemaps.cartocdn.com/rastertiles/…`) now return an *API KEY REQUIRED* watermark, so a project that ships them draws that watermark across every view; CARTO's MapLibre **vector** styles are still open, which is why a dashboard and its QGIS companion may legitimately carry different backgrounds. Every basemap layer must declare its own **complete** `<srs>` — see rule 4.
+3. **Tiled Raster Basemaps:** Always include an official tiled basemap matching the project region, and prefer one that answers unauthenticated requests. CARTO's raster XYZ tiles (`basemaps.cartocdn.com/rastertiles/…`) now return an *API KEY REQUIRED* watermark, so a project that ships them draws that watermark across every view. A dashboard using the global Protomaps vector fallback and its QGIS companion may legitimately carry different backgrounds; preserve the appropriate regional QGIS basemap rather than passing a MapLibre style to a raster provider. Every basemap layer must declare its own **complete** `<srs>` — see rule 4.
    - **Maa- ja Ruumiamet Baaskaart (WMS, EPSG:3301):**
      ```xml
      <datasource>contextualWMSLegend=0&amp;crs=EPSG:3301&amp;dpiMode=7&amp;featureCount=10&amp;format=image/png&amp;layers=BAASKAART&amp;styles=&amp;url=https://kaart.maaamet.ee/wms/alus</datasource>

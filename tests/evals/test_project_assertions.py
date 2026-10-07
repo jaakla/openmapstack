@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from copy import deepcopy
+from pathlib import Path
 
 from .helpers import make_workspace, minimal_project, write_project
 
@@ -144,6 +145,23 @@ class ConformsToSchemaTests(unittest.TestCase):
         result = project_assertions.conforms_to_schema(workspace)
         self.assertEqual(result.status, "failed")
         self.assertEqual(result.data.get("code"), "manifest_schema_invalid")
+
+    def test_optional_vector_basemap_endpoints_are_nonempty_strings(self):
+        import jsonschema
+        import json
+
+        schema = json.loads((Path(__file__).resolve().parents[2] /
+                             "openmapstack/schemas/project-v1.schema.json").read_text())
+        basemap_schema = schema["properties"]["presentation"]["properties"]["map"]["properties"]["basemap"]
+        validator = jsonschema.Draft202012Validator(basemap_schema)
+        base = {"id": "custom", "kind": "vector-style", "url": "https://example.org/style.json",
+                "attribution": "Custom provider"}
+        self.assertEqual(list(validator.iter_errors(base)), [])
+        for field in ("dark_url", "tilejson"):
+            with self.subTest(field=field):
+                self.assertEqual(list(validator.iter_errors({**base, field: "https://example.org/pinned.json"})), [])
+                for value in ("", None, [], 42):
+                    self.assertTrue(list(validator.iter_errors({**base, field: value})))
 
     def test_missing_manifest_fails(self) -> None:
         result = project_assertions.conforms_to_schema(make_workspace())

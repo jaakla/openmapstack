@@ -8,6 +8,7 @@ is unavailable — the scheduled visual-integration environment provides it.
 from __future__ import annotations
 
 import struct
+import json
 import unittest
 import zipfile
 from pathlib import Path
@@ -643,6 +644,51 @@ class DashboardBrowserTests(unittest.TestCase):
         self.assertEqual(result.data["code"], "file_missing")
 
 
+class BasemapTileTemplateTests(unittest.TestCase):
+    def test_dark_style_can_supply_tile_evidence_without_loading_light_style(self):
+        from unittest.mock import Mock
+
+        basemap = {"kind": "vector-style", "url": "https://example.org/white.json",
+                   "dark_url": "https://example.org/dark.json"}
+        response = Mock(ok=True, json=lambda: {"sources": {
+            "base": {"type": "vector", "tiles": ["tiles/{z}/{x}/{y}.mvt"]}}})
+        self.assertEqual(visual._basemap_tile_templates(basemap, {basemap["dark_url"]: response}),
+                         ["https://example.org/tiles/{z}/{x}/{y}.mvt"])
+
+    def test_style_and_relative_tilejson_ignore_analysis_sources_and_cycles(self):
+        from unittest.mock import Mock
+
+        responses = {
+            "https://example.org/styles/white.json": Mock(ok=True, json=lambda: {"sources": {
+                "base": {"type": "vector", "url": "../planet.json"},
+                "overlay": {"type": "geojson", "url": "../analysis.json"}}}),
+            "https://example.org/planet.json": Mock(ok=True, json=lambda: {
+                "tiles": ["tiles/{z}/{x}/{y}.mvt"],
+                "sources": {"cycle": {"type": "vector", "url": "styles/white.json"}}}),
+        }
+        templates = visual._basemap_tile_templates({"kind": "vector-style", "url": "https://example.org/styles/white.json"}, responses)
+        self.assertEqual(templates, ["https://example.org/tiles/{z}/{x}/{y}.mvt"])
+        self.assertTrue(visual._matches_tile_url("https://example.org/tiles/1/2/3.mvt", templates[0]))
+        for resource in ("https://example.org/styles/white.json", "https://example.org/planet.json",
+                         "https://example.org/tiles/sprite.json", "https://example.org/tiles/1/2/3.mvt.json"):
+            self.assertFalse(visual._matches_tile_url(resource, templates[0]))
+
+    def test_unavailable_or_invalid_metadata_cannot_establish_tiles(self):
+        from unittest.mock import Mock
+
+        basemap = {"kind": "vector-style", "url": "https://example.org/style.json"}
+        for response in (None, Mock(ok=False), Mock(ok=True, json=lambda: []),
+                         Mock(ok=True, json=Mock(side_effect=ValueError("invalid JSON")))):
+            with self.subTest(response=response):
+                self.assertEqual(visual._basemap_tile_templates(basemap, {basemap["url"]: response}), [])
+
+    def test_explicit_tiles_and_raster_wms_template_remain_supported(self):
+        tile = "https://example.org/wms?bbox={bbox-epsg-3857}&width=256"
+        self.assertEqual(visual._basemap_tile_templates({"kind": "raster-wms", "url": tile}, {}), [tile])
+        self.assertTrue(visual._matches_tile_url("https://example.org/wms?bbox=1,2,3,4&width=256", tile))
+        self.assertEqual(visual._basemap_tile_templates({"tiles": [tile]}, {}), [tile])
+
+
 @unittest.skipUnless(_chromium_available(), "Playwright Chromium is not installed")
 class BasemapBrowserTests(unittest.TestCase):
     """The manifest-declared interactive background map (OSM/Carto/... tiles)
@@ -743,6 +789,76 @@ class BasemapBrowserTests(unittest.TestCase):
         self.assertEqual(result.data["code"], "map_absent")
         self.assertIn("basemap_absent", result.data["problem_codes"])
         self.assertTrue(any("interactive map canvas" in problem for problem in result.data["problems"]))
+
+    def _vector_basemap(self, *, request_tiles=True, attribution=True, inline_tiles=False):
+        import http.server
+        import threading
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path == "/style.json":
+                    source = {"type": "vector", "tiles": ["./tiles/{z}/{x}/{y}.mvt"]} if inline_tiles else {
+                        "type": "vector", "url": "./planet.json"}
+                    data = {"version": 8, "sources": {"base": source}, "layers": []}
+                elif self.path == "/planet.json":
+                    data = {"tilejson": "3.0.0", "tiles": ["./tiles/{z}/{x}/{y}.mvt"]}
+                else:
+                    data = {}
+                body = json.dumps(data).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        base = f"http://127.0.0.1:{server.server_port}"
+        basemap = {"id": "vector", "kind": "vector-style", "url": base + "/style.json",
+                   "attribution": "© Test tile provider"}
+        html = self.healthy_basemap_html("", include_img=False, include_attribution=attribution)
+        script = f"fetch('{base}/style.json').then(() => fetch('{base}/planet.json'))"
+        if request_tiles:
+            script += f".then(() => fetch('{base}/tiles/0/0/0.mvt'))"
+        # An unrelated asset in the same directory is not tile evidence.
+        script += f";fetch('{base}/tiles/sprite.json');"
+        return basemap, html.replace("</body>", f"<script>{script}</script></body>")
+
+    def test_vector_style_and_tilejson_resolve_real_tile_requests(self):
+        for inline in (False, True):
+            with self.subTest(inline_tiles=inline):
+                basemap, html = self._vector_basemap(inline_tiles=inline)
+                workspace = make_workspace()
+                write_project(workspace, manifest(basemap=basemap, groups=[], canonical_reset=False))
+                write_dashboard(workspace, html)
+                result = visual.dashboard_loads_in_browser(workspace)
+                self.assertEqual(result.status, "passed", result.detail)
+                self.assertEqual(len(result.data["evidence"]["basemap_tile_requests"]), 1)
+                self.assertTrue(result.data["evidence"]["basemap_tile_requests"][0].endswith("/0/0/0.mvt"))
+
+    def test_vector_metadata_and_sprite_without_tiles_fail(self):
+        basemap, html = self._vector_basemap(request_tiles=False)
+        workspace = make_workspace()
+        write_project(workspace, manifest(basemap=basemap, groups=[], canonical_reset=False))
+        write_dashboard(workspace, html)
+        result = visual.dashboard_loads_in_browser(workspace)
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertEqual(result.data["code"], "basemap_absent")
+
+    def test_vector_tiles_without_attribution_fail(self):
+        basemap, html = self._vector_basemap(attribution=False)
+        workspace = make_workspace()
+        write_project(workspace, manifest(basemap=basemap, groups=[], canonical_reset=False))
+        write_dashboard(workspace, html)
+        result = visual.dashboard_loads_in_browser(workspace)
+        self.assertEqual(result.status, "failed", result.detail)
+        self.assertEqual(result.data["code"], "basemap_absent")
+        self.assertTrue(any("attribution" in p for p in result.data["problems"]))
 
 
 class PlaywrightUnavailableTests(unittest.TestCase):

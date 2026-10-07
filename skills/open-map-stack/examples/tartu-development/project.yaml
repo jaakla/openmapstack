@@ -6,7 +6,7 @@ project:
     walking distance to city-owned kindergarten and school), and land-use criteria in Tartu, and show
     them on an interactive map with education POIs and catchment areas.
   created_at: 2026-08-25 08:15:03+03:00
-  updated_at: '2026-09-28T20:57:04.069801+00:00'
+  updated_at: '2026-10-07T20:57:55.871187+00:00'
   status: warning
 interpretation:
   objective: Find cadastral parcels in Tartu satisfying stated land-use, minimum size (>= 2 ha), primary
@@ -542,15 +542,16 @@ presentation:
       hover_tooltip: true
       zoom_to_selection: true
     basemap:
-      id: cartodb-positron
+      id: goplex-protomaps
       kind: vector-style
-      url: https://basemaps.cartocdn.com/gl/positron-gl-style/style.json
-      attribution: © OpenStreetMap contributors © CARTO
+      url: https://tiles.goplex.ee/styles/5.7.2/white.json
+      dark_url: https://tiles.goplex.ee/styles/5.7.2/dark.json
+      tilejson: https://tiles.goplex.ee/planet-20261006.json
+      attribution: © OpenStreetMap contributors, Protomaps tiles by goplex.ee
       default_visible: true
-      note: The MapLibre style dashboard.html actually loads (its dark counterpart is the matching dark-matter-gl-style).
-        project.qgz cannot read a MapLibre style, and CARTO's raster XYZ tiles now answer unauthenticated
-        requests with an "API KEY REQUIRED" watermark, so the QGIS companion carries the Maa- ja Ruumiamet
-        Baaskaart WMS as its default background and OpenStreetMap XYZ as the unchecked alternative.
+      note: The web dashboard uses the global fallback with matching light/dark styles. The QGIS companion
+        retains the appropriate Maa- ja Ruumiamet Baaskaart WMS as its default background and OpenStreetMap
+        XYZ as the unchecked alternative.
     layer_groups:
     - id: candidates_tier1
       title: Prime Candidates (Road + School + Kindergarten)
@@ -755,13 +756,13 @@ runtime:
     osmium: 4.3.1
 runs:
   latest:
-    id: run-20260928-205521
-    started_at: '2026-09-28T20:55:21.438817+00:00'
-    completed_at: '2026-09-28T20:57:04.069801+00:00'
+    id: run-20261007-205708
+    started_at: '2026-10-07T20:57:08.903422+00:00'
+    completed_at: '2026-10-07T20:57:55.871187+00:00'
     status: warning
-    inputs_hash: sha256:a32c8758adbf5b77c00ee5d5d6b71159a69fd7b7eeb1dc83ecad57fbcf502471
+    inputs_hash: sha256:7435c51d236ac5cf68937d5a5709783f37df117a38e5df76d5acb728a5e90f1c
     outputs_hash: sha256:9a7dc21e8e6ab6efb2d739cdc0f73e25aeca0a6e07db6c60dc22dc1197c3ba22
     record:
-      path: runs/run-20260928-205521.json
+      path: runs/run-20261007-205708.json
     validation_report:
       path: validation/latest-report.json

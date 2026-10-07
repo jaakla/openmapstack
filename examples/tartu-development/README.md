@@ -129,7 +129,7 @@ reads must retain the same rows and coordinates.
 - `data/derived/education_catchments.json`: accepted 25-minute scenario unions.
 - `data/derived/education_catchment_variants.json`: every threshold and scenario.
 - `data/derived/education_pois.json`, `main_roads.json`: effective facilities and official roads.
-- `dashboard.html`, `project.qgz`: generated web and desktop views.
+- `dashboard.html`, `project.qgz`: generated web and desktop views. The web map uses the manifest's goplex.ee Protomaps global fallback with automatic/manual light/dark switching and visible provider credit. The QGIS companion retains its regional Maa- ja Ruumiamet background. Explicit user and appropriate local/regional web basemaps take precedence over the global fallback; see `references/web-delivery.md` in the skill.
 - `validation/`, `runs/`: checks, routing evidence and hashes; current counts live here.
 
 The dashboard retains layer switches, scenario comparisons, provenance and local

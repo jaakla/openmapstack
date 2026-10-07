@@ -451,6 +451,8 @@
                 "kind": {"enum": ["raster-xyz", "raster-wms", "vector-style"]},
                 "tiles": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
                 "url": {"type": "string", "minLength": 1},
+                "dark_url": {"type": "string", "minLength": 1},
+                "tilejson": {"type": "string", "minLength": 1},
                 "attribution": {"type": "string", "minLength": 1},
                 "default_visible": {"type": "boolean"}
               },
