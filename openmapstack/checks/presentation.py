@@ -9,6 +9,63 @@ from pathlib import Path
 
 from . import AssertionResult, failed, get_in, load_project_yaml, not_testable, passed, project_root, warning
 
+# Design-language versions a manifest may declare (ADR 0007), each with the
+# page archetypes it defines. A project that declares none keeps the checks
+# that predate the language.
+DESIGN_LANGUAGES = {"openmapstack-views/0.1": ("workspace", "report")}
+CONTROL_KINDS = ("filters", "scenarios", "variants")
+CONTROL_EFFECTS = ("exploratory", "published")
+
+
+def declared_views(proj: dict) -> list[dict]:
+    """The project's pages: ``id``, ``path``, ``archetype``, ``scope``,
+    ``entry`` and the ``presentation`` that applies to that page.
+
+    A view's own ``presentation`` block overrides top-level keys for that page
+    only. Without top-level ``views:`` the dashboard is the one implicit view.
+    Entries whose output does not resolve are skipped here; validation reports
+    them.
+    """
+    base = proj.get("presentation") if isinstance(proj.get("presentation"), dict) else {}
+    views = proj.get("views")
+    if not isinstance(views, list) or not views:
+        return [{"id": "dashboard", "path": "dashboard.html", "archetype": None, "scope": None,
+                 "entry": True, "presentation": base}]
+    outputs = proj.get("outputs") or {}
+    result = []
+    for view in views:
+        if not isinstance(view, dict):
+            continue
+        output = outputs.get(view.get("output"))
+        if not isinstance(output, dict) or not output.get("path"):
+            continue
+        override = view.get("presentation") if isinstance(view.get("presentation"), dict) else {}
+        result.append({
+            "id": str(view.get("id")),
+            "path": str(output["path"]),
+            "archetype": view.get("archetype"),
+            "scope": view.get("scope"),
+            "entry": bool(view.get("entry")) or len(views) == 1,
+            "presentation": {**base, **override},
+        })
+    return result
+
+
+def declared_controls(presentation: dict) -> list[dict]:
+    """Every declared control of one page with its kind and effect.
+
+    ``effect`` defaults to ``exploratory``: only a control explicitly marked
+    ``published`` may leave its canonical position without the view saying so.
+    """
+    controls = presentation.get("controls") if isinstance(presentation.get("controls"), dict) else {}
+    found = []
+    for kind in CONTROL_KINDS:
+        for control in controls.get(kind) or []:
+            if isinstance(control, dict) and control.get("id") is not None:
+                found.append({**control, "kind": kind, "effect": control.get("effect") or "exploratory"})
+    return found
+
+
 SEMANTIC_ROLES = {
     "primary_result", "secondary_result", "source", "context", "constraint",
     "excluded_area", "warning", "user_override", "planned", "hypothetical",

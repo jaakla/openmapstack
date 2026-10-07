@@ -709,6 +709,45 @@ checks the project/run identity, verifies every source precondition, writes or
 references real override geodata, reruns affected processing steps, reports every
 override `applied`, `rejected`, or `not_testable`, and emits a new run record.
 
+#### Pages and the design language
+
+A project whose result needs more than one page — a citywide screening app and a
+report on one district, say — lists them in a top-level `views:` block. Without it
+the project has one page, its dashboard.
+
+```yaml
+views:
+  - id: screening
+    output: screening_view        # a declared output whose path is an HTML page
+    archetype: workspace          # from the declared design language
+    scope: citywide               # what this page's numbers describe
+    entry: true                   # exactly one page opens first
+  - id: detail
+    output: dashboard
+    archetype: report
+    scope: north_west
+    presentation:                 # overrides top-level presentation keys for this page
+      controls:
+        variants:
+          - id: scenario
+            options: [T, M, TM]
+            canonical: T
+            effect: published     # every option is a result the run published
+```
+
+`presentation.design_language` names the version of the design language the pages
+follow (`openmapstack-views/0.1`; see `design-language.md`). Declaring it opts the
+pages into that version's checks: every declared control is found and operated
+through the version's state protocol, on whichever tab it sits. A project that does
+not declare it keeps the checks that predate the language.
+
+Every control in `filters`, `scenarios` and `variants` has an `effect`. The default,
+`exploratory`, means that leaving the canonical position must show the exploratory
+label and offer a reset. `published` is for a control that only switches between
+results the run itself published, such as the scenarios a report compares side by
+side; it needs no exploratory label. A sensitivity variant, a re-applied rule or a
+reader's filter is never `published`.
+
 ### 2.8 Runtime, runs, warnings
 
 ```yaml
@@ -922,7 +961,9 @@ Four rules keep a reconfigurable view honest:
   pipeline turns the whole view into a confident lie.
 * **Off-canonical states must say so.** The moment any control leaves its canonical
   position, label the view as exploratory and offer a one-click reset. A what-if that
-  looks identical to the accepted result is worse than no control at all.
+  looks identical to the accepted result is worse than no control at all. The one
+  exception is a control declared `effect: published`, which only switches between
+  results the run published (s. 2.7, Pages and the design language).
 * **Re-apply rules; never re-measure geometry.** The browser may re-evaluate a
   published rule against values the pipeline measured in the analysis CRS. It must not
   compute distances, areas, buffers or reprojections of its own — those belong to the

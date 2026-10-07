@@ -151,6 +151,7 @@ class _Validator:
         self._overrides()
         self._processing_and_outputs()
         self._presentation()
+        self._views()
         self._warnings()
         self._runtime()
         self._validation_declaration()
@@ -482,6 +483,56 @@ class _Validator:
             self.add("presentation.declaration", "failed", "; ".join(([f"missing {missing}"] if missing else []) + layer_errors), path="presentation")
         else:
             self.add("presentation.declaration", "passed", f"semantic presentation declares {len(layers)} layers", path="presentation")
+
+    def _views(self) -> None:
+        """Top-level ``views:`` names the project's pages (ADR 0007)."""
+        from .checks.presentation import CONTROL_EFFECTS, DESIGN_LANGUAGES, declared_controls
+
+        views = self.project.get("views")
+        if views is None:
+            return
+        if not isinstance(views, list) or not views:
+            self.add("views.declaration", "failed", "views must be a non-empty list", path="views")
+            return
+        language = get_in(self.project, "presentation", "design_language")
+        archetypes = DESIGN_LANGUAGES.get(language, ())
+        outputs = self.project.get("outputs") or {}
+        errors: list[str] = []
+        ids = [str(view.get("id")) for view in views if isinstance(view, dict)]
+        if len(ids) != len(views):
+            errors.append("every view must be a mapping")
+        if duplicates := _duplicates(ids):
+            errors.append(f"duplicate view ids: {duplicates}")
+        for view in views:
+            if not isinstance(view, dict):
+                continue
+            output = outputs.get(view.get("output"))
+            if not isinstance(output, dict):
+                errors.append(f"view {view.get('id')!r} references unknown output {view.get('output')!r}")
+            elif not str(output.get("path", "")).lower().endswith((".html", ".htm")):
+                errors.append(f"view {view.get('id')!r} output {view.get('output')!r} is not an HTML page")
+            if archetypes and view.get("archetype") is not None and view.get("archetype") not in archetypes:
+                errors.append(
+                    f"view {view.get('id')!r} archetype {view.get('archetype')!r} is not one of "
+                    f"{list(archetypes)} defined by {language}"
+                )
+            if view.get("presentation") is not None and not isinstance(view.get("presentation"), dict):
+                errors.append(f"view {view.get('id')!r} presentation must be a mapping")
+            elif isinstance(view.get("presentation"), dict):
+                # The schema checks top-level controls; a page's own are checked here.
+                for control in declared_controls(view["presentation"]):
+                    if control["effect"] not in CONTROL_EFFECTS:
+                        errors.append(
+                            f"view {view.get('id')!r} control {control['id']!r} effect {control['effect']!r} "
+                            f"is not one of {list(CONTROL_EFFECTS)}"
+                        )
+        entries = [view.get("id") for view in views if isinstance(view, dict) and view.get("entry") is True]
+        if len(views) > 1 and len(entries) != 1:
+            errors.append(f"exactly one view must be the entry page; found {len(entries)}")
+        if errors:
+            self.add("views.declaration", "failed", "; ".join(errors), path="views")
+        else:
+            self.add("views.declaration", "passed", f"{len(views)} view(s) declared", path="views")
 
     def _runtime(self) -> None:
         implementation = get_in(self.project, "runtime", "implementation")
