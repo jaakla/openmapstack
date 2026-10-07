@@ -53,6 +53,16 @@ provenance, label honesty, hash construction), and the cross-file invariants
 `openmapstack validate` enforces beyond the schema. The YAML below is illustrative — a
 worked example of the shape, not a second field registry to keep in sync by hand.
 
+**Project-specific extensions.** v1 allows additive metadata wherever the schema
+permits additional properties; objects marked `additionalProperties: false` are
+closed and cannot be extended. Extra keys do not become OpenMapStack features:
+the built-in tools do not execute them or validate their project-specific meaning.
+They must not replace required fields or change the meaning of standard fields.
+Prefer namespaced keys for custom metadata to avoid collisions with future fields;
+document their meaning and any consumer in the project README. If custom metadata
+affects analytical results, implement its behavior in the declared pipeline and
+provide appropriate validation evidence.
+
 ### 2.1 Head and interpretation
 
 ```yaml
@@ -89,16 +99,27 @@ interpretation:
       rationale: Metric area calculation is required.
 ```
 
-`interpretation` is where "what the user actually wanted" is pinned, including any rephrasing you did. Every assumption needs a `statement` and `rationale`.
+`interpretation` is where "what the user actually wanted" is pinned, including any
+rephrasing you did. Each assumption must be an object with `id`, `statement`, and
+`rationale`, all nonblank strings. The schema enforces this shape; `openmapstack
+validate` and `project.assumptions_have_rationale` also reject duplicate assumption
+IDs. An empty assumptions array is schema-valid but produces a warning. The audit
+additionally rejects unresolved placeholder text.
 
-The schema requires every `project.*` and `interpretation.*` key shown above except
-`project.author` and `project.generated_with`, and closes `project.status` to the
-five listed values. `author` and `generated_with` are delivery requirements: the
+Additional assumption fields are allowed as project-specific metadata. For example,
+`scope: accessibility` and a project-specific scope glossary can describe where an
+assumption applies, but OpenMapStack does not resolve scope references, check that
+glossary, or restrict an assumption's effect based on `scope`. Put applicability
+needed to understand the analysis in `statement` or `rationale`, so consumers of
+the standard contract can still interpret it correctly.
+
+The schema requires `project.id`, `title`, `question`, `created_at`, `updated_at`,
+and `status`, plus `interpretation.objective` and `assumptions`, and closes
+`project.status` to the five listed values. `author` and `generated_with` are delivery requirements: the
 credits header (section 3) renders them. Fill `author` from the requesting user or
 their version-control identity (`git config user.name` / `user.email`) and ask when
-neither is known; never invent an author or leave a placeholder in a delivered view. The per-assumption
-`statement`/`rationale` requirement is a semantic rule checked by `openmapstack validate`,
-not by the schema — a manifest can be schema-valid and still fail the audit.
+neither is known; never invent an author or leave a placeholder in a delivered view.
+A manifest can be schema-valid and still fail the semantic audit.
 
 ### 2.2 Sources
 

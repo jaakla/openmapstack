@@ -8,6 +8,17 @@
     "processing", "outputs", "validation", "presentation", "runtime", "runs"
   ],
   "$defs": {
+    "assumption": {
+      "type": "object",
+      "required": ["id", "statement", "rationale"],
+      "additionalProperties": true,
+      "description": "An explicit analytical assumption. Additional fields are project-specific metadata with no built-in execution or validation semantics.",
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "pattern": "\\S"},
+        "statement": {"type": "string", "minLength": 1, "pattern": "\\S"},
+        "rationale": {"type": "string", "minLength": 1, "pattern": "\\S"}
+      }
+    },
     "table_column": {
       "oneOf": [
         {"type": "string", "minLength": 1},
@@ -336,7 +347,11 @@
       "required": ["objective", "assumptions"],
       "properties": {
         "objective": {"type": "string", "minLength": 1},
-        "assumptions": {"type": "array"}
+        "assumptions": {
+          "type": "array",
+          "description": "Assumption IDs must be unique within the project (checked beyond JSON Schema). An empty array is valid but produces a no-assumptions warning.",
+          "items": {"$ref": "#/$defs/assumption"}
+        }
       }
     },
     "sources": {

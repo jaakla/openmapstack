@@ -242,22 +242,21 @@ def declared_files_exist(workspace: Path, files: list[str], project_dir: str = "
 
 
 def assumptions_have_rationale(workspace: Path, project_dir: str = ".") -> AssertionResult:
+    from openmapstack.schema import assumptions_errors
+
     proj = load_project_yaml(workspace, project_dir)
     if proj is None:
         return failed("project.yaml missing", code="manifest_missing")
-    assumptions = get_in(proj, "interpretation.assumptions", []) or []
+    assumptions = get_in(proj, "interpretation.assumptions")
+    errors = assumptions_errors(assumptions)
+    if errors:
+        return failed(
+            f"invalid assumptions: {errors}",
+            code="assumption_missing_rationale",
+            errors=errors,
+        )
     if not assumptions:
         return warning("no assumptions declared", code="no_assumptions_declared")
-    missing = [
-        a.get("id", "?")
-        for a in assumptions
-        if not a.get("statement") or not a.get("rationale")
-    ]
-    if missing:
-        return failed(
-            f"assumptions missing statement/rationale: {missing}",
-            code="assumption_missing_rationale",
-        )
     return passed(f"all {len(assumptions)} assumptions have statement + rationale")
 
 

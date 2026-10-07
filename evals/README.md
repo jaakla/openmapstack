@@ -121,6 +121,10 @@ Scenario input files are checked in under
 `evals/fixtures/spatial-scenarios/<scenario>/`, and the runner's automatic
 byte-identity check verifies the generator copies them unmodified.
 
+Case `933-invalid-assumption` replaces the required rationale text with a mapping
+and requires `project.conforms_to_schema` to reject it. Its healthy control twin
+proves that the normal assumption record still passes.
+
 ## Coordinate-order boundary regression
 
 Case `018-coordinate-order-boundaries` is a focused fixture/live task for the
