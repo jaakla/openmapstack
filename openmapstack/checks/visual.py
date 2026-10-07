@@ -672,12 +672,16 @@ def _protocol_page_problems(
         if not has_map:
             continue
         info = toggle.evaluate(_CONTROL_STATE_JS)
+        # A group may start hidden (default_open: false): flip it from its
+        # initial state and restore that state, never force it on.
+        initially_on = info["state"] if info["kind"] == "checkbox" else toggle.get_attribute("aria-pressed") == "true"
         if info["kind"] == "checkbox":
-            def switch(on: bool, toggle=toggle, info=info) -> None:
-                _set_control(toggle, info, on)
+            def switch(as_initial: bool, toggle=toggle, info=info, initially_on=initially_on) -> None:
+                _set_control(toggle, info, initially_on if as_initial else not initially_on)
         else:
-            def switch(on: bool, toggle=toggle) -> None:
-                if (toggle.get_attribute("aria-pressed") == "true") != on:
+            def switch(as_initial: bool, toggle=toggle, initially_on=initially_on) -> None:
+                wanted = initially_on if as_initial else not initially_on
+                if (toggle.get_attribute("aria-pressed") == "true") != wanted:
                     toggle.click(timeout=3000)
         problem, fraction = _toggle_changes_render(
             page, toggle, switch=switch, settle_ms=settle_ms,

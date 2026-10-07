@@ -1471,6 +1471,17 @@ class StateProtocolBrowserTests(unittest.TestCase):
         self.assertEqual(result.status, "passed", result.detail)
         self.assertIn("group:analysis", result.data["evidence"]["toggle_diff_fraction"])
 
+    def test_layer_group_that_starts_hidden_is_flipped_and_left_hidden(self) -> None:
+        html = protocol_page().replace(
+            'data-oms-layer-group="context" aria-pressed="true"', 'data-oms-layer-group="context" aria-pressed="false"'
+        ).replace('<rect id="context"', '<rect id="context" style="display:none"')
+        workspace = make_workspace()
+        write_project(workspace, protocol_manifest())
+        write_dashboard(workspace, html)
+        result = visual.dashboard_loads_in_browser(workspace, settle_ms=150)
+        self.assertEqual(result.status, "passed", result.detail)
+        self.assertIn("group:context", result.data["evidence"]["toggle_diff_fraction"])
+
     def test_control_without_its_hook_fails(self) -> None:
         result = self.check(protocol_page(HALF_LIFE_HOOK=""))
         self.assertFailsWith(result, "control_absent", "half_life has no element with data-oms-control")
