@@ -39,8 +39,10 @@
   --oms-radius: 10px;
   --radius-sm: 7px;
   --panel-w: 384px;
+  --map-icon-filter: none;
 }
 :root[data-theme="dark"], :root:not([data-theme="light"]) {
+  --map-icon-filter: invert(1);
   --oms-bg: #070b10;
   --oms-surface: #10161e;
   --oms-surface-2: #161e28;
@@ -65,6 +67,7 @@
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
+    --map-icon-filter: none;
     --oms-bg: #eef1f5;
     --oms-surface: #ffffff;
     --oms-surface-2: #f4f6f9;
@@ -330,6 +333,9 @@ input[type="range"]::-moz-range-thumb {
 .switch input:focus-visible ~ .track { outline: 2px solid var(--oms-accent); outline-offset: 2px; }
 
 .layer-row {
+  /* Positioned so the hidden checkbox stays inside its row: focusing an
+     input that escapes the panel scroller scrolls the whole page. */
+  position: relative;
   display: flex; align-items: center; gap: 10px;
   padding: 7px 8px; border-radius: var(--radius-sm);
   cursor: pointer; transition: background 0.14s;
@@ -495,6 +501,14 @@ input[type="range"]::-moz-range-thumb {
 .map-status b { color: var(--oms-text); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .maplibregl-ctrl-group { border-radius: 8px !important; box-shadow: var(--shadow-md) !important; }
+/* The map engine's attribution is the page's only basemap credit: theme it
+   like the status pill so it stays readable in both themes. */
+.maplibregl-ctrl.maplibregl-ctrl-attrib {
+  background: color-mix(in srgb, var(--oms-surface) 88%, transparent);
+  color: var(--oms-text-muted);
+}
+.maplibregl-ctrl-attrib a { color: var(--oms-text-muted); }
+.maplibregl-ctrl-attrib-button { filter: var(--map-icon-filter); }
 .maplibregl-popup-content {
   background: var(--oms-surface); color: var(--oms-text);
   border: 1px solid var(--oms-border); border-radius: var(--oms-radius);
@@ -536,8 +550,11 @@ input[type="range"]::-moz-range-thumb {
     grid-template-areas: "top" "map" "panel";
   }
   .panel { border-right: 0; border-top: 1px solid var(--oms-border); }
-  .map-status { border-radius: 12px; }
+  /* One line on a narrow map, so the scale and the basemap attribution
+     sit just above the pill instead of under it. */
+  .map-status { flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
   .map-status .opt { display: none; }
+  .maplibregl-ctrl-bottom-right { bottom: 40px; }
   .topbar { min-width: 0; gap: 8px; padding: 0 10px; }
   .brand { flex: 1 1 0; overflow: hidden; }
   .topbar-right { flex: 0 0 auto; min-width: 0; }
@@ -1542,13 +1559,12 @@ const POIS = {"type":"FeatureCollection","features":[{"type":"Feature","properti
     const draftCount = activeOperations().length;
     $("#mapStatus").innerHTML = "<span><b>" + int(stats.shown) + "</b> parcels in scope</span>"
       + '<span class="sep"></span><span><b>' + int(stats.tier1) + "</b> prime</span>"
-      + '<span class="sep"></span><span><b>' + int(fc.school) + "</b> schools · <b>"
+      + '<span class="sep opt"></span><span class="opt"><b>' + int(fc.school) + "</b> schools · <b>"
       + int(fc.kindergarten) + "</b> kindergartens</span>"
       + '<span class="sep opt"></span><span class="opt">' + esc(VIEW.project.analysis_crs) + "</span>"
       + (draftCount ? '<span class="sep"></span><span style="color:var(--accent-text)"><b>'
         + int(draftCount) + "</b> draft " + (draftCount === 1 ? "edit" : "edits") + "</span>" : "")
-      + '<span class="sep opt"></span><span class="mono opt">' + esc(VIEW.run.id) + "</span>"
-      + '<span class="sep"></span><span>Basemap ' + esc(BASEMAP_ATTRIBUTION) + "</span>";
+      + '<span class="sep opt"></span><span class="mono opt">' + esc(VIEW.run.id) + "</span>";
   }
 
   function updateReconfigured() {
@@ -1577,8 +1593,6 @@ const POIS = {"type":"FeatureCollection","features":[{"type":"Feature","properti
     dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
     light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
   };
-  // The attribution project.yaml requires, shown verbatim with the map.
-  const BASEMAP_ATTRIBUTION = "© OpenStreetMap contributors © CARTO";
   function currentTheme() {
     const attr = document.documentElement.getAttribute("data-theme");
     if (attr) return attr;

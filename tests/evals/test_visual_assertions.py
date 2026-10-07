@@ -643,6 +643,20 @@ class DashboardBrowserTests(unittest.TestCase):
         self.assertEqual(result.data["code"], "file_missing")
 
 
+class CreditedPartiesTests(unittest.TestCase):
+    def test_each_copyright_holder_is_a_party_and_captions_are_not(self) -> None:
+        cases = {
+            "© OpenStreetMap contributors © CARTO": ["OpenStreetMap contributors", "CARTO"],
+            "Map data © OpenStreetMap contributors, © CARTO | ©  Maa- ja Ruumiamet": [
+                "OpenStreetMap contributors", "CARTO", "Maa- ja Ruumiamet"],
+            "Esri, Maxar": ["Esri, Maxar"],
+            "  ": [],
+        }
+        for attribution, parties in cases.items():
+            with self.subTest(attribution=attribution):
+                self.assertEqual(visual.credited_parties(attribution), parties)
+
+
 @unittest.skipUnless(_chromium_available(), "Playwright Chromium is not installed")
 class BasemapBrowserTests(unittest.TestCase):
     """The manifest-declared interactive background map (OSM/Carto/... tiles)
@@ -683,14 +697,15 @@ class BasemapBrowserTests(unittest.TestCase):
             "default_visible": True,
         }
 
-    def healthy_basemap_html(self, tiles_url, *, include_img=True, include_attribution=True, include_canvas=True):
+    def healthy_basemap_html(self, tiles_url, *, include_img=True, include_attribution=True, include_canvas=True,
+                             attribution_html="© Test tile provider"):
         canvas = ('<canvas id="map" data-testid="map" width="200" height="150">'
                   '</canvas><script>const c=document.querySelector("canvas");'
                   'const g=c.getContext("2d");g.fillStyle="#34a06b";g.fillRect(10,10,100,60);'
                   'g.fillStyle="#1d4ed8";g.beginPath();g.arc(160,110,8,0,7);g.fill();</script>'
                   ) if include_canvas else '<div data-testid="map" style="display:none"></div>'
         img = f'<img src="{tiles_url.replace("{z}/{x}/{y}.png", "0/0/0.png")}" alt="">' if include_img else ""
-        attribution = '<div class="maplibregl-ctrl-attrib">© Test tile provider</div>' if include_attribution else ""
+        attribution = f'<div class="maplibregl-ctrl-attrib">{attribution_html}</div>' if include_attribution else ""
         return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>t</title></head>
 <body style="margin:0">
@@ -728,6 +743,22 @@ class BasemapBrowserTests(unittest.TestCase):
         self.assertEqual(result.status, "failed")
         self.assertEqual(result.data["code"], "basemap_absent")
         self.assertTrue(any("attribution" in problem for problem in result.data["problems"]))
+
+    def test_attribution_in_the_map_engines_wording_passes_and_a_dropped_party_fails(self) -> None:
+        # The manifest credits two parties; the map engine's control credits
+        # them in its own order and markup, which needs no second copy.
+        tiles_url = self._serve_tiles()
+        basemap = {**self.basemap(tiles_url), "attribution": "© OpenStreetMap contributors © CARTO"}
+        engine = '<a href="#">© CARTO</a>, © <a href="#">OpenStreetMap</a> contributors'
+        for html, status in ((engine, "passed"), ('<a href="#">© CARTO</a>', "failed")):
+            with self.subTest(status=status):
+                workspace = make_workspace()
+                write_project(workspace, manifest(basemap=basemap, groups=[], canonical_reset=False))
+                write_dashboard(workspace, self.healthy_basemap_html(tiles_url, attribution_html=html))
+                result = visual.dashboard_loads_in_browser(workspace)
+                self.assertEqual(result.status, status, result.detail)
+                if status == "failed":
+                    self.assertIn("missing: OpenStreetMap contributors", result.detail)
 
     def test_basemap_without_interactive_canvas_fails(self) -> None:
         workspace = make_workspace()
@@ -1346,7 +1377,11 @@ body { margin: 0; display: flex; font: 14px sans-serif; }
 #sidebar { width: 320px; flex: none; }
 #map { flex: 0 1 400px; min-width: 0; height: 300px; }
 #map svg { width: 100%; height: 100%; }
+.scroller { height: 120px; overflow-y: auto; }
+.spacer { height: 1500px; }
+.row input { position: absolute; opacity: 0; pointer-events: none; }
 %%MOBILE_CSS%%
+%%ROW_CSS%%
 </style></head>
 <body>
 <div id="sidebar">
@@ -1370,7 +1405,8 @@ body { margin: 0; display: flex; font: 14px sans-serif; }
   </section>
   <section role="tabpanel" id="panel-m" hidden>
     <input type="range" %%MIN_AREA_HOOK%% min="20" max="60" step="20" value="20">
-    <label><input type="checkbox" data-oms-layer-group="analysis" checked> Analysis</label>
+    <div class="scroller"><div class="spacer"></div>
+      <label class="row"><input type="checkbox" data-oms-layer-group="analysis" checked><span>Analysis</span></label></div>
   </section>
   <section role="tabpanel" id="panel-p" hidden><div data-testid="provenance">Sources and run</div></section>
   %%ORPHAN_PANEL%%
@@ -1420,6 +1456,9 @@ render();
 
 PROTOCOL_PARTS = {
     "MOBILE_CSS": "@media (max-width: 600px) { body { flex-direction: column; } #sidebar { width: auto; } #map { flex: none; width: 100%; } }",
+    # The analysis toggle is a styled row whose input is hidden: positioning
+    # the row keeps the input inside the scrolled panel.
+    "ROW_CSS": ".row { position: relative; }",
     "HALF_LIFE_HOOK": 'data-oms-control="half_life"',
     "MIN_AREA_HOOK": 'data-oms-control="min_area"',
     "ORPHAN_PANEL": "",
@@ -1508,6 +1547,14 @@ class StateProtocolBrowserTests(unittest.TestCase):
         html = protocol_page().replace('const state = {min_area: "20"', 'const state = {min_area: "40"')
         result = self.check(html)
         self.assertFailsWith(result, "not_canonical_at_open", "canonical state")
+
+    def test_layer_toggle_that_scrolls_the_whole_page_fails(self) -> None:
+        # Without a positioned row the hidden input sits where the unscrolled
+        # panel would put it, below the screen; clicking the row focuses it
+        # and the browser scrolls the page away from the map.
+        result = self.check(protocol_page(ROW_CSS=""))
+        self.assertFailsWith(result, "page_jumped", "toggle of layer group analysis scrolled the whole page")
+        self.assertNotIn("layer_group_not_rendered", result.data["problem_codes"])
 
     def test_fixed_sidebar_that_squeezes_the_mobile_map_fails(self) -> None:
         result = self.check(protocol_page(MOBILE_CSS=""))

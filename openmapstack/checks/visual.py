@@ -213,6 +213,23 @@ def render_substantive(workspace: Path, path: str, project_dir: str = ".") -> As
 # dashboard_loads_in_browser: live headless-browser validation
 # ---------------------------------------------------------------------------
 
+def credited_parties(attribution: str) -> list[str]:
+    """The parties an attribution credits, which must each be visible.
+
+    "© OpenStreetMap contributors © CARTO" credits "OpenStreetMap
+    contributors" and "CARTO". Order and punctuation are free, so the map
+    engine's own attribution control ("© CARTO, © OpenStreetMap
+    contributors") satisfies it and the page needs no second copy. Text
+    before the first © ("Map data") is a caption, not a party. Without a ©
+    the whole string is the one credit.
+    """
+    text = " ".join(attribution.split())
+    if "©" not in text:
+        return [text] if text else []
+    parties = (part.strip(" ,;|·") for part in text.split("©")[1:])
+    return [party for party in parties if party]
+
+
 def _playwright():
     from playwright.sync_api import sync_playwright  # type: ignore
 
@@ -499,12 +516,15 @@ def _panel_and_basemap_problems(
                 f"requested its tiles ({tile_prefix}...) — the background map is not interactive",
             )
         attribution = basemap.get("attribution")
-        if attribution and attribution not in page.inner_text("body"):
-            problems.add(
-                "basemap_absent",
-                f"basemap attribution {attribution!r} required by the manifest is not visible "
-                "in the rendered product",
-            )
+        if attribution:
+            text = " ".join(page.inner_text("body").split())
+            missing = [party for party in credited_parties(attribution) if party not in text]
+            if missing:
+                problems.add(
+                    "basemap_absent",
+                    f"basemap attribution {attribution!r} required by the manifest is not visible "
+                    f"in the rendered product (missing: {', '.join(missing)})",
+                )
 
 
 def _checkbox_states(page: Any) -> dict[str, bool]:
@@ -609,14 +629,50 @@ def _alternative_state(info: dict) -> Any:
     return None
 
 
-def _set_control(control: Any, info: dict, value: Any) -> None:
-    """Operate a protocol control the way a reader would."""
+_PAGE_SCROLL_JS = """() => [window.scrollX, window.scrollY,
+  document.body ? document.body.scrollLeft : 0, document.body ? document.body.scrollTop : 0]"""
+
+
+def _click_like_reader(target: Any) -> int:
+    """Click ``target`` and return how far the page itself scrolled because of
+    the click, in pixels.
+
+    Measured only from an unscrolled page with the target already in view, so
+    neither Playwright's own scrolling nor a page that scrolls as a document
+    counts. The typical cause is a visually hidden input that escapes its
+    panel: the browser scrolls the whole page to focus it. The scroll is
+    undone so later screenshots compare the same page.
+    """
+    target.scroll_into_view_if_needed(timeout=3000)
+    before = target.evaluate(_PAGE_SCROLL_JS)
+    target.click(timeout=3000)
+    after = target.evaluate(_PAGE_SCROLL_JS)
+    if any(before) or after == before:
+        return 0
+    target.evaluate("() => { window.scrollTo(0, 0); if (document.body) document.body.scrollTop = 0; }")
+    return int(max(abs(v) for v in after))
+
+
+def _set_control(control: Any, info: dict, value: Any) -> int:
+    """Operate a protocol control the way a reader would. Returns the page
+    jump the operation caused (see ``_click_like_reader``)."""
     kind = info["kind"]
     if kind == "checkbox":
-        try:
-            control.set_checked(bool(value), timeout=3000)
-        except Exception:  # noqa: BLE001  - a switch that hides its input behind a styled track
-            control.evaluate("(e, v) => { if (e.checked !== v) e.click(); }", bool(value))
+        wanted = bool(value)
+        if control.evaluate("e => e.checked") == wanted:
+            return 0
+        # A reader clicks the label: custom switches hide the box itself.
+        label = control.evaluate_handle("e => (e.labels && e.labels[0]) || null").as_element()
+        for target in (label, control):
+            if target is None:
+                continue
+            try:
+                jump = _click_like_reader(target)
+            except Exception:  # noqa: BLE001  - covered or hidden; try the next target
+                continue
+            if control.evaluate("e => e.checked") == wanted:
+                return jump
+        control.evaluate("(e, v) => { if (e.checked !== v) e.click(); }", wanted)
     elif kind == "select":
         control.select_option(value=str(value), timeout=3000)
     elif kind == "range":
@@ -624,7 +680,8 @@ def _set_control(control: Any, info: dict, value: Any) -> None:
           e.dispatchEvent(new Event('input', {bubbles: true}));
           e.dispatchEvent(new Event('change', {bubbles: true})); }""", str(value))
     elif kind == "group":
-        control.query_selector(f'[data-oms-value="{value}"]').click(timeout=3000)
+        return _click_like_reader(control.query_selector(f'[data-oms-value="{value}"]'))
+    return 0
 
 
 def _restore_control(control: Any, initial: dict) -> None:
@@ -656,6 +713,14 @@ def _protocol_page_problems(
     controls = declared_controls(presentation)
     exploratory = [c for c in controls if c["effect"] != "published"]
     has_map = _first_visible(page, _MAP_SELECTOR) is not None
+    # A report scrolls as a document; any other page keeps still while a
+    # reader operates it, and only the panel a control sits in may scroll.
+    keeps_still = view.get("archetype") != "report"
+
+    def jumped(jump: int, what: str) -> None:
+        if jump and keeps_still:
+            problems.add("page_jumped", f"operating {what} scrolled the whole page by {jump}px; keep each "
+                         "control's input inside its positioned row or panel so focusing it scrolls nothing")
 
     if exploratory and (_page_state(page) != "canonical" or _first_visible(page, "[data-oms-exploratory]")):
         problems.add("not_canonical_at_open",
@@ -675,19 +740,21 @@ def _protocol_page_problems(
         # A group may start hidden (default_open: false): flip it from its
         # initial state and restore that state, never force it on.
         initially_on = info["state"] if info["kind"] == "checkbox" else toggle.get_attribute("aria-pressed") == "true"
+        jumps: list[int] = []
         if info["kind"] == "checkbox":
-            def switch(as_initial: bool, toggle=toggle, info=info, initially_on=initially_on) -> None:
-                _set_control(toggle, info, initially_on if as_initial else not initially_on)
+            def switch(as_initial: bool, toggle=toggle, info=info, initially_on=initially_on, jumps=jumps) -> None:
+                jumps.append(_set_control(toggle, info, initially_on if as_initial else not initially_on))
         else:
-            def switch(as_initial: bool, toggle=toggle, initially_on=initially_on) -> None:
+            def switch(as_initial: bool, toggle=toggle, initially_on=initially_on, jumps=jumps) -> None:
                 wanted = initially_on if as_initial else not initially_on
                 if (toggle.get_attribute("aria-pressed") == "true") != wanted:
-                    toggle.click(timeout=3000)
+                    jumps.append(_click_like_reader(toggle))
         problem, fraction = _toggle_changes_render(
             page, toggle, switch=switch, settle_ms=settle_ms,
             baseline=shot_prefix.with_name(f"{shot_prefix.name}-group-{group_id}-before.png"),
             toggled=shot_prefix.with_name(f"{shot_prefix.name}-group-{group_id}-after.png"),
         )
+        jumped(max(jumps, default=0), f"the toggle of layer group {group_id}")
         if problem is not None:
             problems.add("layer_group_not_rendered", f"layer group {group_id}: {problem}")
         elif fraction is not None:
@@ -707,7 +774,7 @@ def _protocol_page_problems(
                          "checked, value or aria-pressed")
             continue
         text_before = page.evaluate(_PAGE_TEXT_JS)
-        _set_control(element, initial, target)
+        jumped(_set_control(element, initial, target), f"control {control_id}")
         _settle(page, settle_ms)
         if element.evaluate(_CONTROL_STATE_JS)["state"] == initial["state"]:
             problems.add("control_inoperable", f"control {control_id} does not change state when operated")

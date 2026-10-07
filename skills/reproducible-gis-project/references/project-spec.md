@@ -641,7 +641,7 @@ presentation:
             options: [ARIMAA, MAATULUNDUSMAA, TOOTMISMAA]
 ```
 
-**`presentation.map.basemap` is required whenever `presentation.map` is present**, and its `tiles`/`url` and `attribution` are load-bearing rather than decorative. The dashboard must really request tiles from the declared endpoint and really display the declared attribution; `visual.dashboard_loads_in_browser` fails with `basemap_absent` when the manifest omits the basemap, when no tile request to the declared URL is ever issued, or when the attribution is not visible in the rendered product. Use an official regional service where one exists (Estonia: Maa- ja Ruumiamet WMS) and OSM/Carto XYZ otherwise; see `references/data-sources.md`.
+**`presentation.map.basemap` is required whenever `presentation.map` is present**, and its `tiles`/`url` and `attribution` are load-bearing rather than decorative. The dashboard must really request tiles from the declared endpoint and really display the declared attribution. Every party it credits must be visible; wording and order are free, so the map engine's own attribution control is enough and needs no second copy. `visual.dashboard_loads_in_browser` fails with `basemap_absent` when the manifest omits the basemap, when no tile request to the declared URL is ever issued, or when the attribution is not visible in the rendered product. Use an official regional service where one exists (Estonia: Maa- ja Ruumiamet WMS) and OSM/Carto XYZ otherwise; see `references/data-sources.md`.
 
 `presentation.map.engine_preference` is a closed enum:
 

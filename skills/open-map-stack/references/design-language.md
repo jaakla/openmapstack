@@ -26,7 +26,9 @@ pages to section 5. A view that does not declare a version is checked as before.
 - **Re-apply published rules; never re-measure.** The browser switches between values
   the pipeline computed. It does not compute distances, areas or buffers.
 - **Provenance is one step away.** Every page has the credits block and a way from a
-  number or feature to its source, run and assumptions.
+  number or feature to its source, run and assumptions. The basemap is credited once,
+  on the map: the map engine's attribution control does that, readable in both themes
+  and never covered by the page's own overlays.
 - **It works on a phone and in both themes.** On a 390-pixel-wide screen the map keeps
   at least half the width, and every token has a light and a dark value.
 - **The reader's language.** Labels, dates and numbers follow the language and locale
@@ -66,6 +68,9 @@ Interaction rules:
   selection highlights the entry.
 - When one control appears in several places (a travel-mode switch in three panels),
   every copy shows the same state and carries the same manifest id.
+- Operating a control never moves the page. Outside a `report`, only the panel the
+  control sits in scrolls. A visually hidden input stays inside its positioned row;
+  otherwise focusing it scrolls the whole page away from the map.
 - Free-text search over a list is a find tool, not a declared control: its states
   cannot be enumerated. If it hides entries of the published result, a non-empty
   search still marks the page exploratory, and the reset clears it.
@@ -127,11 +132,12 @@ With the version declared, `visual.dashboard_loads_in_browser` opens every page 
 `views:` and, for each declared control, checks that:
 
 - the control exists, on whichever tab it sits;
-- changing it changes the page;
+- changing it changes the page, and outside a `report` does not scroll the page;
 - an exploratory control shows the label and sets the page state;
 - the reset restores every control and the canonical state.
 
-Layer-group toggles must change the rendered map, and on a 390-pixel-wide screen a
+Layer-group toggles must change the rendered map without scrolling the page. Every
+party the basemap attribution credits must be visible. On a 390-pixel-wide screen a
 page that declares a map shows it at least half the screen wide.
 
 ## 6. Adding a component
