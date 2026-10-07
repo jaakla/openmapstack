@@ -52,6 +52,11 @@ basemap require internet, but list filtering, zone details and CSV export work w
 map library available, zones, fleet points and hubs also render when basemap tiles are unavailable. On mobile the map
 appears first, followed by the tabbed analysis and selected-zone details.
 
+The street map uses the manifest's goplex.ee Protomaps global fallback and displays
+its provider credit. An explicit user or appropriate local/regional web basemap
+takes precedence; change `presentation.map.basemap` to select one. The QGIS
+companion retains its OpenStreetMap XYZ background.
+
 `dashboard-template.html` is the editable presentation source; `pipeline.py` embeds only approved derived
 properties and snapshot metadata. Rerun the pipeline after editing either file. The template is included
 in the run's input inventory and clean-rerun dependencies.

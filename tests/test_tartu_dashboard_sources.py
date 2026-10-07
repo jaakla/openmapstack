@@ -6,12 +6,16 @@ import re
 import tempfile
 from pathlib import Path
 
+import yaml
+
+from openmapstack.integrity import declared_input_paths, sha256_file
+
 
 DASHBOARD = Path(__file__).resolve().parents[1] / "examples/tartu-development/dashboard.html"
 VENDOR = DASHBOARD.parents[2] / "evals/fixtures/vendor/maplibre-gl-3.6.2"
 
 
-def route_basemap(page):
+def route_basemap(page, *, source_id="candidates", layer_id="pois"):
     """Real MapLibre renderer with deterministic, offline provider responses."""
     seen = []
     script = (VENDOR / "maplibre-gl.js").read_text() + """
@@ -33,13 +37,13 @@ maplibregl.Map = class extends TestMap {
         seen.append(url)
         if "/styles/" in url or url.endswith("/style.json"):
             dark = url.endswith("/dark.json")
-            body = {"version": 8, "sources": {"candidates": {
+            body = {"version": 8, "sources": {source_id: {
                 "type": "vector", "tiles": ["https://custom.example/tiles/{z}/{x}/{y}.mvt" if "custom.example" in url
                                             else "https://tiles.goplex.ee/planet-20261006/{z}/{x}/{y}.mvt"]}},
                 "layers": [{"id": "background", "type": "background",
                             "paint": {"background-color": "#222222" if dark else "#eeeeee"}},
-                           {"id": "land", "type": "fill", "source": "candidates", "source-layer": "land"},
-                           {"id": "pois", "type": "fill", "source": "candidates", "source-layer": "land"}]}
+                           {"id": "land", "type": "fill", "source": source_id, "source-layer": "land"},
+                           {"id": layer_id, "type": "fill", "source": source_id, "source-layer": "land"}]}
         elif url.endswith(".json"):
             body = {"tilejson": "3.0.0", "tiles": ["https://tiles.goplex.ee/planet-20261006/{z}/{x}/{y}.mvt"],
                     "minzoom": 0, "maxzoom": 15}
@@ -57,6 +61,15 @@ maplibregl.Map = class extends TestMap {
 
 
 class TartuDashboardSourceTests(unittest.TestCase):
+    def test_template_is_declared_and_attested_as_a_run_input(self):
+        root = DASHBOARD.parent
+        project = yaml.safe_load((root / "project.yaml").read_text())
+        template = project["presentation"]["dashboard"]["template"]
+        self.assertIn(template, declared_input_paths(root, project))
+        record = json.loads((root / project["runs"]["latest"]["record"]["path"]).read_text())
+        inventory = {entry["path"]: entry["sha256"] for entry in record["inputs"]}
+        self.assertEqual(inventory[template], sha256_file(root / template))
+
     def test_layer_switches_and_basemap_show_their_sources(self):
         try:
             from playwright.sync_api import Error, sync_playwright

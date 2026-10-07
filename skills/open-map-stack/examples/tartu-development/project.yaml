@@ -6,7 +6,7 @@ project:
     walking distance to city-owned kindergarten and school), and land-use criteria in Tartu, and show
     them on an interactive map with education POIs and catchment areas.
   created_at: 2026-08-25 08:15:03+03:00
-  updated_at: '2026-10-07T20:57:55.871187+00:00'
+  updated_at: '2026-10-07T21:30:48.681033+00:00'
   status: warning
 interpretation:
   objective: Find cadastral parcels in Tartu satisfying stated land-use, minimum size (>= 2 ha), primary
@@ -434,6 +434,8 @@ validation:
   - name: education_ownership_check
     expression: ownership = 'municipal' AND active = true
 presentation:
+  dashboard:
+    template: dashboard-template.html
   intent: analytical_workspace
   primary_view: map
   layout:
@@ -744,6 +746,7 @@ runtime:
     preferred_engine: duckdb-spatial
     pipeline: pipeline.py
     dependencies:
+    - dashboard-template.html
     - routing.py
     - requirements.txt
   environment:
@@ -756,13 +759,13 @@ runtime:
     osmium: 4.3.1
 runs:
   latest:
-    id: run-20261007-205708
-    started_at: '2026-10-07T20:57:08.903422+00:00'
-    completed_at: '2026-10-07T20:57:55.871187+00:00'
+    id: run-20261007-213001
+    started_at: '2026-10-07T21:30:01.637687+00:00'
+    completed_at: '2026-10-07T21:30:48.681033+00:00'
     status: warning
-    inputs_hash: sha256:7435c51d236ac5cf68937d5a5709783f37df117a38e5df76d5acb728a5e90f1c
+    inputs_hash: sha256:31afbadea684dbfdd4d0f5cf3c59709fb0220c3f59bdc0e861058d993998096a
     outputs_hash: sha256:9a7dc21e8e6ab6efb2d739cdc0f73e25aeca0a6e07db6c60dc22dc1197c3ba22
     record:
-      path: runs/run-20261007-205708.json
+      path: runs/run-20261007-213001.json
     validation_report:
       path: validation/latest-report.json

@@ -4,6 +4,10 @@ A reproducible `openmapstack-project/v1` project that screens land near main
 roads against **25-minute pedestrian-network catchments** of municipal schools
 and kindergartens. `project.yaml` defines the analysis; `pipeline.py` produces
 the datasets, QGIS project, dashboard, validation report and run evidence.
+`dashboard-template.html` is the editable HTML/JS presentation source. The pipeline
+embeds the project metadata and derived data into it to generate `dashboard.html`.
+Rerun the pipeline after editing the template; it is a declared input included in
+the run's input inventory and hash.
 
 ## Run
 

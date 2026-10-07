@@ -6,7 +6,7 @@ project:
     fleet and hub coverage and account demand, and show ranked candidate zones on an interactive map while
     respecting all database access restrictions.
   created_at: '2026-09-17T00:00:00Z'
-  updated_at: '2026-09-28T20:54:12.330626+00:00'
+  updated_at: '2026-10-07T21:30:39.607552+00:00'
   status: validated
 interpretation:
   objective: Rank NYC H3 resolution-8 cells for tenant alpha using pinned read-only captures of the provisioned
@@ -554,14 +554,14 @@ validation:
     expression: trips_total >= 30 AND hub_distance_m >= 1500 AND fleet_present <= 6
 runs:
   latest:
-    id: run-20260928-205412
-    started_at: '2026-09-28T20:54:11.774888+00:00'
-    completed_at: '2026-09-28T20:54:12.330626+00:00'
+    id: run-20261007-213039
+    started_at: '2026-10-07T21:30:39.057949+00:00'
+    completed_at: '2026-10-07T21:30:39.607552+00:00'
     status: passed
-    inputs_hash: sha256:7f7b6a7a3138ddae6e4c117b5149d9858b22d2407a52e3b0deb8aea7ca62f727
-    outputs_hash: sha256:772c13d70ef74567ec4b6158f1fcb728cd495c8085c11786abca8e320d3eb42e
+    inputs_hash: sha256:a43967d81b80612ae657e866ea3fad0f90e4c8c3dceb54970260bdcdc8a665cb
+    outputs_hash: sha256:cd9d6178850c18be68560c20107a0637e01d05bfa94ce917feca9bfd20476ed6
     record:
-      path: runs/run-20260928-205412.json
+      path: runs/run-20261007-213039.json
     validation_report:
       path: validation/latest-report.json
 runtime:
@@ -631,10 +631,12 @@ presentation:
       reuse historical 2016 TLC taxi pickup coordinates; the point layer is not live tracking.
   map:
     basemap:
-      id: cartodb-positron
+      id: goplex-protomaps
       kind: vector-style
-      url: https://basemaps.cartocdn.com/gl/positron-gl-style/style.json
-      attribution: © OpenStreetMap contributors © CARTO
+      url: https://tiles.goplex.ee/styles/5.7.2/white.json
+      dark_url: https://tiles.goplex.ee/styles/5.7.2/dark.json
+      tilejson: https://tiles.goplex.ee/planet-20261006.json
+      attribution: © OpenStreetMap contributors, Protomaps tiles by goplex.ee
       default_visible: true
     layers:
     - source: hub_candidates_geojson

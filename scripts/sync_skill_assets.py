@@ -8,7 +8,7 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-EXAMPLE_FILES = ("README.md", "project.yaml", "pipeline.py", "routing.py", "requirements.txt", "run_e2e.py", "data/overrides/planned-road.geojson")
+EXAMPLE_FILES = ("README.md", "project.yaml", "pipeline.py", "dashboard-template.html", "routing.py", "requirements.txt", "run_e2e.py", "data/overrides/planned-road.geojson")
 NOTES = """# Installed example contents
 
 Generated maps, QGIS archives, source downloads, derived data, validation
