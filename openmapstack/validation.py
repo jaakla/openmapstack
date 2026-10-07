@@ -474,6 +474,10 @@ class _Validator:
                     layer_errors.append(f"layer {index} references unknown group {layer.get('group')!r}")
         else:
             layer_errors.append("map.layers must be a list")
+        if get_in(presentation, "controls", "views") is not None:
+            # Renamed before any release, so no alias: an unread key would
+            # silently drop the variant checks.
+            layer_errors.append("presentation.controls.views was renamed to presentation.controls.variants")
         if missing or layer_errors:
             self.add("presentation.declaration", "failed", "; ".join(([f"missing {missing}"] if missing else []) + layer_errors), path="presentation")
         else:

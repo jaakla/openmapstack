@@ -54,6 +54,14 @@ class OpenMapStackCliTests(unittest.TestCase):
         self.assertEqual(result.status, "passed", [check.to_dict() for check in result.checks])
         self.assertTrue(result.ok())
 
+    def test_renamed_variant_key_fails_the_presentation_declaration(self) -> None:
+        project = valid_manifest()
+        project["presentation"]["controls"] = {"views": [{"id": "mode", "options": ["walk", "bike"], "canonical": "walk"}]}
+        result = validate_project(self.write_project(project))
+        check = next(c for c in result.checks if c.id == "presentation.declaration")
+        self.assertEqual(check.status, "failed")
+        self.assertIn("presentation.controls.variants", check.message)
+
     # ---- qgis.layer_crs -------------------------------------------------
     # A layer with no <srs> is assumed to be in the project CRS and never
     # reprojected, so a Web Mercator basemap in an EPSG:3301 project draws

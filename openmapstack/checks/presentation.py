@@ -81,35 +81,38 @@ def controls_match_pipeline(workspace: Path, project_dir: str = ".") -> Assertio
                 f"control {f.get('id')} canonical value(s) {absent!r} not found in matching step expression(s)"
             )
 
-    # View switches between variants the pipeline already measured (travel
-    # mode, analysis year, metric). They change which precomputed columns the
-    # view shows, never the analysis, so they reference outputs, not overrides.
+    # Variant switches choose between results the pipeline already measured
+    # (travel mode, analysis year, metric). They change which precomputed
+    # columns the view shows, never the analysis, so they reference outputs,
+    # not overrides.
+    if get_in(proj, "presentation.controls.views") is not None:
+        errors.append("presentation.controls.views was renamed to presentation.controls.variants")
     outputs = proj.get("outputs") or {}
-    views = get_in(proj, "presentation.controls.views", []) or []
-    for v in views:
+    variants = get_in(proj, "presentation.controls.variants", []) or []
+    for v in variants:
         options = v.get("options") or []
         if not options or len(set(map(str, options))) != len(options):
-            errors.append(f"view {v.get('id')} needs a non-empty list of distinct options")
+            errors.append(f"variant {v.get('id')} needs a non-empty list of distinct options")
             continue
         if v.get("canonical") not in options:
-            errors.append(f"view {v.get('id')} canonical {v.get('canonical')!r} is not one of its options")
+            errors.append(f"variant {v.get('id')} canonical {v.get('canonical')!r} is not one of its options")
         fields = v.get("fields") or {}
         output = outputs.get(v.get("output")) if v.get("output") else None
         if fields and v.get("output") and not isinstance(output, dict):
-            errors.append(f"view {v.get('id')} references unknown output {v.get('output')!r}")
+            errors.append(f"variant {v.get('id')} references unknown output {v.get('output')!r}")
             continue
         declared = {c.get("name") if isinstance(c, dict) else c for c in get_in(output or {}, "table.columns", []) or []}
         for option in options:
             if fields and str(option) not in {str(k) for k in fields}:
-                errors.append(f"view {v.get('id')} option {option!r} has no fields mapping")
+                errors.append(f"variant {v.get('id')} option {option!r} has no fields mapping")
             for column in (fields.get(option) or fields.get(str(option)) or []) if fields else []:
                 if declared and column not in declared:
-                    errors.append(f"view {v.get('id')} option {option!r} shows undeclared column {column!r}")
+                    errors.append(f"variant {v.get('id')} option {option!r} shows undeclared column {column!r}")
 
     if errors:
         return failed("; ".join(errors), errors=errors, code="control_pipeline_drift")
-    if views:
-        return passed(f"{len(filters)} filter control(s), {len(scenarios)} scenario control(s) and {len(views)} view control(s) consistent")
+    if variants:
+        return passed(f"{len(filters)} filter control(s), {len(scenarios)} scenario control(s) and {len(variants)} variant control(s) consistent")
     return passed(f"{len(filters)} filter control(s) and {len(scenarios)} scenario control(s) consistent")
 
 

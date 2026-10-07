@@ -59,7 +59,7 @@ presentation:
       #   override: OVERRIDE-001   # the override this switch turns on and off
       #   canonical: true
       #   baseline_fields: [dist_b_baseline_m]   # measured without the override
-    views:
+    variants:
       # A switch between precomputed variants that is not an override
       # (travel mode, analysis year). See project-spec.md s.3.
       # - id: travel_mode

@@ -390,14 +390,15 @@ class TableOutputGuidanceTests(GuidanceCase):
                 self.assertShips(text, "Tables are outputs too.", path)
                 self.assertShips(text, "`downloads: [csv, xlsx]`", path)
 
-    def test_the_contract_defines_tables_downloads_and_views(self) -> None:
+    def test_the_contract_defines_tables_downloads_and_variants(self) -> None:
         for path, text in _shipped_copies("project-spec.md").items():
             with self.subTest(path=path):
                 self.assertShips(text, "#### Non-spatial table outputs", path)
                 self.assertShips(text, "### Tabular results", path)
                 self.assertShips(text, "Only a declared `kind` changes how an output is checked.", path)
                 self.assertShips(text, "Never generate a\n  download in the browser", path)
-                self.assertShips(text, "**Views switch between precomputed variants.**", path)
+                self.assertShips(text, "**Variants switch between precomputed results.**", path)
+                self.assertShips(text, "`presentation.controls.variants`", path)
 
     def test_every_template_copy_scaffolds_tables(self) -> None:
         for path in [REPO_ROOT / "templates", *sorted(SKILLS_ROOT.glob("*/templates"))]:

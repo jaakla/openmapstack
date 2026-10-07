@@ -934,15 +934,15 @@ Four rules keep a reconfigurable view honest:
   (`dist_kg_m` / `dist_kg_baseline_m`) and let the control choose. Never approximate
   the counterfactual, and never let switching an override off imply the source data
   changed.
-* **Views switch between precomputed variants.** A switch that only chooses which
+* **Variants switch between precomputed results.** A switch that only chooses which
   measured columns to show (travel mode, analysis year, a second metric) is not an
-  override. Declare it under `presentation.controls.views` with its `options`, the
+  override. Declare it under `presentation.controls.variants` with its `options`, the
   `canonical` option the view opens at, and, when it addresses a table output, the
   columns each option shows:
 
   ```yaml
   controls:
-    views:
+    variants:
       - id: travel_mode
         label: Travel mode
         options: [walk, bike]
