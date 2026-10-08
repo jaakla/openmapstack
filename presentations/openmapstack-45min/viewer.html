@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="description" content="OpenMapStack: 45 minuti demo ja esitlus GIS-ekspertidele eesti ja inglise keeles.">
+<title>OpenMapStack — korratav kaardianalüüs · 45 min</title>
+<style>__STYLES__</style>
+</head>
+<body>
+<div id="app">
+  <main id="stage" aria-label="Esitluse slaid"></main>
+  <footer aria-label="Esitluse juhtnupud">
+    <span class="brand">OpenMapStack</span><div class="language-switch" role="group" aria-label="Esitluse keel"><button class="btn language-button" data-language="et" aria-label="Eesti" aria-pressed="true">ET</button><button class="btn language-button" data-language="en" aria-label="English" aria-pressed="false">EN</button></div><span class="meta" id="timing"></span>
+    <div class="nav-center"><button class="btn quiet back-label" id="previous" aria-label="Eelmine slaid">←</button><span class="counter" id="counter"></span><button class="btn" id="choose">Vali slaid</button></div>
+    <div class="nav-right"><button class="btn quiet notes-toggle" id="notes-toggle" aria-label="Näita esinejamärkmeid" aria-expanded="false">Märkmed</button><button class="btn quiet fullscreen-label" id="fullscreen" data-compact-label="Täisekraan" aria-label="Lülita täisekraan">Täisekraan</button><button class="btn primary" id="next">Edasi →</button></div>
+  </footer>
+</div>
+<div class="progress" id="progress" aria-hidden="true"></div>
+<div class="live" id="announcement" aria-live="polite"></div>
+<dialog id="chooser" aria-labelledby="chooser-title"><div class="dialog-head"><div><h2 id="chooser-title">Vali slaid</h2><p class="caption">24 slaidi · 45 minutit · ← → liikumiseks · N märkmeteks · F täisekraaniks</p></div><button class="btn quiet" data-close="chooser" aria-label="Sulge slaidivalik">✕</button></div><ol class="chooser-list" id="chooser-list"></ol></dialog>
+<aside class="notes-panel" id="notes" aria-label="Esinejamärkmed" hidden><div class="dialog-head"><h3>Esinejamärkmed</h3><button class="btn quiet" id="close-notes" aria-label="Sulge märkmed">✕</button></div><div id="notes-body"></div></aside>
+<dialog class="lightbox" id="lightbox" aria-labelledby="lightbox-title"><div class="dialog-head"><p id="lightbox-title"></p><button class="btn" data-close="lightbox" aria-label="Sulge ekraanipilt">Sulge</button></div><img id="lightbox-img" alt=""></dialog>
+<div id="toast" class="toast" role="status" hidden></div>
+<script>__APP__</script>
+</body>
+</html>
