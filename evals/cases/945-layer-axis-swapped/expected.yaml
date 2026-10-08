@@ -1,0 +1,29 @@
+id: 945-layer-axis-swapped
+case_type: mutation
+modes: [fixture]
+score_types: {fixture: mutation_tests}
+project_dir: project
+hard_gate: true
+fixture:
+  generator: "{python} {evals_dir}/fixtures/reference_pipeline/gen_spatial.py {project_dir} --scenario=extent --break=axis-swapped"
+  source_baseline:
+    - {source: ../../fixtures/spatial-scenarios/crs/parcels-3301.geojson, destination: data/source/parcels-3301.geojson}
+    - {source: ../../fixtures/spatial-scenarios/crs/road-4326.geojson, destination: data/source/road-4326.geojson}
+    - {source: ../../fixtures/spatial-scenarios/crs/road-3301.geojson, destination: data/source/road-3301.geojson}
+mutation:
+  control_generator: "{python} {evals_dir}/fixtures/reference_pipeline/gen_spatial.py {project_dir} --scenario=extent"
+
+# Valid geometry and a correct EPSG:4326 label, but every road position is
+# [lat, lon]. Legal ranges and the CRS label pass; only the AOI exposes it.
+assertions:
+  - assert: project.conforms_to_schema
+  - assert: project.graph_resolves
+  - assert: validation.run_record_matches
+  - assert: geodata.layer_extent_within_aoi
+    args: {path: data/derived/candidates.parquet}
+  - assert: geodata.layer_extent_within_aoi
+    args: {path: data/derived/road.geojson}
+    expect: failed
+    expect_code: axis_swap_suspected
+  - assert: geodata.layer_extent_within_aoi
+    args: {path: data/derived/parcels.geojson}

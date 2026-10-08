@@ -32,13 +32,16 @@ from .checks import geodata as geodata_checks
 from .checks import metamorphic as metamorphic_checks
 from .checks import overrides as overrides_checks
 from .checks import presentation as presentation_checks
+from .checks import delivery as delivery_checks
+from .checks import integration as integration_checks
+from .checks import visual as visual_checks
+from . import delivery
 from .checks import project as project_checks
 from .checks import provenance as provenance_checks
 from .checks import qgis as qgis_checks
 from .checks import rerun as rerun_checks
 from .checks import tables as table_checks
 from .checks import validation as validation_checks
-from .checks import visual as visual_checks
 from .expectations import evaluate_expectation
 from .project import get_in, load_project
 from .rerun import perform_clean_rerun
@@ -288,6 +291,7 @@ def verify_project(
             )
 
     # -- geodata: read the produced files, do not trust what the manifest says
+    outputs_spec = manifest.get("outputs") if isinstance(manifest.get("outputs"), dict) else {}
     _run(runs, "geodata.crs_not_used_for_metrics", geodata_checks.crs_not_used_for_metrics, root)
     for name, path, epsg in _declared_output_paths(manifest):
         if Path(path).suffix.lower() not in GEODATA_SUFFIXES:
@@ -318,9 +322,12 @@ def verify_project(
                     {"path": path},
                 )
             )
+        # A declared AOI places every local layer; global layers are exempt.
+        spec = outputs_spec.get(name) if isinstance(outputs_spec.get(name), dict) else {}
+        if isinstance(get_in(manifest, "project", "aoi"), dict) and spec.get("extent") != "global":
+            _run(runs, "geodata.layer_extent_within_aoi", geodata_checks.layer_extent_within_aoi, root, path=path)
 
     # -- tables: non-spatial outputs are read back as tables, never as geodata
-    outputs_spec = manifest.get("outputs") if isinstance(manifest.get("outputs"), dict) else {}
     for name, path, _ in _declared_output_paths(manifest, kind="table"):
         spec = outputs_spec.get(name) or {}
         table = spec.get("table") if isinstance(spec.get("table"), dict) else {}
@@ -332,16 +339,43 @@ def verify_project(
         if spec.get("downloads"):
             _run(runs, "tables.downloads_consistent", table_checks.downloads_consistent, root, path=path, formats=spec.get("downloads"))
 
+    if "integrations" in manifest:
+        _run(runs, "integration.bindings_valid", integration_checks.bindings_valid, root)
+        _run(runs, "integration.evidence_matches", integration_checks.evidence_matches, root)
+
     # -- presentation and QGIS: the product matches what the manifest claims
+    selected_targets = []
+    if "delivery" in manifest:
+        _run(runs, "delivery.declaration_valid", delivery_checks.declaration_valid, root)
+        if runs[-1].result.status == "passed":
+            selected_targets = delivery.targets(manifest)
+        _run(runs, "presentation.layers_reference_outputs", presentation_checks.layers_reference_outputs, root)
+        for target in selected_targets:
+            tid = target.get("id")
+            if not isinstance(tid, str):
+                continue
+            _run(runs, f"delivery.{tid}.evidence_matches", delivery_checks.evidence_matches, root, target_id=tid)
+            if target.get("kind") in {"dashboard", "observable"}:
+                _run(runs, f"delivery.{tid}.web_view_loads", delivery_checks.web_view_loads, root, target_id=tid)
     if get_in(manifest, "presentation", "tables"):
         _run(runs, "presentation.tables_reference_table_outputs", presentation_checks.tables_reference_table_outputs, root)
-        _run(runs, "presentation.table_downloads_linked", presentation_checks.table_downloads_linked, root)
+        if "delivery" not in manifest:
+            _run(runs, "presentation.table_downloads_linked", presentation_checks.table_downloads_linked, root)
+        else:
+            for target in selected_targets:
+                if target.get("kind") in {"dashboard", "observable"}:
+                    page = get_in(manifest, "outputs", target.get("output"), "path")
+                    if isinstance(page, str):
+                        _run(runs, f"delivery.{target['id']}.table_downloads_linked",
+                             presentation_checks.table_downloads_linked, root, dashboard=page,
+                             allow_identical_copies=target.get("kind") == "observable")
     for name, fn in (
         ("layers_use_semantic_roles", presentation_checks.layers_use_semantic_roles),
         ("controls_match_pipeline", presentation_checks.controls_match_pipeline),
         ("edit_targets_reference_real_sources", presentation_checks.edit_targets_reference_real_sources),
     ):
-        _run(runs, f"presentation.{name}", fn, root)
+        if "delivery" not in manifest or name != "layers_use_semantic_roles" or get_in(manifest, "presentation", "map"):
+            _run(runs, f"presentation.{name}", fn, root)
     # The browser check runs for projects that opt into a design-language
     # version (ADR 0007); without a browser it is not_testable, never passed.
     language = get_in(manifest, "presentation", "design_language")
@@ -351,7 +385,13 @@ def verify_project(
         runs.append(CheckRun("visual.dashboard_loads_in_browser", failed(
             f"presentation.design_language {language!r} is not a known version "
             f"{sorted(presentation_checks.DESIGN_LANGUAGES)}", code="design_language_unknown"), {}))
-    if (root / "project.qgz").is_file():
+    qgis_targets = [("qgis", "project.qgz")] if "delivery" not in manifest and (root / "project.qgz").is_file() else []
+    for target in selected_targets:
+        if target.get("kind") == "qgis":
+            path = get_in(manifest, "outputs", target.get("output"), "path")
+            if isinstance(path, str):
+                qgis_targets.append((f"delivery.{target['id']}.qgis", path))
+    for prefix, path in qgis_targets:
         for name, fn in (
             ("static_valid", qgis_checks.static_valid),
             ("datasources_portable", qgis_checks.datasources_portable),
@@ -363,7 +403,14 @@ def verify_project(
             ("layers_match_manifest", qgis_checks.layers_match_manifest),
             ("every_declared_layer_renders", qgis_checks.every_declared_layer_renders),
         ):
-            _run(runs, f"qgis.{name}", fn, root)
+            _run(runs, f"{prefix}.{name}", fn, root, **({"path": path} if prefix != "qgis" else {}))
+    if language not in presentation_checks.DESIGN_LANGUAGES and "delivery" in manifest and get_in(manifest, "presentation", "primary_view") == "map":
+        for target in selected_targets:
+            if target.get("kind") == "dashboard":
+                path = get_in(manifest, "outputs", target.get("output"), "path")
+                if isinstance(path, str):
+                    _run(runs, f"delivery.{target['id']}.dashboard_loads_in_browser",
+                         visual_checks.dashboard_loads_in_browser, root, dashboard=path)
 
     # -- metamorphic relations: declared invariants under controlled perturbation
     relations = get_in(manifest, "validation", "metamorphic")

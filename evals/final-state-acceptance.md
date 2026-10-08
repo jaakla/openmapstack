@@ -2,11 +2,11 @@
 
 Status: **live-trial gates closed by the maintainer on 2026-09-26; the map-layer source contract is
 deferred to #67; packaging and hosted visual checks refreshed; live-dashboard gaps explicitly
-deferred to #69 and publication authorized**. See the [final preparation review](../docs/release-0.4.0-final.md)
+deferred to #69 and publication authorized**. See the [final preparation review](https://github.com/jaakla/openmapstack-skills/blob/v0.4.0/docs/release-0.4.0-final.md)
 for current evidence. This file records OpenMapStack's
 release gate. Live trials used this repository's runner with the sandboxed Claude Code adapter ([ADR 0006](../docs/maintainers/decisions/0006-release-trials-in-repository-sandbox.md)).
 The OpenMapBench trials below remain supporting evidence; generic benchmarking continues there.
-Historical routing results remain in [the release record](../docs/release-0.4.0.md).
+Historical routing results remain in [the release record](https://github.com/jaakla/openmapstack-skills/blob/v0.4.0/docs/release-0.4.0.md).
 
 ## Historical candidate and benchmark (September 23)
 
@@ -444,7 +444,7 @@ the routing cases; review outcomes and actual execution separately as below.
 - **Deferred comparison:** the maintainer explicitly moved the next plain-versus-skill comparison
   after 0.4.0. Run such comparisons occasionally with a separately agreed model and budget, not
   after small changes. Existing unscorable arms are not valid comparative evidence.
-- **Reviews completed with limits:** the [final review](../docs/release-0.4.0-final.md) assesses the
+- **Reviews completed with limits:** the [final review](https://github.com/jaakla/openmapstack-skills/blob/v0.4.0/docs/release-0.4.0-final.md) assesses the
   compilation scaffold against its actual prompt and the four companion contexts against a
   validated control and pinned external text. Neither review claims executed compilation or
   observed live companion behavior; those evidence gaps remain visible under live-gate closure.
@@ -458,7 +458,7 @@ the routing cases; review outcomes and actual execution separately as below.
   it and authorized publication on September 26; never record these checks as passed.
 - **Publication authorized:** commit the reconciled evidence, confirm
   CI on the final revision, publish through the release workflow, and verify the actual tag and
-  PyPI installation. [Final preparation](../docs/release-0.4.0-final.md) distinguishes prepublication
+  PyPI installation. [Final preparation](https://github.com/jaakla/openmapstack-skills/blob/v0.4.0/docs/release-0.4.0-final.md) distinguishes prepublication
   artifact hashes from the distributions the publishing workflow will build.
 
 OpenMapBench #2 remains open for generic live comparison, provider/telemetry parity and historical

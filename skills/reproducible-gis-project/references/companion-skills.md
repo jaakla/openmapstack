@@ -1,5 +1,9 @@
 # Optional product companions
 
+For selected existing tools and runnable dlt/Dagster/dbt/Observable/QGIS examples,
+see `established-stack.md`. Keep one owner per transformation/dependency;
+optional tool runtimes are required only for selected integration work.
+
 Use focused product expertise when it helps the requested work. Check the
 installed skills first; do not assume this table means a companion is installed.
 The entries below were checked on **2026-09-14**. Recheck the source and actual

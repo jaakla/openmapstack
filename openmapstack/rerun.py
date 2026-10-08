@@ -359,6 +359,19 @@ def perform_clean_rerun(
             _write_clean_rerun_evidence(rerun_root, evidence)
             return evidence
 
+        evidence["stage"] = "delivery_integrity"
+        rebuilt = yaml.safe_load((rerun_root / "project.yaml").read_text(encoding="utf-8"))
+        if not isinstance(rebuilt, dict) or rebuilt.get("delivery") != _project.get("delivery"):
+            evidence["error"] = "canonical entrypoint changed delivery selection during rerun"
+            _write_clean_rerun_evidence(rerun_root, evidence)
+            return evidence
+
+        evidence["stage"] = "integration_integrity"
+        if rebuilt.get("integrations") != _project.get("integrations"):
+            evidence["error"] = "canonical entrypoint changed integration ownership during rerun"
+            _write_clean_rerun_evidence(rerun_root, evidence)
+            return evidence
+
         evidence["stage"] = "artifact_validation"
         validation = validate_project(rerun_root / "project.yaml", artifacts=True)
         evidence["artifact_validation"] = validation.to_dict()

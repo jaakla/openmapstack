@@ -11,6 +11,10 @@ from typing import Any, Iterable
 
 from .checks import project as project_checks
 from .checks import qgis as qgis_checks
+from .checks import delivery as delivery_checks
+from .checks import integration as integration_checks
+from .checks import presentation as presentation_checks
+from . import delivery
 from .integrity import (
     canonical_file_set_hash,
     declared_input_paths,
@@ -20,7 +24,7 @@ from .integrity import (
 )
 from .project import ProjectError, get_in, load_json, load_project, project_path, step_outputs
 from .sampling import run_mode, run_record_errors
-from .schema import project_schema_errors
+from .schema import assumptions_errors, project_schema_errors
 from .sources import assess_pin, connection_reference_error, find_inline_credentials
 
 SCHEMA = "openmapstack-project/v1"
@@ -150,6 +154,8 @@ class _Validator:
         self._sources()
         self._overrides()
         self._processing_and_outputs()
+        self._delivery()
+        self._integrations()
         self._presentation()
         self._views()
         self._warnings()
@@ -206,27 +212,19 @@ class _Validator:
             self.add("interpretation.objective", "failed", "interpretation.objective is required", path="interpretation.objective")
             return
         assumptions = interpretation.get("assumptions")
-        if not isinstance(assumptions, list) or not assumptions:
+        errors = assumptions_errors(assumptions)
+        if errors:
+            self.add("interpretation.assumptions", "failed", "; ".join(errors), path="interpretation.assumptions")
+            return
+        if not assumptions:
             self.add("interpretation.assumptions", "warning", "no assumptions are documented", path="interpretation.assumptions")
             return
         bad: list[str] = []
-        ids: list[str] = []
-        for index, assumption in enumerate(assumptions):
-            if not isinstance(assumption, dict):
-                bad.append(str(index))
-                continue
-            aid = str(assumption.get("id", index))
-            ids.append(aid)
-            if not _present(assumption.get("id")) or not _present(assumption.get("statement")) or not _present(assumption.get("rationale")):
-                bad.append(aid)
-        duplicates = _duplicates(ids)
-        if bad or duplicates:
-            message = []
-            if bad:
-                message.append(f"missing id/statement/rationale: {bad}")
-            if duplicates:
-                message.append(f"duplicate ids: {duplicates}")
-            self.add("interpretation.assumptions", "failed", "; ".join(message), path="interpretation.assumptions")
+        for assumption in assumptions:
+            if any(not _present(assumption[key]) for key in ("id", "statement", "rationale")):
+                bad.append(assumption["id"])
+        if bad:
+            self.add("interpretation.assumptions", "failed", f"missing id/statement/rationale: {bad}", path="interpretation.assumptions")
         else:
             self.add("interpretation.assumptions", "passed", f"{len(assumptions)} assumptions have rationale", path="interpretation.assumptions")
 
@@ -459,7 +457,15 @@ class _Validator:
         if not isinstance(presentation, dict):
             self.add("presentation.declaration", "failed", "presentation must be a mapping", path="presentation")
             return
-        missing = [key for key in ("intent", "primary_view", "layout", "map", "provenance_ui") if not _present(presentation.get(key))]
+        required = ["intent", "primary_view"]
+        if "delivery" not in self.project:
+            required += ["layout", "map", "provenance_ui"]
+        else:
+            if presentation.get("primary_view") == "map":
+                required.append("map")
+            if delivery.selected(self.project, "dashboard"):
+                required += ["layout", "provenance_ui"]
+        missing = [key for key in required if not _present(presentation.get(key))]
         layers = get_in(presentation, "map", "layers", default=[])
         groups = get_in(presentation, "map", "layer_groups", default=[])
         group_ids = {str(group.get("id")) for group in groups if isinstance(group, dict) and _present(group.get("id"))} if isinstance(groups, list) else set()
@@ -483,6 +489,28 @@ class _Validator:
             self.add("presentation.declaration", "failed", "; ".join(([f"missing {missing}"] if missing else []) + layer_errors), path="presentation")
         else:
             self.add("presentation.declaration", "passed", f"semantic presentation declares {len(layers)} layers", path="presentation")
+        if "delivery" in self.project:
+            result = presentation_checks.layers_reference_outputs(self.root)
+            self.add("presentation.layers_reference_outputs", result.status, result.detail, **result.data)
+
+    def _integrations(self) -> None:
+        if "integrations" not in self.project:
+            return
+        result = integration_checks.bindings_valid(self.root)
+        self.add("integration.bindings", result.status, result.detail, **result.data)
+        if self.artifacts and result.status == "passed":
+            result = integration_checks.evidence_matches(self.root)
+            self.add("integration.evidence", result.status, result.detail, **result.data)
+
+    def _delivery(self) -> None:
+        if "delivery" not in self.project:
+            return
+        result = delivery_checks.declaration_valid(self.root)
+        self.add("delivery.declaration", result.status, result.detail, path="delivery", **result.data)
+        if self.artifacts and result.status == "passed":
+            for target in delivery.targets(self.project):
+                evidence = delivery_checks.evidence_matches(self.root, target["id"])
+                self.add(f"delivery.{target['id']}.evidence", evidence.status, evidence.detail, **evidence.data)
 
     def _views(self) -> None:
         """Top-level ``views:`` names the project's pages (ADR 0007)."""
@@ -519,7 +547,9 @@ class _Validator:
             if view.get("presentation") is not None and not isinstance(view.get("presentation"), dict):
                 errors.append(f"view {view.get('id')!r} presentation must be a mapping")
             elif isinstance(view.get("presentation"), dict):
-                # The schema checks top-level controls; a page's own are checked here.
+                effective = {**(self.project.get("presentation") or {}), **view["presentation"]}
+                errors.extend(f"view {view.get('id')!r}: {error}" for error in
+                              presentation_checks.control_pipeline_errors(self.project, effective))
                 for control in declared_controls(view["presentation"]):
                     if control["effect"] not in CONTROL_EFFECTS:
                         errors.append(
@@ -701,7 +731,7 @@ class _Validator:
             self.add("project.readme", "warning", "README.md is missing", path="README.md")
         else:
             self.add("project.readme", "passed", "README.md exists", path="README.md")
-        if get_in(self.project, "presentation", "primary_view") == "map":
+        if "delivery" not in self.project and get_in(self.project, "presentation", "primary_view") == "map":
             if not (self.root / "project.qgz").is_file():
                 self.add("qgis.project", "warning", "map project has no project.qgz companion", path="project.qgz")
             else:
@@ -709,6 +739,22 @@ class _Validator:
                 self._qgis_layer_crs()
                 self._qgis_datasource_formats()
                 self._qgis_layer_crs_data()
+        elif "delivery" in self.project and not delivery.declaration_errors(self.project, self.root):
+            for target in delivery.targets(self.project):
+                if target.get("kind") != "qgis":
+                    continue
+                output = get_in(self.project, "outputs", target.get("output"), default={})
+                path = output.get("path") if isinstance(output, dict) else None
+                if project_path(self.root, path) is None:
+                    continue  # Declaration failure already records this.
+                for name, checker in (
+                    ("static_valid", qgis_checks.static_valid),
+                    ("every_layer_declares_crs", qgis_checks.every_layer_declares_crs),
+                    ("datasources_portable", qgis_checks.datasources_portable),
+                    ("layer_crs_matches_data", qgis_checks.layer_crs_matches_data),
+                ):
+                    result = checker(self.root, path=path)
+                    self.add(f"delivery.{target['id']}.qgis.{name}", result.status, result.detail, path=path, **result.data)
 
     def _runtime_parameters(self) -> None:
         """Delegates to ``verify``'s ``project.parameters_match_steps``.

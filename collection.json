@@ -22,7 +22,8 @@
         "validation-and-ops.md",
         "qgis.md",
         "installation.md",
-        "companion-skills.md"
+        "companion-skills.md",
+        "established-stack.md"
       ]
     },
     {
@@ -32,7 +33,8 @@
         "data-sources.md",
         "user-data-sources.md",
         "formats-and-crs.md",
-        "companion-skills.md"
+        "companion-skills.md",
+        "established-stack.md"
       ]
     },
     {
@@ -41,7 +43,8 @@
       "shared_references": [
         "spatial-sql.md",
         "formats-and-crs.md",
-        "companion-skills.md"
+        "companion-skills.md",
+        "established-stack.md"
       ]
     }
   ]

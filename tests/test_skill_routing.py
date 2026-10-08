@@ -10,8 +10,6 @@ fixture evals, which grade produced projects rather than the routing table.
 from __future__ import annotations
 
 import re
-import hashlib
-import json
 import unittest
 from pathlib import Path
 
@@ -24,43 +22,6 @@ UNROUTED_ALLOWED: dict[str, str] = {}
 
 def _routed_references(skill_text: str) -> set[str]:
     return set(re.findall(r"references/[A-Za-z0-9._-]+\.md", skill_text))
-
-
-# Intentional additions to the frozen project-workflow contract. Each needs
-# its own focused evidence: a guidance regression test plus the owning live case.
-WORKFLOW_ADDITIONS = (
-    # tests/test_guidance_regressions.py; live 001 semantic_predicate_documented.
-    ", zoning",
-    " Record every coded attribute the selection depends on as `selection.semantic_predicates`"
-    " (`field`, `domain_value`) on the source it filters, even when the source is local and"
-    " unfiltered on load; a free-text `selection.filter` does not document it.",
-    # tests/test_guidance_regressions.py native QGIS delivery guidance;
-    # tests/evals/test_qgis_assertions.py native CRS/relocation controls;
-    # live 001 qgis.runtime_load, static_valid and reproducibility checks.
-    "  * When PyQGIS is available, use `QgsProject.write(\"project.qgz\")` and check its return value."
-    " Reopen the saved project from another working directory and require a valid project CRS plus valid layers."
-    " Bare `data/...` strings in hand-written XML are not QGIS's serialized `./data/...` relative paths."
-    " The canonical pipeline must rebuild the QGIS companion on every run; a one-off export is insufficient.\n",
-    # tests/test_guidance_regressions.py CreditsHeaderGuidanceTests: delivered views
-    # credit the toolkit, the analysis time and the author.
-    '* **Credit the toolkit, the author and the run.** The provenance tab of a '
-    'dashboard, or the provenance section of a report, opens with a credits block in '
-    'the view\'s language: a "made with AI using the free OpenMapStack toolkit" '
-    'statement linked to https://github.com/jaakla/openmapstack-skills, the analysis '
-    'date and time with its UTC offset taken from `runs.latest.completed_at`, and '
-    "the author's name and email from `project.author` (email as a `mailto:` link, "
-    'plus the optional `url`). Take the author from the requesting user or their '
-    'version-control identity and ask when neither is known; never invent one. A '
-    'canonical rerun refreshes the timestamp. See `project-spec.md` section 3, '
-    'Credits header.\n',
-    # tests/test_tables.py and CreditsHeaderGuidanceTests' sibling TableOutputGuidanceTests:
-    # non-spatial results are declared table outputs with downloads.
-    '* **Tables are outputs too.** A non-spatial result (scenario comparison, cost '
-    'table, ranking) is declared with `kind: table`, its columns and `downloads: '
-    '[csv, xlsx]`; the pipeline writes every download format, and the view shows it '
-    'as a scrollable table that links those files. See `project-spec.md` section '
-    '2.5, Non-spatial table outputs, and section 3, Tabular results.\n',
-)
 
 
 class SkillRoutingTests(unittest.TestCase):
@@ -81,26 +42,19 @@ class SkillRoutingTests(unittest.TestCase):
         unrouted = sorted(self.references - _routed_references(self.skill) - set(UNROUTED_ALLOWED))
         self.assertEqual(unrouted, [], f"reference(s) nothing in SKILL.md points at: {unrouted}")
 
-    def test_project_workflow_preserves_the_frozen_contract_verbatim(self) -> None:
-        """#33 moves normative guidance; a lost requirement is a regression.
+    def test_delivery_workflow_preserves_core_guarantees_and_target_routing(self) -> None:
+        """#79 deliberately changes delivery; fixtures/live cases replace the #33 freeze.
 
-        This guards the initial lossless extraction, not future wording changes.
-        A later intentional behavior change must replace this migration guard
-        with its own focused eval evidence instead of silently updating the hash.
-        Intentional additions are listed in ``WORKFLOW_ADDITIONS`` with their
-        evidence and removed before hashing, so the frozen text itself still
-        cannot be lost or reworded.
+        The historical hash proved a lossless extraction only. Delivery cases
+        019–023 and mutations 934–939 now measure the changed contract. This
+        content check proves routing/invariant guidance ships, not live adherence.
         """
-        baseline = json.loads((REPO_ROOT / "evals/baselines/pre-refactor.json").read_text())
         reference = (SKILL_ROOT / "references/project-workflow.md").read_text()
-        body = reference.removeprefix("# Reproducible project-first workflow\n")
-        for addition in WORKFLOW_ADDITIONS:
-            self.assertIn(addition, body)
-            body = body.replace(addition, "", 1)
-        self.assertEqual(
-            "sha256:" + hashlib.sha256(body.encode()).hexdigest(),
-            baseline["skill"]["project_contract_body_sha256"],
-        )
+        for needle in ("openmapstack-delivery/v1", "built-in dashboard is the default",
+                       "Absence of `delivery` means legacy v1", "When QGIS is selected",
+                       "pinned sources", "deterministic ordered steps", "clean rerun",
+                       "canonical definition of the analysis"):
+            self.assertIn(needle, reference)
         self.assertIn("Before compiling or delivering a material analysis", self.skill)
         self.assertIn("references/project-workflow.md", self.skill)
         self.assertIn("references/project-spec.md", self.skill)

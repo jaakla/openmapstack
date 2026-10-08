@@ -107,6 +107,8 @@ add no visible markup.
   exactly one of these elements:
   - an `<input type="checkbox">`, `<input type="range">` or `<select>`, whose state is
     `checked` or `value`;
+    an indexed range adds `data-oms-values='[5,10,15]'` to map its integer
+    positions to analytical values from the manifest;
   - a `role="group"` or `role="radiogroup"` element whose option buttons carry
     `data-oms-value="<option>"` and `aria-pressed="true|false"`.
 
@@ -131,14 +133,19 @@ add no visible markup.
 With the version declared, `visual.dashboard_loads_in_browser` opens every page in
 `views:` and, for each declared control, checks that:
 
-- the control exists, on whichever tab it sits;
+- the control exists, on whichever tab it sits, and opens at its manifest
+  `canonical` value (the page state marker alone is insufficient);
 - changing it changes the page, and outside a `report` does not scroll the page;
 - an exploratory control shows the label and sets the page state;
-- the reset restores every control and the canonical state.
+- the reset restores every control and the canonical state, including after
+  several controls have changed together;
+- the page and its handlers produce no uncaught exceptions or console errors.
 
 Layer-group toggles must change the rendered map without scrolling the page. Every
 party the basemap attribution credits must be visible. On a 390-pixel-wide screen a
-page that declares a map shows it at least half the screen wide.
+page that declares a map shows it at least half the screen wide. An unreachable
+remote dependency makes that page untestable; confirmed failures on other pages
+still fail the project.
 
 ## 6. Adding a component
 

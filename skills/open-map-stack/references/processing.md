@@ -1,5 +1,9 @@
 # Processing Stack
 
+For selected existing tools and runnable dlt/Dagster/dbt/Observable/QGIS examples,
+see `established-stack.md`. Keep one owner per transformation/dependency;
+optional tool runtimes are required only for selected integration work.
+
 The actual mechanics of moving and transforming data: GDAL/OGR for the C-foundation, Python for orchestration and analysis, DuckDB and PostGIS for SQL-side compute, PDAL for point clouds.
 
 ## Choosing the right layer

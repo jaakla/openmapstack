@@ -41,6 +41,7 @@ Legend: ✅ covered · ⚠️ partially covered · ❌ not covered (tracked belo
 | Legitimate EPSG:4326 storage followed by projected metric analysis | 007 | — |
 | CRS/output-metadata mismatch | 007 (real 3301 coordinates vs declared CRS cross-checked) | 914 `crs-metadata-mismatch` (relabelled output CRS) |
 | Coordinate order at API/representation boundaries | 018 (same asymmetric named point in GeoJSON, MapLibre, Leaflet LatLng and Leaflet GeoJSON; fixture/live) | 929–932 `coordinate_pair_mismatch` (one interface swapped per mutation) |
+| Local layer placed outside the area of interest (axis swap, wrong CRS label) | 025 (three local outputs in two CRSs inside a declared Tartu `project.aoi`; global world frame exempt) | 945 `axis_swap_suspected` (WGS84 road written lat/lon), 946 `extent_outside_aoi` (EPSG:3301 metres labelled EPSG:4326 in file and manifest) |
 | Wrong analysis CRS | 001 (analysis_crs enforced) | 902 `wrong-crs` |
 | Geographic CRS used for metric operations | every case (`geodata.crs_not_used_for_metrics`) | — |
 | Complete QGIS layer CRS + project reprojection enabled | every visual-leg case | 922 `qgis-incomplete-crs` |
@@ -87,6 +88,22 @@ Legend: ✅ covered · ⚠️ partially covered · ❌ not covered (tracked belo
 | Interactive basemap (tiles + attribution) | 001, 006 (MapLibre + OSM XYZ) | 913 `basemap-missing` |
 | Manifest claims visible in the product | 001, 006 | 912 `dashboard-silent-warnings` |
 | Layer toggles / scenario distinguishability / canonical reset | 001, 006 | — |
+
+## Delivery selection
+
+| Risk | Positive | Mutation |
+|---|---|---|
+| Default dashboard, external-only and combined target selection | 019–022 (fixture/live; explicit selection and clean rerun) | 934 unknown target; 935 missing selected QGIS artifact |
+| View/input/shared-semantics binding | 019–023 (HTML/QGZ metadata and independent receipt checks) | 936 stale embedded metadata with rewritten receipt |
+| Desktop-visible QGIS provenance and limitations | 020, 022; unit tests for providers, assumptions and warnings | 940 missing native project metadata with rewritten receipt |
+| Complete Observable bundles without evidence hashing cycles | synthetic bundle controls; unit tests for changed/missing JS, CSS and data | 945 missing required bundle; 946 receipt inside bundle |
+| Hosted-export configuration/retrieval evidence | 023 (fictional URL, local export; no service operation) | unit tests: missing configuration and stale retrieval declaration |
+| Core provenance/CRS independent of selected view | 019–023 | 937 unpinned source; 938 forbidden metric CRS |
+| Static presentation source ownership without a GIS runtime | 020, 022 | 939 unresolved layer source |
+| Legacy v1 interpretation remains unchanged | existing legacy contract fixtures; unit tests | unit tests: legacy missing-companion warning |
+
+Runtime capability gaps remain explicit. These fixture results do not prove live
+agent adherence, complete rendered parity, turnkey integrations or publication.
 
 ## Prompt style (live-only cases, graded with the same assertion library)
 

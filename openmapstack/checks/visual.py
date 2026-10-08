@@ -560,7 +560,8 @@ _MARK_OWNING_TABS_JS = """(element) => {
 
 _CONTROL_STATE_JS = """(e) => {
   if (e.matches('input[type="checkbox"]')) return {kind: 'checkbox', state: e.checked};
-  if (e.matches('input[type="range"]')) return {kind: 'range', state: e.value, min: e.min || '0', max: e.max || '100'};
+  if (e.matches('input[type="range"]')) return {kind: 'range', state: e.value, min: e.min || '0', max: e.max || '100',
+    value_options: e.hasAttribute('data-oms-values') ? JSON.parse(e.dataset.omsValues) : null};
   if (e.matches('select')) return {kind: 'select', state: e.value,
     options: [...e.options].filter((o) => !o.disabled).map((o) => o.value)};
   const buttons = [...e.querySelectorAll('[data-oms-value]')];
@@ -698,6 +699,32 @@ def _page_state(page: Any) -> str | None:
     return page.evaluate("() => document.documentElement.dataset.omsState || null")
 
 
+def _control_is_canonical(info: dict, control: dict) -> bool:
+    """Compare the widget's analytical value with the manifest, not page claims."""
+    if "canonical" not in control:
+        return False
+    value, canonical = info.get("state"), control["canonical"]
+    if info["kind"] == "group":
+        expected = canonical if isinstance(canonical, list) else [canonical]
+        return value == sorted(str(v) for v in expected)
+    if info["kind"] == "range" and info.get("value_options") is not None:
+        try:
+            index = int(value)
+            if str(index) != str(value) or index < 0:
+                return False
+            value = info["value_options"][index]
+        except (ValueError, TypeError, IndexError, KeyError):
+            return False
+    if isinstance(canonical, bool):
+        return isinstance(value, bool) and value == canonical
+    if isinstance(canonical, (int, float)):
+        try:
+            return not isinstance(value, bool) and float(value) == canonical
+        except (ValueError, TypeError):
+            return False
+    return str(value) == str(canonical)
+
+
 def _protocol_page_problems(
     page: Any,
     problems: "_Problems",
@@ -726,6 +753,18 @@ def _protocol_page_problems(
         problems.add("not_canonical_at_open",
                      "page does not open in the canonical state (html data-oms-state is not 'canonical' "
                      "or the exploratory label is already shown)")
+
+    def noncanonical_controls() -> list[str]:
+        mismatches = []
+        for control in controls:
+            element, _ = _find_revealed(page, f'[data-oms-control="{control["id"]}"]')
+            if element is not None and not _control_is_canonical(element.evaluate(_CONTROL_STATE_JS), control):
+                mismatches.append(str(control["id"]))
+        return mismatches
+
+    mismatches = noncanonical_controls()
+    if mismatches:
+        problems.add("not_canonical_at_open", f"control value(s) differ from manifest canonical values: {mismatches}")
 
     for group in get_in(presentation, "map.layer_groups", []) or []:
         group_id = group.get("id")
@@ -811,13 +850,37 @@ def _protocol_page_problems(
             continue
         reset.click(timeout=3000)
         _settle(page, settle_ms)
-        restored = element.evaluate(_CONTROL_STATE_JS)["state"] == initial["state"]
-        if not restored or _page_state(page) != "canonical" or _first_visible(page, "[data-oms-exploratory]"):
+        restored = _control_is_canonical(element.evaluate(_CONTROL_STATE_JS), control)
+        mismatches = noncanonical_controls()
+        if mismatches or not restored or _page_state(page) != "canonical" or _first_visible(page, "[data-oms-exploratory]"):
             problems.add("canonical_reset_failed",
-                         f"reset after changing {control_id} does not restore the canonical state")
+                         f"reset after changing {control_id} does not restore the canonical state; controls: {mismatches}")
             if not restored:
                 _restore_control(element, initial)
                 _settle(page, settle_ms)
+
+    # A reset can work for each filter alone and still leave another changed
+    # filter (or a published variant) behind. Exercise the combined state too.
+    if exploratory and len(controls) > 1:
+        changed_ids = []
+        for control in controls:
+            element, _ = _find_revealed(page, f'[data-oms-control="{control["id"]}"]')
+            if element is None:
+                continue
+            info = element.evaluate(_CONTROL_STATE_JS)
+            alternative = _alternative_state(info)
+            if alternative is not None:
+                _set_control(element, info, alternative)
+                _settle(page, settle_ms)
+                changed_ids.append(control["id"])
+        reset = _first_visible(page, "[data-oms-reset]")
+        if reset is not None:
+            reset.click(timeout=3000)
+            _settle(page, settle_ms)
+        mismatches = noncanonical_controls()
+        if reset is None or mismatches or _page_state(page) != "canonical" or _first_visible(page, "[data-oms-exploratory]"):
+            problems.add("canonical_reset_failed",
+                         f"reset after combined changes {changed_ids} does not restore every control; controls: {mismatches}")
 
 
 def _protocol_check(
@@ -834,7 +897,9 @@ def _protocol_check(
     """``dashboard_loads_in_browser`` for a project that declares a design
     language: every declared page, every declared control."""
     views = declared_views(proj)
-    if not proj.get("views"):
+    if isinstance(proj.get("views"), list) and len(views) != len(proj["views"]):
+        return failed("every declared view must resolve to an output page", code="view_output_unresolved")
+    if not proj.get("views") and "delivery" not in proj:
         views[0]["path"] = dashboard
     missing = [v["path"] for v in views if not (root / v["path"]).is_file()]
     if missing:
@@ -848,6 +913,7 @@ def _protocol_check(
     warnings = proj.get("warnings") or []
     problems = _Problems()
     evidence: dict[str, Any] = {}
+    unavailable_pages: list[dict] = []
     opened = False
     try:
         with sync_playwright() as p:
@@ -880,14 +946,9 @@ def _protocol_check(
                         # The page's own code or styles never arrived: what
                         # follows would grade this machine's network, not the
                         # product. Basemap tiles are images and do not count.
-                        return not_testable(
-                            f"page {view['id']} could not fetch its remote scripts or styles from here: "
-                            f"{unreachable[:3]}", code="dependency_unreachable", unreachable=unreachable,
-                        )
-                    if page_errors:
-                        page_problems.add("browser_page_error", f"{len(page_errors)} page error(s): {page_errors[:3]}")
-                    if console_errors:
-                        page_problems.add("browser_console_error", f"{len(console_errors)} console error(s): {console_errors[:3]}")
+                        unavailable_pages.append({"view": view["id"], "unreachable": unreachable})
+                        context.close()
+                        continue
 
                     map_required = bool(view["presentation"].get("map"))
                     if _first_visible(page, _MAP_SELECTOR) is None:
@@ -912,6 +973,12 @@ def _protocol_check(
                         page, page_problems, view=view, shot_prefix=shot_prefix,
                         settle_ms=settle_ms, evidence=evidence,
                     )
+                    # Handlers can throw after updating the UI; retain errors
+                    # from every interaction, not just initial page load.
+                    if page_errors:
+                        page_problems.add("browser_page_error", f"{len(page_errors)} page error(s): {page_errors[:3]}")
+                    if console_errors:
+                        page_problems.add("browser_console_error", f"{len(console_errors)} console error(s): {console_errors[:3]}")
                     context.close()
 
                     if map_required:
@@ -947,9 +1014,17 @@ def _protocol_check(
                           code="browser_check_error")
         return not_testable(f"browser validation could not run: {type(exc).__name__}: {exc}", code="browser_error")
 
+    if unavailable_pages:
+        evidence["unavailable_pages"] = unavailable_pages
     if problems:
         return failed("; ".join(problems.messages), code=problems.primary_code,
                       problems=problems.messages, problem_codes=problems.codes, evidence=evidence)
+    if unavailable_pages:
+        return not_testable(
+            f"page(s) could not fetch remote scripts or styles: {unavailable_pages}",
+            code="dependency_unreachable", evidence=evidence,
+            unreachable=[url for entry in unavailable_pages for url in entry["unreachable"]],
+        )
     return passed(
         f"{len(views)} page(s) load cleanly; every declared control, layer group, panel and reset "
         "works through the state protocol",

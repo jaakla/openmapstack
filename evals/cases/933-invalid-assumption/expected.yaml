@@ -1,0 +1,22 @@
+id: 933-invalid-assumption
+case_type: mutation
+modes: [fixture]
+score_types: {fixture: mutation_tests}
+project_dir: project
+hard_gate: true
+mutation:
+  control_generator: "{python} {evals_dir}/fixtures/reference_pipeline/gen.py {project_dir}"
+fixture:
+  generator: "{python} {evals_dir}/fixtures/reference_pipeline/gen.py {project_dir} --break=invalid_assumption"
+  source_baseline:
+    - {source: ../../fixtures/mini-tartu/parcels.geojson, destination: data/source/parcels.geojson}
+    - {source: ../../fixtures/mini-tartu/roads.geojson, destination: data/source/roads.geojson}
+    - {source: ../../fixtures/mini-tartu/pois.geojson, destination: data/source/pois.geojson}
+
+# A mapping in rationale used to satisfy both the untyped array schema and
+# the truthiness-only rationale check. The schema must reject it; the control passes.
+assertions:
+  - assert: project.conforms_to_schema
+    expect: failed
+    expect_code: manifest_schema_invalid
+  - assert: project.graph_resolves

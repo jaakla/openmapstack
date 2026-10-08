@@ -1465,7 +1465,9 @@ PROTOCOL_PARTS = {
     "HALF_LIFE_RENDER": 'document.getElementById("hl").textContent = "Half-life " + state.half_life + " min";',
     "LABEL_RENDER": 'document.documentElement.dataset.omsState = exploratory ? "exploratory" : "canonical";\n'
                     '  document.querySelector("[data-oms-exploratory]").hidden = !exploratory;',
-    "RESET": 'state.min_area = minArea.value = canonical.min_area; state.half_life = halfLife.value = canonical.half_life;',
+    "RESET": 'state.min_area = minArea.value = canonical.min_area; state.half_life = halfLife.value = canonical.half_life;'
+             ' state.mode = "walk"; document.querySelectorAll("[data-oms-value]").forEach(b => '
+             'b.setAttribute("aria-pressed", String(b.dataset.omsValue === state.mode)));',
 }
 
 
@@ -1548,6 +1550,54 @@ class StateProtocolBrowserTests(unittest.TestCase):
         result = self.check(html)
         self.assertFailsWith(result, "not_canonical_at_open", "canonical state")
 
+    def test_page_canonical_marker_cannot_hide_manifest_value_drift(self) -> None:
+        project = protocol_manifest()
+        project["presentation"]["controls"]["filters"][0]["canonical"] = 40
+        self.assertFailsWith(self.check(project=project), "not_canonical_at_open", "min_area")
+
+    def test_indexed_range_exposes_analytical_values(self) -> None:
+        html = protocol_page().replace(
+            'min="20" max="60" step="20" value="20"',
+            'min="0" max="2" step="1" value="0" data-oms-values="[20,40,60]"'
+        ).replace('state.min_area = minArea.value; render();',
+                  'state.min_area = String([20,40,60][minArea.value]); render();')
+        html = html.replace('state.min_area = minArea.value = canonical.min_area;',
+                            'state.min_area = canonical.min_area; minArea.value = "0";')
+        result = self.check(html)
+        self.assertEqual(result.status, "passed", result.detail)
+
+    def test_reset_must_restore_multiple_changed_controls(self) -> None:
+        reset = ('if (state.min_area !== canonical.min_area) { state.min_area = minArea.value = canonical.min_area; }'
+                 ' else { state.half_life = halfLife.value = canonical.half_life; }'
+                 ' state.mode = "walk"; document.querySelectorAll("[data-oms-value]").forEach(b => '
+                 'b.setAttribute("aria-pressed", String(b.dataset.omsValue === state.mode)));')
+        result = self.check(protocol_page(RESET=reset))
+        self.assertFailsWith(result, "canonical_reset_failed", "combined changes")
+
+    def test_control_handler_errors_after_render_fail(self) -> None:
+        html = protocol_page().replace('state.half_life = halfLife.value; render();',
+                                       'state.half_life = halfLife.value; render(); throw new Error("handler broke");')
+        self.assertFailsWith(self.check(html), "browser_page_error", "handler broke")
+
+    def test_control_console_errors_after_render_fail(self) -> None:
+        html = protocol_page().replace('state.half_life = halfLife.value; render();',
+                                       'state.half_life = halfLife.value; render(); console.error("handler broke");')
+        self.assertFailsWith(self.check(html), "browser_console_error", "handler broke")
+
+    def test_unreachable_page_preserves_other_page_failures_in_either_order(self) -> None:
+        remote = protocol_page().replace('<title>protocol</title>',
+                 '<title>protocol</title><script src="https://cdn.example.invalid/lib.js"></script>')
+        for first in ("broken", "offline"):
+            with self.subTest(first=first):
+                names = [first, "offline" if first == "broken" else "broken"]
+                project = protocol_manifest(views=[
+                    {"id": name, "output": name, "entry": i == 0} for i, name in enumerate(names)])
+                project["outputs"] = {name: {"path": name + ".html"} for name in names}
+                result = self.check(project=project, pages={
+                    "broken.html": protocol_page(MIN_AREA_HOOK=""), "offline.html": remote})
+                self.assertFailsWith(result, "control_absent", "[broken]")
+                self.assertEqual(result.data["evidence"]["unavailable_pages"][0]["view"], "offline")
+
     def test_layer_toggle_that_scrolls_the_whole_page_fails(self) -> None:
         # Without a positioned row the hidden input sits where the unscrolled
         # panel would put it, below the screen; clicking the row focuses it
@@ -1576,6 +1626,11 @@ class StateProtocolBrowserTests(unittest.TestCase):
         project["outputs"] = {"screening": {"path": "index.html"}}
         result = self.check(project=project, pages={"dashboard.html": protocol_page()})
         self.assertEqual((result.status, result.data["code"]), ("failed", "file_missing"))
+
+    def test_unknown_view_output_cannot_be_skipped_as_a_pass(self) -> None:
+        project = protocol_manifest(views=[{"id": "screening", "output": "missing"}])
+        result = self.check(project=project)
+        self.assertEqual((result.status, result.data["code"]), ("failed", "view_output_unresolved"))
 
     def test_unreachable_remote_script_is_not_testable_not_a_product_failure(self) -> None:
         # .invalid never resolves, here or in CI: this is a machine without

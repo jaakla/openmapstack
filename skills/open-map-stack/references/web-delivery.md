@@ -1,5 +1,9 @@
 # Web Delivery
 
+For selected existing tools and runnable dlt/Dagster/dbt/Observable/QGIS examples,
+see `established-stack.md`. Keep one owner per transformation/dependency;
+optional tool runtimes are required only for selected integration work.
+
 Generating tiles, serving them, and rendering them. The 2026 default stack: PMTiles + Martin (or static hosting) + MapLibre. tippecanoe for vector tile generation, TiTiler for dynamic raster tiling.
 
 ## Map review rules

@@ -1,10 +1,11 @@
 """Shipped corrections that a live acceptance run caught must not silently revert.
 
-The 0.4.0 acceptance run (see `docs/release-0.4.0.md`) found two task-outcome
-failures that traced to shipped guidance rather than to the adapter or model:
-an agent claimed a plain `geom` GiST index serves a `::geography` predicate, and
-another treated a WFS `resultType=hits` total as proof of completeness. Both
-sentences were corrected, and both reruns then passed.
+The 0.4.0 acceptance run (see `docs/release-0.4.0.md` at tag `v0.4.0`) found
+two task-outcome failures that traced to shipped guidance rather than to the
+adapter or model: an agent claimed a plain `geom` GiST index serves a
+`::geography` predicate, and another treated a WFS `resultType=hits` total as
+proof of completeness. Both sentences were corrected, and both reruns then
+passed.
 
 Nothing else in the repository can notice if that wording goes away. The routing
 eval grades *selection* only -- `evals/routing.py` reports `task_success` as
@@ -406,6 +407,15 @@ class TableOutputGuidanceTests(GuidanceCase):
                 self.assertIn("kind: table", (path / "project.yaml").read_text(encoding="utf-8"))
                 self.assertIn("tables:", (path / "presentation.yaml").read_text(encoding="utf-8"))
                 self.assertIn("def write_table(", (path / "pipeline.py").read_text(encoding="utf-8"))
+
+    def test_project_templates_use_the_valid_variant_key(self) -> None:
+        import yaml
+
+        for path in [REPO_ROOT / "templates/project.yaml", *sorted(SKILLS_ROOT.glob("*/templates/project.yaml"))]:
+            with self.subTest(path=str(path.relative_to(REPO_ROOT))):
+                controls = yaml.safe_load(path.read_text())["presentation"]["controls"]
+                self.assertIn("variants", controls)
+                self.assertNotIn("views", controls)
 
 
 if __name__ == "__main__":  # pragma: no cover

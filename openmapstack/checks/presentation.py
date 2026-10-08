@@ -29,6 +29,22 @@ def declared_views(proj: dict) -> list[dict]:
     base = proj.get("presentation") if isinstance(proj.get("presentation"), dict) else {}
     views = proj.get("views")
     if not isinstance(views, list) or not views:
+        # Explicit delivery selection names the web artifacts; a custom output
+        # path must not accidentally activate an unrelated dashboard.html.
+        from .. import delivery
+
+        web_views = []
+        outputs = proj.get("outputs") or {}
+        for target in delivery.targets(proj):
+            if target.get("kind") not in {"dashboard", "observable"}:
+                continue
+            output = outputs.get(target.get("output"))
+            if isinstance(output, dict) and output.get("path"):
+                web_views.append({"id": target["id"], "path": str(output["path"]),
+                                  "archetype": None, "scope": None,
+                                  "entry": not web_views, "presentation": base})
+        if web_views:
+            return web_views
         return [{"id": "dashboard", "path": "dashboard.html", "archetype": None, "scope": None,
                  "entry": True, "presentation": base}]
     outputs = proj.get("outputs") or {}
@@ -60,7 +76,8 @@ def declared_controls(presentation: dict) -> list[dict]:
     controls = presentation.get("controls") if isinstance(presentation.get("controls"), dict) else {}
     found = []
     for kind in CONTROL_KINDS:
-        for control in controls.get(kind) or []:
+        entries = controls.get(kind) or []
+        for control in entries if isinstance(entries, list) else []:
             if isinstance(control, dict) and control.get("id") is not None:
                 found.append({**control, "kind": kind, "effect": control.get("effect") or "exploratory"})
     return found
@@ -71,6 +88,26 @@ SEMANTIC_ROLES = {
     "excluded_area", "warning", "user_override", "planned", "hypothetical",
     "selected_feature",
 }
+
+
+def layers_reference_outputs(workspace: Path, project_dir: str = ".") -> AssertionResult:
+    """Static presentation lineage; no QGIS/browser runtime is required."""
+    proj = load_project_yaml(workspace, project_dir)
+    if proj is None:
+        return failed("project.yaml missing", code="manifest_missing")
+    # These helpers resolve format variants and override geometry from manifest
+    # data only. They neither import PyQGIS nor open a desktop project.
+    from .qgis import _manifest_layer_files, _acceptable_files, _is_client_local
+    resolved = _manifest_layer_files(proj)
+    errors = []
+    for layer in get_in(proj, "presentation.map.layers", []) or []:
+        if not isinstance(layer, dict):
+            errors.append("layer must be a mapping")
+        elif not _is_client_local(layer) and not _acceptable_files(resolved, layer.get("source")):
+            errors.append(f"layer source {layer.get('source')!r} names no output or override geometry")
+    if errors:
+        return failed("; ".join(errors), code="presentation_source_unresolved")
+    return passed("all persistent presentation layers resolve to outputs or override geometry")
 
 
 def layers_use_semantic_roles(workspace: Path, project_dir: str = ".") -> AssertionResult:
@@ -106,15 +143,33 @@ def controls_match_pipeline(workspace: Path, project_dir: str = ".") -> Assertio
     if proj is None:
         return failed("project.yaml missing", code="manifest_missing")
 
+    presentations = [("presentation", proj.get("presentation") or {})]
+    for view in declared_views(proj) if proj.get("views") else []:
+        presentations.append((f"view {view['id']}", view["presentation"]))
+    errors = []
+    for name, presentation in presentations:
+        errors.extend(f"{name}: {error}" for error in control_pipeline_errors(proj, presentation))
+    if errors:
+        return failed("; ".join(errors), errors=errors, code="control_pipeline_drift")
+    controls = (proj.get("presentation") or {}).get("controls") or {}
+    filters, scenarios, variants = (controls.get(kind) or [] for kind in CONTROL_KINDS)
+    detail = f"{len(filters)} filter control(s) and {len(scenarios)} scenario control(s) consistent"
+    if variants:
+        detail = f"{len(filters)} filter control(s), {len(scenarios)} scenario control(s) and {len(variants)} variant control(s) consistent"
+    return passed(detail)
+
+
+def control_pipeline_errors(proj: dict, presentation: dict) -> list[str]:
+    """Check a page's effective controls against the shared analytical contract."""
     override_ids = {o.get("id") for o in (proj.get("overrides") or [])}
-    scenarios = get_in(proj, "presentation.controls.scenarios", []) or []
+    scenarios = [c for c in declared_controls(presentation) if c["kind"] == "scenarios"]
     errors: list[str] = []
     for s in scenarios:
         if s.get("override") not in override_ids:
             errors.append(f"scenario {s.get('id')} references unknown override {s.get('override')!r}")
 
     steps = get_in(proj, "processing.steps", []) or []
-    filters = get_in(proj, "presentation.controls.filters", []) or []
+    filters = [c for c in declared_controls(presentation) if c["kind"] == "filters"]
     for f in filters:
         field = f.get("field")
         canonical = f.get("canonical")
@@ -142,10 +197,10 @@ def controls_match_pipeline(workspace: Path, project_dir: str = ".") -> Assertio
     # (travel mode, analysis year, metric). They change which precomputed
     # columns the view shows, never the analysis, so they reference outputs,
     # not overrides.
-    if get_in(proj, "presentation.controls.views") is not None:
+    if get_in(presentation, "controls.views") is not None:
         errors.append("presentation.controls.views was renamed to presentation.controls.variants")
     outputs = proj.get("outputs") or {}
-    variants = get_in(proj, "presentation.controls.variants", []) or []
+    variants = [c for c in declared_controls(presentation) if c["kind"] == "variants"]
     for v in variants:
         options = v.get("options") or []
         if not options or len(set(map(str, options))) != len(options):
@@ -166,11 +221,7 @@ def controls_match_pipeline(workspace: Path, project_dir: str = ".") -> Assertio
                 if declared and column not in declared:
                     errors.append(f"variant {v.get('id')} option {option!r} shows undeclared column {column!r}")
 
-    if errors:
-        return failed("; ".join(errors), errors=errors, code="control_pipeline_drift")
-    if variants:
-        return passed(f"{len(filters)} filter control(s), {len(scenarios)} scenario control(s) and {len(variants)} variant control(s) consistent")
-    return passed(f"{len(filters)} filter control(s) and {len(scenarios)} scenario control(s) consistent")
+    return errors
 
 
 def tables_reference_table_outputs(workspace: Path, project_dir: str = ".") -> AssertionResult:
@@ -200,11 +251,13 @@ def tables_reference_table_outputs(workspace: Path, project_dir: str = ".") -> A
     return passed(f"{len(tables)} table view(s) show declared table outputs")
 
 
-def table_downloads_linked(workspace: Path, project_dir: str = ".", dashboard: str | None = None) -> AssertionResult:
+def table_downloads_linked(workspace: Path, project_dir: str = ".", dashboard: str | None = None,
+                           allow_identical_copies: bool = False) -> AssertionResult:
     """The delivered dashboard links every download file of every table it shows.
 
     The links must point at the files the pipeline wrote (hashed in the run
-    record), not at data regenerated in the browser."""
+    record), not at data regenerated in the browser. Static app builds may opt
+    into project-local bundled copies only when bytes match the declared file."""
     import os
     import re
 
@@ -237,7 +290,21 @@ def table_downloads_linked(workspace: Path, project_dir: str = ".", dashboard: s
         for relative in download_paths(output.get("path", ""), formats).values():
             expected = Path(os.path.relpath(root / relative, page.parent)).as_posix()
             if expected not in hrefs:
-                missing.append(relative)
+                matches = False
+                if allow_identical_copies:
+                    from ..integrity import sha256_file
+                    from ..project import project_path
+                    original = project_path(root, relative)
+                    if original is not None and original.is_file():
+                        for href in hrefs:
+                            if ":" in href or href.startswith("/"):
+                                continue
+                            alias = project_path(root, str(page.parent.relative_to(root) / href))
+                            if alias is not None and alias.is_file() and sha256_file(alias) == sha256_file(original):
+                                matches = True
+                                break
+                if not matches:
+                    missing.append(relative)
     if missing:
         return failed(f"{page.name} does not link downloads {missing}", code="table_download_unlinked", missing=missing)
     return passed(f"{page.name} links every declared table download")

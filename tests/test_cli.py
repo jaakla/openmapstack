@@ -108,6 +108,42 @@ class OpenMapStackCliTests(unittest.TestCase):
         self.assertEqual(check.status, "failed")
         self.assertIn("effect 'final'", check.message)
 
+    def test_page_controls_use_the_same_pipeline_contract(self) -> None:
+        from openmapstack.checks.presentation import controls_match_pipeline
+
+        for controls, fragment in (
+            ({"variants": [{"id": "mode", "options": ["walk", "bike"], "canonical": "car"}]}, "canonical 'car'"),
+            ({"scenarios": [{"id": "closure", "override": "absent", "canonical": True}]}, "unknown override"),
+            ({"views": [{"id": "mode", "options": ["walk", "bike"], "canonical": "walk"}]}, "renamed"),
+            ({"filters": [{"id": "area", "field": "area_m2", "canonical": 40}]}, "not found"),
+        ):
+            with self.subTest(controls=controls):
+                project = self.views_manifest()
+                project["processing"]["steps"][0]["expression"] = "area_m2 >= 20"
+                project["views"][1]["presentation"]["controls"] = controls
+                check = self.views_check(project)
+                self.assertEqual(check.status, "failed", check.message)
+                self.assertIn(fragment, check.message)
+                result = controls_match_pipeline(self.root)
+                self.assertEqual(result.status, "failed", result.detail)
+                self.assertIn("view detail", result.detail)
+
+        project = self.views_manifest()
+        self.assertEqual(self.views_check(project).status, "passed")
+        self.assertEqual(controls_match_pipeline(self.root).status, "passed")
+
+    def test_page_controls_use_the_shared_json_schema(self) -> None:
+        for controls in ({"filters": [{"canonical": 20}]},
+                         {"variants": [{"id": "mode", "options": []}]},
+                         {"filters": "malformed"}, {"scenarios": 42}):
+            with self.subTest(controls=controls):
+                project = self.views_manifest()
+                project["views"][1]["presentation"]["controls"] = controls
+                result = validate_project(self.write_project(project), artifacts=False)
+                schema = next(c for c in result.checks if c.id == "manifest.json_schema")
+                self.assertEqual(schema.status, "failed", schema.message)
+                self.assertIn("views", schema.message)
+
     def test_unknown_language_and_effect_fail_the_schema(self) -> None:
         project = self.views_manifest()
         project["presentation"]["design_language"] = "openmapstack-views/9"
@@ -125,6 +161,25 @@ class OpenMapStackCliTests(unittest.TestCase):
         check = next(c for c in result.checks if c.id == "presentation.declaration")
         self.assertEqual(check.status, "failed")
         self.assertIn("presentation.controls.variants", check.message)
+
+    def test_aoi_bounds_are_validated_without_local_outputs(self) -> None:
+        for outputs in ({"report": {"path": "report.csv", "format": "CSV", "kind": "table"}},
+                        {"world": {"path": "world.geojson", "format": "GeoJSON", "extent": "global"}}):
+            for bbox, expected in (([26.65, 58.32, 26.80, 58.42], "passed"),
+                                   ([26.80, 58.32, 26.65, 58.42], "failed"),
+                                   ([26.65, 58.42, 26.80, 58.32], "failed"),
+                                   ([26.65, 58.32, 26.65, 58.42], "failed"),
+                                   ([26.65, 58.32, float("inf"), 58.42], "failed")):
+                with self.subTest(outputs=outputs, bbox=bbox):
+                    project = valid_manifest()
+                    project["outputs"] = outputs
+                    project["project"]["aoi"] = {"bbox": bbox, "crs": "EPSG:4326"}
+                    result = validate_project(self.write_project(project), artifacts=False)
+                    check = self._check(result, "manifest.json_schema")
+                    self.assertEqual(check.status, expected, check.to_dict())
+                    if expected == "failed":
+                        self.assertFalse(result.ok())
+                        self.assertIn("project.aoi.bbox", check.message)
 
     # ---- qgis.layer_crs -------------------------------------------------
     # A layer with no <srs> is assumed to be in the project CRS and never

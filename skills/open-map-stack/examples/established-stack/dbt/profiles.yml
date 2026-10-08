@@ -1,0 +1,9 @@
+spatial_example:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: "{{ env_var('OMS_EXAMPLE_DATABASE') }}"
+      schema: analysis
+      threads: 1
+      extensions: [spatial]

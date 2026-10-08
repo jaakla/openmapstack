@@ -15,6 +15,18 @@
 
 schema: openmapstack-project/v1
 
+# New-project default. Remove/replace targets only as an explicit delivery
+# choice; omitting this whole declaration restores legacy v1 obligations.
+delivery:
+  schema: openmapstack-delivery/v1
+  targets:
+    - id: dashboard
+      kind: dashboard             # dashboard | qgis | observable
+      mode: local
+      output: dashboard
+      inputs: [example_output]
+      evidence: dashboard_evidence
+
 project:
   id: TODO-project-id
   title: TODO-human-readable-title
@@ -23,6 +35,11 @@ project:
   created_at: 2026-08-25T00:00:00Z
   updated_at: 2026-08-25T00:00:00Z
   status: draft              # draft | in_progress | validated | warning | failed
+  # Declare the area of interest whenever the question has a bounded place;
+  # `openmapstack verify` then checks every local output lies near it.
+  # aoi:
+  #   bbox: [26.65, 58.32, 26.80, 58.42]   # minx, miny, maxx, maxy in crs x/y order
+  #   crs: EPSG:4326
   author:                    # shown in the credits header; ask the user, never invent
     name: TODO-author-name
     email: TODO-author-email
@@ -34,7 +51,8 @@ project:
 interpretation:
   objective: >-
     TODO analyst interpretation of the objective in one or two sentences.
-  assumptions:
+  assumptions:              # each item: nonblank id/statement/rationale; unique ids
+    # Extra fields are metadata only; built-in tools do not interpret them.
     - id: A1
       statement: >-
         TODO the assumption made ("near" = <= N meters, etc.).
@@ -111,6 +129,10 @@ processing:
       operation: read
       source: example_source
       output: example_raw
+    - id: render_delivery
+      operation: render
+      input: example_raw
+      output: delivery_views
     # - id: select_candidates
     #   operation: filter
     #   input: example_raw
@@ -118,6 +140,16 @@ processing:
     #   output: candidates
 
 outputs:
+  dashboard:
+    path: dashboard.html
+    format: HTML
+    kind: document
+    generated_by: render_delivery
+  dashboard_evidence:
+    path: delivery/dashboard-evidence.json
+    format: JSON
+    kind: document
+    generated_by: render_delivery
   # Each output: path, format, generated_by: <step id>.
   example_output:
     path: data/derived/example.parquet
@@ -154,7 +186,6 @@ validation:
     - overrides_applied               # every override has an application result
     - manifest_graph_resolves         # every step input/output symbol resolves
     - view_controls_match_pipeline    # presentation.controls canonical == run
-    - qgis_project_static_valid       # IDs, files, styles, CRS
     - manifest_report_parity          # manifest, report, and run record agree
   domain_checks:
     - name: example_range_check
@@ -209,7 +240,7 @@ presentation:
     off_canonical_labelling: required
     filters: []                    # id, label, type, field(s), unit, canonical, step/options
     scenarios: []                  # id, override, canonical, baseline_fields
-    views: []                      # id, options, canonical, output, fields (precomputed variants)
+    variants: []                   # id, options, canonical, output, fields (precomputed variants)
   tables: []                       # output, title, downloads, default_sort (kind: table outputs)
   map:
     engine_preference: maplibre    # maplibre | deck | kepler
