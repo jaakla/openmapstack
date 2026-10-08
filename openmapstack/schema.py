@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from datetime import date, datetime
 from importlib.resources import files
 from typing import Any
@@ -37,3 +38,22 @@ def validation_errors(instance: Any, schema: dict[str, Any]) -> list[str]:
 
 def project_schema_errors(project: Any) -> list[str]:
     return validation_errors(project, load_packaged_schema("project-v1.schema.json"))
+
+
+def assumptions_errors(assumptions: Any) -> list[str]:
+    """Check assumption shape from the schema, then the unique-ID invariant."""
+    schema = load_packaged_schema("project-v1.schema.json")
+    errors = validation_errors(
+        assumptions,
+        {
+            "$defs": schema["$defs"],
+            **schema["properties"]["interpretation"]["properties"]["assumptions"],
+        },
+    )
+    if errors:
+        return errors
+    counts = Counter(a["id"] for a in _json_value(assumptions))
+    duplicates = sorted(aid for aid, count in counts.items() if count > 1)
+    if duplicates:
+        errors.append(f"duplicate ids: {duplicates}")
+    return errors

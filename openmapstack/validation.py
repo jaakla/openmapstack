@@ -23,7 +23,7 @@ from .integrity import (
 )
 from .project import ProjectError, get_in, load_json, load_project, project_path, step_outputs
 from .sampling import run_mode, run_record_errors
-from .schema import project_schema_errors
+from .schema import assumptions_errors, project_schema_errors
 from .sources import assess_pin, connection_reference_error, find_inline_credentials
 
 SCHEMA = "openmapstack-project/v1"
@@ -209,27 +209,19 @@ class _Validator:
             self.add("interpretation.objective", "failed", "interpretation.objective is required", path="interpretation.objective")
             return
         assumptions = interpretation.get("assumptions")
-        if not isinstance(assumptions, list) or not assumptions:
+        errors = assumptions_errors(assumptions)
+        if errors:
+            self.add("interpretation.assumptions", "failed", "; ".join(errors), path="interpretation.assumptions")
+            return
+        if not assumptions:
             self.add("interpretation.assumptions", "warning", "no assumptions are documented", path="interpretation.assumptions")
             return
         bad: list[str] = []
-        ids: list[str] = []
-        for index, assumption in enumerate(assumptions):
-            if not isinstance(assumption, dict):
-                bad.append(str(index))
-                continue
-            aid = str(assumption.get("id", index))
-            ids.append(aid)
-            if not _present(assumption.get("id")) or not _present(assumption.get("statement")) or not _present(assumption.get("rationale")):
-                bad.append(aid)
-        duplicates = _duplicates(ids)
-        if bad or duplicates:
-            message = []
-            if bad:
-                message.append(f"missing id/statement/rationale: {bad}")
-            if duplicates:
-                message.append(f"duplicate ids: {duplicates}")
-            self.add("interpretation.assumptions", "failed", "; ".join(message), path="interpretation.assumptions")
+        for assumption in assumptions:
+            if any(not _present(assumption[key]) for key in ("id", "statement", "rationale")):
+                bad.append(assumption["id"])
+        if bad:
+            self.add("interpretation.assumptions", "failed", f"missing id/statement/rationale: {bad}", path="interpretation.assumptions")
         else:
             self.add("interpretation.assumptions", "passed", f"{len(assumptions)} assumptions have rationale", path="interpretation.assumptions")
 
