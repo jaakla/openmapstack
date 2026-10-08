@@ -101,6 +101,12 @@ def binding_errors(root: Path, project: dict) -> list[str]:
         run = project["outputs"].get(value["run_evidence"])
         if not isinstance(run, dict) or run.get("kind") != "document" or project_path(root, run.get("path")) is None:
             errors.append("run evidence must bind a declared document output")
+    targets = project.get("delivery", {}).get("targets", [])
+    receipt_keys = [value["evidence"], *[target["evidence"] for target in targets]]
+    if "run_evidence" in value:
+        receipt_keys.append(value["run_evidence"])
+    receipt_paths = {key: project_path(root, project["outputs"].get(key, {}).get("path"))
+                     for key in receipt_keys}
     bundled = set()
     for bundle in value.get("bundles", []):
         if bundle["target"] in bundled:
@@ -110,11 +116,19 @@ def binding_errors(root: Path, project: dict) -> list[str]:
             errors.append("bundle must be an object")
             continue
         path = project_path(root, bundle.get("path"))
-        target = next((t for t in project.get("delivery", {}).get("targets", [])
+        target = next((t for t in targets
                        if t.get("id") == bundle.get("target")), None)
         view = project_path(root, project["outputs"].get(target.get("output"), {}).get("path")) if target else None
-        if path is None or path == root.resolve() or view is None or not view.is_relative_to(path):
+        if (path is None or path == root.resolve() or view is None or view == path
+                or not view.is_relative_to(path) or path.is_file()):
             errors.append("bundle must contain its selected target view below the project root")
+            continue
+        for key, receipt in receipt_paths.items():
+            if receipt is not None and receipt.is_relative_to(path):
+                errors.append(f"bundle {bundle['target']}: evidence output {key!r} must be outside bundle directories")
+    required_bundles = {target["id"] for target in targets if target["kind"] == "observable"}
+    for target_id in sorted(required_bundles - bundled):
+        errors.append(f"Observable target {target_id!r} requires exactly one delivery bundle")
     return errors
 
 

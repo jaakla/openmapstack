@@ -850,3 +850,10 @@ QGIS executed. Optional real runtime QA is documented in
 and uses `tests/test_established_stack_tools.py`; it needs only explicitly
 selected local runtimes, no paid accounts. Live mode remains subject to the
 repository's explicit model/budget policy.
+
+Mutations `945`–`946` use a synthetic complete HTML/JavaScript/data bundle and
+healthy control twins to reject missing Observable bundle declarations and
+receipts inside bundle directories. The controls execute and validate their
+canonical pipeline without claiming a Framework runtime. Unit tests also cover
+multiple selected targets, changed/deleted JS/CSS/data, and receipt placement
+before files exist.

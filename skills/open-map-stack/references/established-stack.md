@@ -60,7 +60,13 @@ reviewed contract/check change; enterprise integration is not implied.
 The declaration binds a document output for evidence, optionally a tool-run
 output, and selected delivery bundle directories. The receipt binds current
 immutable inputs, owner definitions/summaries, analytical output bytes, tool-run
-bytes and every local bundle resource. Changed/missing scripts or data beyond
+bytes and every local bundle resource. With this extension declared, every
+selected Observable target must have exactly one bundle entry containing its
+view and complete local assets. Other target kinds may declare bundles as needed.
+Keep integration, delivery and tool-run receipts outside all bundle directories;
+the validator rejects paths that would include evidence in a bundle, even before
+the receipt is written. This avoids circular hashing and order-dependent evidence.
+Changed/missing scripts or data beyond
 index.html therefore invalidate the build. The canonical rerun must preserve
 integration ownership and delivery selection, rebuild selected artifacts from
 pins, and execute normal validation. It must not silently refresh a stale binding.

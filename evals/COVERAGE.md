@@ -95,6 +95,7 @@ Legend: ✅ covered · ⚠️ partially covered · ❌ not covered (tracked belo
 | Default dashboard, external-only and combined target selection | 019–022 (fixture/live; explicit selection and clean rerun) | 934 unknown target; 935 missing selected QGIS artifact |
 | View/input/shared-semantics binding | 019–023 (HTML/QGZ metadata and independent receipt checks) | 936 stale embedded metadata with rewritten receipt |
 | Desktop-visible QGIS provenance and limitations | 020, 022; unit tests for providers, assumptions and warnings | 940 missing native project metadata with rewritten receipt |
+| Complete Observable bundles without evidence hashing cycles | synthetic bundle controls; unit tests for changed/missing JS, CSS and data | 945 missing required bundle; 946 receipt inside bundle |
 | Hosted-export configuration/retrieval evidence | 023 (fictional URL, local export; no service operation) | unit tests: missing configuration and stale retrieval declaration |
 | Core provenance/CRS independent of selected view | 019–023 | 937 unpinned source; 938 forbidden metric CRS |
 | Static presentation source ownership without a GIS runtime | 020, 022 | 939 unresolved layer source |

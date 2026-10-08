@@ -40,7 +40,12 @@ class IntegrationTests(unittest.TestCase):
         self.project['processing']['steps'][1]['integration'] = 'models'
         binding['steps_sha256'] = integration.steps_hash(self.project, ['select'])
         self.project['outputs']['integration_receipt'] = {'path': 'delivery/integrations.json', 'format': 'JSON', 'kind': 'document', 'generated_by': 'render'}
-        self.project['integrations'] = {'schema': integration.SCHEMA, 'bindings': [binding], 'evidence': 'integration_receipt'}
+        (self.root / 'views').mkdir()
+        (self.root / 'views/index.html').write_text((self.root / 'observable.html').read_text().replace(
+            'href="data/derived/areas.csv"', 'href="../data/derived/areas.csv"'))
+        self.project['outputs']['observable']['path'] = 'views/index.html'
+        self.project['integrations'] = {'schema': integration.SCHEMA, 'bindings': [binding], 'evidence': 'integration_receipt',
+                                       'bundles': [{'target': 'observable', 'path': 'views'}]}
         self.save()
         integration.write_evidence(self.root, self.project)
 
@@ -96,23 +101,29 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(checks.bindings_valid(self.root).status, 'failed')
 
     def test_bundle_changes_detected_beyond_index(self):
-        bundle = self.root / 'views'; bundle.mkdir()
-        (bundle / 'index.html').write_bytes((self.root / 'observable.html').read_bytes())
-        (bundle / 'data.json').write_text('{}')
+        bundle = self.root / 'views'
+        resources = {'data.json': '{}', 'app.js': 'const valid = true;', 'style.css': 'body { color: black; }'}
+        for filename, content in resources.items():
+            (bundle / filename).write_text(content)
         self.project['outputs']['observable']['path'] = 'views/index.html'
         self.project['integrations']['bundles'] = [{'target': 'observable', 'path': 'views'}]
         self.save(); integration.write_evidence(self.root, self.project)
         self.assertEqual(checks.evidence_matches(self.root).status, 'passed')
-        (bundle / 'data.json').write_text('{"stale":true}')
-        self.assertEqual(checks.evidence_matches(self.root).data['code'], 'integration_evidence_mismatch')
-        integration.write_evidence(self.root, self.project)
-        (bundle / 'data.json').unlink()
-        self.assertEqual(checks.evidence_matches(self.root).status, 'failed')
+        for filename, content in resources.items():
+            with self.subTest(resource=filename):
+                (bundle / filename).write_text(content + ' changed')
+                self.assertEqual(checks.evidence_matches(self.root).data['code'], 'integration_evidence_mismatch')
+                (bundle / filename).write_text(content)
+                self.assertEqual(checks.evidence_matches(self.root).status, 'passed')
+                (bundle / filename).unlink()
+                self.assertEqual(checks.evidence_matches(self.root).data['code'], 'integration_evidence_mismatch')
+                (bundle / filename).write_text(content)
+                self.assertEqual(checks.evidence_matches(self.root).status, 'passed')
 
     def test_unsafe_bundle_and_definitions_rejected(self):
         self.project['integrations']['bundles'] = [{'target': 'observable', 'path': '.'}]
         self.save(); self.assertEqual(checks.bindings_valid(self.root).status, 'failed')
-        self.project['integrations']['bundles'] = []
+        self.project['integrations']['bundles'] = [{'target': 'observable', 'path': 'views'}]
         (self.root / 'link').symlink_to(self.root / 'definitions', target_is_directory=True)
         self.project['integrations']['bindings'][0]['definition'] = 'link'
         self.save(); self.assertEqual(checks.bindings_valid(self.root).status, 'failed')
@@ -148,9 +159,66 @@ class IntegrationTests(unittest.TestCase):
     def test_sha256_view_fields_have_one_prefix(self):
         target = delivery.targets(self.project)[0]
         payload = delivery.evidence_payload(self.root, self.project, target)
-        self.assertEqual(payload['view_sha256'], sha256_file(self.root / 'observable.html'))
+        self.assertEqual(payload['view_sha256'], sha256_file(self.root / self.project['outputs'][target['output']]['path']))
         for digest in payload['metadata']['analytical_outputs'].values():
             self.assertRegex(digest, r'^sha256:[0-9a-f]{64}$')
+
+    def test_each_observable_target_requires_exactly_one_bundle(self):
+        healthy = copy.deepcopy(self.project)
+        mutations = [lambda p: p['integrations'].pop('bundles'),
+                     lambda p: p['integrations'].update(bundles=[]),
+                     lambda p: p['integrations']['bundles'].append(copy.deepcopy(p['integrations']['bundles'][0]))]
+        self.assertEqual(checks.bindings_valid(self.root).status, 'passed')
+        for index, mutate in enumerate(mutations):
+            with self.subTest(index=index):
+                self.project = copy.deepcopy(healthy)
+                mutate(self.project)
+                self.save()
+                self.assertEqual(checks.bindings_valid(self.root).data['code'], 'integration_binding_invalid')
+                self.assertEqual(checks.evidence_matches(self.root).data['code'], 'integration_binding_invalid')
+                with self.assertRaises(ValueError):
+                    integration.write_evidence(self.root, self.project)
+        self.project = copy.deepcopy(healthy)
+        target = copy.deepcopy(self.project['delivery']['targets'][0])
+        target.update(id='second_view', output='second_html', evidence='second_receipt')
+        self.project['delivery']['targets'].append(target)
+        self.project['outputs']['second_html'] = {'path': 'second/index.html', 'kind': 'document', 'format': 'HTML', 'generated_by': 'render'}
+        self.project['outputs']['second_receipt'] = {'path': 'delivery/second.json', 'kind': 'document', 'format': 'JSON', 'generated_by': 'render'}
+        self.save()
+        self.assertIn("Observable target 'second_view'", checks.bindings_valid(self.root).detail)
+        self.project['integrations']['bundles'].append({'target': 'second_view', 'path': 'second'})
+        self.save()
+        # Preflight resolves declarations before the build creates their directories.
+        self.assertEqual(checks.bindings_valid(self.root).status, 'passed')
+
+    def test_receipts_cannot_be_placed_in_any_bundle_even_before_they_exist(self):
+        self.project['outputs']['tool_run'] = {'path': 'delivery/tool-run.json', 'kind': 'document', 'format': 'JSON', 'generated_by': 'render'}
+        self.project['integrations']['run_evidence'] = 'tool_run'
+        (self.root / 'delivery/tool-run.json').write_text('{}')
+        healthy = copy.deepcopy(self.project)
+        self.save()
+        integration.write_evidence(self.root, self.project)
+        self.assertEqual(checks.evidence_matches(self.root).status, 'passed')
+        for key in ['integration_receipt', 'observable_evidence', 'tool_run']:
+            with self.subTest(receipt=key):
+                self.project = copy.deepcopy(healthy)
+                self.project['outputs'][key]['path'] = f'views/receipts/{key}.json'
+                self.save()
+                result = checks.bindings_valid(self.root)
+                self.assertEqual(result.status, 'failed', result.detail)
+                self.assertIn('must be outside bundle directories', result.detail)
+                self.assertEqual(checks.evidence_matches(self.root).data['code'], 'integration_binding_invalid')
+                with self.assertRaises(ValueError):
+                    integration.write_evidence(self.root, self.project)
+                self.assertFalse((self.root / f'views/receipts/{key}.json').exists())
+        self.project = healthy
+        self.save()
+        integration.write_evidence(self.root, self.project)
+        receipt = self.root / 'delivery/integrations.json'
+        original = receipt.read_bytes()
+        integration.write_evidence(self.root, self.project)
+        self.assertEqual(receipt.read_bytes(), original)
+        self.assertEqual(checks.evidence_matches(self.root).status, 'passed')
 
 
 class ExampleDefinitionTests(unittest.TestCase):
