@@ -1316,7 +1316,15 @@ def finalize_run(report: dict, manifest: list[dict], started_at: str) -> None:
         for directory in (SOURCE, OVERRIDES)
         for path in directory.rglob("*")
         if path.is_file()
-    ] + [ROOT / "pipeline.py", ROOT / "routing.py", ROOT / "requirements.txt"]
+    ]
+    implementation = PROJECT["runtime"]["implementation"]
+    for relative in [implementation["pipeline"], *implementation.get("dependencies", [])]:
+        path = ROOT / relative
+        if path.is_dir():
+            input_paths.extend(item for item in path.rglob("*") if item.is_file())
+        else:
+            input_paths.append(path)
+    input_paths = sorted(set(input_paths))
     output_paths = [
         DERIVED / "final-candidates.gpkg",
         DERIVED / "final-candidates.parquet",

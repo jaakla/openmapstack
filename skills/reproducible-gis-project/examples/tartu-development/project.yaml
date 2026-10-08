@@ -6,7 +6,7 @@ project:
     walking distance to city-owned kindergarten and school), and land-use criteria in Tartu, and show
     them on an interactive map with education POIs and catchment areas.
   created_at: 2026-08-25 08:15:03+03:00
-  updated_at: '2026-10-07T15:12:59.015099+00:00'
+  updated_at: '2026-10-08T17:51:30.282989+00:00'
   status: warning
 interpretation:
   objective: Find cadastral parcels in Tartu satisfying stated land-use, minimum size (>= 2 ha), primary
@@ -756,13 +756,13 @@ runtime:
     osmium: 4.3.1
 runs:
   latest:
-    id: run-20261007-151210
-    started_at: '2026-10-07T15:12:10.942707+00:00'
-    completed_at: '2026-10-07T15:12:59.015099+00:00'
+    id: run-20261008-175042
+    started_at: '2026-10-08T17:50:42.504076+00:00'
+    completed_at: '2026-10-08T17:51:30.282989+00:00'
     status: warning
-    inputs_hash: sha256:6ae97c209e95f555477cada4660d0af75480b2fc1c230c33b25429773a4ba8e5
+    inputs_hash: sha256:a1318e4e7a23c59137e0cad210ea2d7b966ca42edcae92de1871aa5058675b5c
     outputs_hash: sha256:9a7dc21e8e6ab6efb2d739cdc0f73e25aeca0a6e07db6c60dc22dc1197c3ba22
     record:
-      path: runs/run-20261007-151210.json
+      path: runs/run-20261008-175042.json
     validation_report:
       path: validation/latest-report.json
