@@ -14,6 +14,11 @@ import re
 
 
 def load_spatial(con) -> None:
+    # Offline runners pre-install the extension here instead of downloading it.
+    extension_dir = os.environ.get('OPENMAPSTACK_SPATIAL_EXTENSION_DIR')
+    if extension_dir:
+        path = str(Path(extension_dir).expanduser().resolve()).replace("'", "''")
+        con.execute(f"SET extension_directory = '{path}'")
     try:
         con.execute('LOAD spatial')
     except Exception:
