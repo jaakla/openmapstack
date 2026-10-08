@@ -67,6 +67,7 @@ CHECK_MODULES = (
     "geodata",
     "tables",
     "presentation",
+    "delivery",
     "qgis",
     "visual",
     "rerun",
@@ -84,6 +85,7 @@ DIMENSIONS = {
     "validation": "validation_integrity",
     "qgis": "presentation_contract",
     "presentation": "presentation_contract",
+    "delivery": "presentation_contract",
     "visual": "visual_judgement",
     "rerun": "rerun_success",
     "metamorphic": "metamorphic_evidence",
@@ -100,6 +102,7 @@ KNOWN_ANSWER_CHECKS = frozenset(
         "geodata.feature_field_equals",
         "geodata.field_range",
         "geodata.coordinate_pair_equals",
+        "delivery.selection_is",
     }
 )
 
@@ -267,6 +270,8 @@ def api_info() -> dict[str, Any]:
         "package_version": __version__,
         "check_api_version": CHECK_API_VERSION,
         "project_schema": PROJECT_SCHEMA,
+        "delivery_schemas": ["openmapstack-delivery/v1"],
+        "delivery_kinds": ["dashboard", "qgis", "observable"],
         "skill_snapshot_schemas": ["openmapstack-skill-snapshot/v1", "openmapstack-skill-snapshot/v2"],
         "benchmark_arm_schemas": ["openmapstack-benchmark-arm/v1", "openmapstack-benchmark-arm/v2"],
         "result_schemas": {

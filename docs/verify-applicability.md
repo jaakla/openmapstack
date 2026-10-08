@@ -18,6 +18,41 @@ dependency, supported artifact, or required declaration is `not_testable` and
 remains in the denominator. A mixture of executed and `not_testable` checks
 has aggregate status `warning`, never `passed`.
 
+## Explicit delivery targets
+
+`delivery.schema: openmapstack-delivery/v1` makes target selection authoritative.
+Absent `delivery` retains legacy v1 planning; new templates record the dashboard
+explicitly. Core analytical/provenance checks always apply to their declared
+artifacts. Target selection cannot opt out of them.
+
+- `delivery.declaration_valid` checks supported target identities and output/input
+  bindings. `presentation.layers_reference_outputs` checks persistent map-layer
+  lineage without PyQGIS or a browser.
+- `delivery.<id>.evidence_matches` reads the selected view's embedded metadata,
+  JSON receipt, and analytical bytes. Missing selected files fail. Changed
+  semantics/input/view hashes fail, even if the pipeline rewrites its receipt.
+- Selected web targets get `delivery.<id>.web_view_loads`: local browser smoke,
+  visible provenance and warnings. Missing Playwright/Chromium is `not_testable`;
+  loaded-page errors or missing required visible content fail. The retained
+  export is checked; live hosted state is not queried or certified.
+- Selected QGIS targets get the existing static/native checks under
+  `delivery.<id>.qgis.*`, using the declared archive path, even when the archive
+  is missing. Native runtime unavailability remains `not_testable`. A stray
+  unselected `project.qgz` does not activate this plan.
+- Selected map-primary built-in dashboards also get
+  `delivery.<id>.dashboard_loads_in_browser`, using the existing visual checker.
+  Its failure and missing-capability semantics remain unchanged. External BI
+  views do not inherit dashboard-specific tabs/controls.
+- Table download links are inspected in each selected web view; desktop-only
+  delivery does not require a dashboard. Shared table/source/CRS/control
+  semantics remain checked.
+- Clean reruns require unchanged delivery selection and regenerated target
+  artifacts/evidence. Pipeline-generated evidence is consistency evidence, not
+  an independent answer key or proof of every rendered pixel.
+
+See [the delivery contract](../skills/open-map-stack/references/project-spec.md#20-selectable-delivery--openmapstack-deliveryv1)
+for serialization, hosted evidence and explicit migration.
+
 ## Current plan
 
 “Regression evidence” names representative eval cases. Direct unit tests also
@@ -90,8 +125,9 @@ address them without guessing:
   backend-specific evidence;
 - cross-project presentation consistency requires an explicit comparison
   project;
-- browser/dashboard behaviour and cartographic rendering are not currently in
-  the `verify` plan; Playwright being installed does not imply they ran;
+- legacy browser/dashboard behaviour and additional cartographic predicates
+  are outside the automatic plan; explicit delivery targets execute the bounded
+  checks above. Playwright being installed does not prove any unplanned check ran;
 - validation evidence recomputation requires machine-readable declarations
   mapping report fields to artifacts and metrics;
 - clean-rerun checks run only when the user supplies `--rerun`, and declared

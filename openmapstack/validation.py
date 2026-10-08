@@ -11,6 +11,9 @@ from typing import Any, Iterable
 
 from .checks import project as project_checks
 from .checks import qgis as qgis_checks
+from .checks import delivery as delivery_checks
+from .checks import presentation as presentation_checks
+from . import delivery
 from .integrity import (
     canonical_file_set_hash,
     declared_input_paths,
@@ -150,6 +153,7 @@ class _Validator:
         self._sources()
         self._overrides()
         self._processing_and_outputs()
+        self._delivery()
         self._presentation()
         self._warnings()
         self._runtime()
@@ -450,7 +454,15 @@ class _Validator:
         if not isinstance(presentation, dict):
             self.add("presentation.declaration", "failed", "presentation must be a mapping", path="presentation")
             return
-        missing = [key for key in ("intent", "primary_view", "layout", "map", "provenance_ui") if not _present(presentation.get(key))]
+        required = ["intent", "primary_view"]
+        if "delivery" not in self.project:
+            required += ["layout", "map", "provenance_ui"]
+        else:
+            if presentation.get("primary_view") == "map":
+                required.append("map")
+            if delivery.selected(self.project, "dashboard"):
+                required += ["layout", "provenance_ui"]
+        missing = [key for key in required if not _present(presentation.get(key))]
         layers = get_in(presentation, "map", "layers", default=[])
         groups = get_in(presentation, "map", "layer_groups", default=[])
         group_ids = {str(group.get("id")) for group in groups if isinstance(group, dict) and _present(group.get("id"))} if isinstance(groups, list) else set()
@@ -470,6 +482,19 @@ class _Validator:
             self.add("presentation.declaration", "failed", "; ".join(([f"missing {missing}"] if missing else []) + layer_errors), path="presentation")
         else:
             self.add("presentation.declaration", "passed", f"semantic presentation declares {len(layers)} layers", path="presentation")
+        if "delivery" in self.project:
+            result = presentation_checks.layers_reference_outputs(self.root)
+            self.add("presentation.layers_reference_outputs", result.status, result.detail, **result.data)
+
+    def _delivery(self) -> None:
+        if "delivery" not in self.project:
+            return
+        result = delivery_checks.declaration_valid(self.root)
+        self.add("delivery.declaration", result.status, result.detail, path="delivery", **result.data)
+        if self.artifacts and result.status == "passed":
+            for target in delivery.targets(self.project):
+                evidence = delivery_checks.evidence_matches(self.root, target["id"])
+                self.add(f"delivery.{target['id']}.evidence", evidence.status, evidence.detail, **evidence.data)
 
     def _runtime(self) -> None:
         implementation = get_in(self.project, "runtime", "implementation")
@@ -638,7 +663,7 @@ class _Validator:
             self.add("project.readme", "warning", "README.md is missing", path="README.md")
         else:
             self.add("project.readme", "passed", "README.md exists", path="README.md")
-        if get_in(self.project, "presentation", "primary_view") == "map":
+        if "delivery" not in self.project and get_in(self.project, "presentation", "primary_view") == "map":
             if not (self.root / "project.qgz").is_file():
                 self.add("qgis.project", "warning", "map project has no project.qgz companion", path="project.qgz")
             else:
@@ -646,6 +671,22 @@ class _Validator:
                 self._qgis_layer_crs()
                 self._qgis_datasource_formats()
                 self._qgis_layer_crs_data()
+        elif "delivery" in self.project and not delivery.declaration_errors(self.project, self.root):
+            for target in delivery.targets(self.project):
+                if target.get("kind") != "qgis":
+                    continue
+                output = get_in(self.project, "outputs", target.get("output"), default={})
+                path = output.get("path") if isinstance(output, dict) else None
+                if project_path(self.root, path) is None:
+                    continue  # Declaration failure already records this.
+                for name, checker in (
+                    ("static_valid", qgis_checks.static_valid),
+                    ("every_layer_declares_crs", qgis_checks.every_layer_declares_crs),
+                    ("datasources_portable", qgis_checks.datasources_portable),
+                    ("layer_crs_matches_data", qgis_checks.layer_crs_matches_data),
+                ):
+                    result = checker(self.root, path=path)
+                    self.add(f"delivery.{target['id']}.qgis.{name}", result.status, result.detail, path=path, **result.data)
 
     def _runtime_parameters(self) -> None:
         """Delegates to ``verify``'s ``project.parameters_match_steps``.

@@ -9,6 +9,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_FILES = ("README.md", "project.yaml", "pipeline.py", "routing.py", "requirements.txt", "run_e2e.py", "data/overrides/planned-road.geojson")
+DELIVERY_EXAMPLE_FILES = ("README.md", "project.yaml", "pipeline.py", "create.py", "data/source/parcels.geojson")
 NOTES = """# Installed example contents
 
 Generated maps, QGIS archives, source downloads, derived data, validation
@@ -34,6 +35,8 @@ def expected_assets(root=ROOT):
             for relative in EXAMPLE_FILES:
                 outputs[target / "examples/tartu-development" / relative] = (root / "examples/tartu-development" / relative).read_bytes()
             outputs[target / "examples/tartu-development/PACKAGE-NOTES.md"] = NOTES.encode()
+            for relative in DELIVERY_EXAMPLE_FILES:
+                outputs[target / "examples/delivery-profiles" / relative] = (root / "examples/delivery-profiles" / relative).read_bytes()
             outputs[target / "schemas/project-v1.schema.json"] = (root / "openmapstack/schemas/project-v1.schema.json").read_bytes()
         for reference in skill["shared_references"]:
             source = generalist / "references" / reference

@@ -974,14 +974,24 @@ def _resolve_output_references(value: Any, project_path: Path) -> Any:
 
     Used recursively so geodata, evidence and clean-rerun assertions all inspect
     the same manifest-declared artifact, regardless of filename or format.
+    $DELIVERY:<target-id> follows the target's output binding first.
     """
     if isinstance(value, dict):
         return {key: _resolve_output_references(item, project_path) for key, item in value.items()}
     if isinstance(value, list):
         return [_resolve_output_references(item, project_path) for item in value]
-    if isinstance(value, str) and value.startswith("$OUTPUT:"):
-        output_id = value.removeprefix("$OUTPUT:")
+    if isinstance(value, str) and value.startswith(("$OUTPUT:", "$DELIVERY:")):
         project = load_project_yaml(project_path) or {}
+        if value.startswith("$DELIVERY:"):
+            from openmapstack.delivery import targets
+
+            target_id = value.removeprefix("$DELIVERY:")
+            selected = [target for target in targets(project) if target.get("id") == target_id]
+            if len(selected) != 1 or not isinstance(selected[0].get("output"), str):
+                raise ValueError(f"delivery target {target_id!r} must have one declared output binding")
+            output_id = selected[0]["output"]
+        else:
+            output_id = value.removeprefix("$OUTPUT:")
         outputs = project.get("outputs") or {}
         output = outputs.get(output_id) if isinstance(outputs, dict) else None
         path = output.get("path") if isinstance(output, dict) else None
