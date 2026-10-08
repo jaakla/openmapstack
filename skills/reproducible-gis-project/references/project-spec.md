@@ -123,8 +123,11 @@ The pipeline embeds one `openmapstack-view/v1` JSON record in every view:
 - QGIS: native project variable `openmapstack_delivery`, set with
   `QgsExpressionContextUtils.setProjectVariable`, or a serialized custom property
   `openmapstack.delivery` retained by the integration. Use PyQGIS to save the
-  project, preserving its other properties. Project metadata exposes provenance
-  and limitations in the desktop interface. The verifier reads serialized property/Option or project-variable
+  project, preserving its other properties. Native `projectMetadata` exposes
+  source providers, assumption statements and rationales, and declared warning
+  statements in the desktop interface (for example, in its abstract).
+  `delivery.evidence_matches` checks these fields without PyQGIS; hidden binding
+  metadata alone cannot pass. The verifier reads serialized property/Option or project-variable
   representations without requiring PyQGIS.
 
 Use `openmapstack.delivery.metadata_json(root, project, target)` to build this

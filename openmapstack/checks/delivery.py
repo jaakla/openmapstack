@@ -81,6 +81,31 @@ def _embedded_metadata(path: Path, kind: str) -> dict:
     return json.loads(values[0])
 
 
+def _qgis_provenance_errors(path: Path, project: dict) -> list[str]:
+    """Inspect desktop-visible metadata, separately from the hidden binding."""
+    from .qgis import _extract_qgs_xml
+
+    tree = ET.fromstring(_extract_qgs_xml(path))
+    metadata = tree.findall("./projectMetadata")
+    if len(metadata) != 1:
+        return ["QGIS project must expose one projectMetadata record"]
+    visible = " ".join(" ".join(metadata[0].itertext()).split())
+    required = [("source provider", source.get("provider"))
+                for source in (project.get("sources") or {}).values()]
+    for assumption in (project.get("interpretation") or {}).get("assumptions") or []:
+        required.extend((f"assumption {field}", assumption.get(field))
+                        for field in ("statement", "rationale"))
+    required.extend(("declared warning", warning.get("statement"))
+                    for warning in project.get("warnings") or [])
+    errors = []
+    if not visible:
+        errors.append("QGIS project metadata is empty")
+    for label, value in required:
+        if value and " ".join(str(value).split()) not in visible:
+            errors.append(f"{label} missing from QGIS project metadata: {value}")
+    return errors
+
+
 def evidence_matches(workspace: Path, target_id: str, project_dir: str = ".") -> AssertionResult:
     """Read back actual view metadata, receipt and input/output bytes.
 
@@ -108,11 +133,14 @@ def evidence_matches(workspace: Path, target_id: str, project_dir: str = ".") ->
         expected = delivery.evidence_payload(root, project, target)
         actual = json.loads(receipt.read_text(encoding="utf-8"))
         embedded = _embedded_metadata(path, target["kind"])
+        provenance_errors = _qgis_provenance_errors(path, project) if target["kind"] == "qgis" else []
     except (OSError, ValueError, TypeError, ET.ParseError, zipfile.BadZipFile) as exc:
         return failed(f"unreadable delivery evidence: {exc}", code="delivery_evidence_invalid")
     if actual != expected or embedded != expected["metadata"]:
         return failed("view metadata/evidence disagree with canonical inputs or semantics",
                       code="delivery_evidence_mismatch")
+    if provenance_errors:
+        return failed("; ".join(provenance_errors), code="delivery_provenance_missing")
     return passed(f"{target_id}: view and evidence bind the declared analysis",
                   evidence={"view_sha256": expected["view_sha256"],
                             "analytical_outputs": expected["metadata"]["analytical_outputs"]})

@@ -68,7 +68,11 @@ assertions:
   args:
     target_id: qgis
 - assert: qgis.static_valid
+  args:
+    path: $DELIVERY:qgis
 - assert: qgis.runtime_load
+  args:
+    path: $DELIVERY:qgis
   hard_gate: false
 - assert: delivery.evidence_matches
   args:

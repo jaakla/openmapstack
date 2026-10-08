@@ -6,6 +6,8 @@ import argparse
 import importlib.util
 import subprocess
 import sys
+import zipfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import yaml
@@ -38,6 +40,17 @@ def generate(destination: Path, kinds: list[str], mutation: str | None, hosted: 
         project["processing"]["analysis_crs"] = "EPSG:4326"
     elif mutation == "lineage":
         project["presentation"]["map"]["layers"][0]["source"] = "parcels"
+    elif mutation == "qgis_provenance":
+        target = next(t for t in project["delivery"]["targets"] if t["kind"] == "qgis")
+        archive_path = path.parent / project["outputs"][target["output"]]["path"]
+        with zipfile.ZipFile(archive_path) as archive:
+            xml = ET.fromstring(archive.read("project.qgs"))
+        xml.remove(xml.find("projectMetadata"))
+        with zipfile.ZipFile(archive_path, "w") as archive:
+            archive.writestr("project.qgs", ET.tostring(xml))
+        # Correct hidden metadata plus an updated view hash still cannot certify provenance.
+        from openmapstack.delivery import write_evidence
+        write_evidence(path.parent, project)
     path.write_text(yaml.safe_dump(project, sort_keys=False))
 
 
@@ -46,6 +59,6 @@ if __name__ == "__main__":
     parser.add_argument("destination", type=Path)
     parser.add_argument("--targets", default="dashboard")
     parser.add_argument("--hosted", action="store_true")
-    parser.add_argument("--break", dest="mutation", choices=["unknown", "missing", "stale", "unpinned", "crs", "lineage"])
+    parser.add_argument("--break", dest="mutation", choices=["unknown", "missing", "stale", "unpinned", "crs", "lineage", "qgis_provenance"])
     args = parser.parse_args()
     generate(args.destination, args.targets.split(","), args.mutation, args.hosted)
