@@ -16,6 +16,26 @@ SEMANTIC_ROLES = {
 }
 
 
+def layers_reference_outputs(workspace: Path, project_dir: str = ".") -> AssertionResult:
+    """Static presentation lineage; no QGIS/browser runtime is required."""
+    proj = load_project_yaml(workspace, project_dir)
+    if proj is None:
+        return failed("project.yaml missing", code="manifest_missing")
+    # These helpers resolve format variants and override geometry from manifest
+    # data only. They neither import PyQGIS nor open a desktop project.
+    from .qgis import _manifest_layer_files, _acceptable_files, _is_client_local
+    resolved = _manifest_layer_files(proj)
+    errors = []
+    for layer in get_in(proj, "presentation.map.layers", []) or []:
+        if not isinstance(layer, dict):
+            errors.append("layer must be a mapping")
+        elif not _is_client_local(layer) and not _acceptable_files(resolved, layer.get("source")):
+            errors.append(f"layer source {layer.get('source')!r} names no output or override geometry")
+    if errors:
+        return failed("; ".join(errors), code="presentation_source_unresolved")
+    return passed("all persistent presentation layers resolve to outputs or override geometry")
+
+
 def layers_use_semantic_roles(workspace: Path, project_dir: str = ".") -> AssertionResult:
     proj = load_project_yaml(workspace, project_dir)
     if proj is None:

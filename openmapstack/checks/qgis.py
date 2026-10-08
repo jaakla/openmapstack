@@ -56,7 +56,7 @@ def static_valid(workspace: Path, path: str = "project.qgz", project_dir: str = 
         return failed(f"{path} declares no layers (no <datasource> elements)", code="no_layers")
 
     errors: list[str] = []
-    root = project_root(workspace, project_dir)
+    root = qgz_path.parent
     for ds in datasources:
         ds = ds.strip()
         # remote/WMS/WFS datasources use key=value query strings, not file paths.
@@ -191,7 +191,7 @@ def layer_crs_matches_data(workspace: Path, path: str = "project.qgz", project_d
         return failed(f"{path} is not a valid zip archive", code="not_a_zip")
     if xml is None:
         return failed(f"{path} does not contain a .qgs document", code="no_qgs_document")
-    root = project_root(workspace, project_dir)
+    root = _qgz_path.parent
     compared: dict[str, dict[str, str]] = {}
     mismatched: list[str] = []
     for layer_xml in re.findall(r"<maplayer[ >].*?</maplayer>", xml, re.DOTALL):
@@ -414,7 +414,7 @@ def _render_extent_png(
         known = set(layers.values())
         ordered = [lyr for lyr in ordered if lyr in known] or list(layers.values())
         valid_layers = [lyr for lyr in ordered if lyr.isValid()]
-        if not valid_layers:
+        if not valid_layers and extent_layers is None:
             return "no valid layers to render"
 
         def is_tile_layer(lyr: Any) -> bool:
@@ -423,15 +423,22 @@ def _render_extent_png(
         # The extent never comes from tile layers, whose reported extent is
         # the whole world; it comes from the local data under test.
         data_layers = [lyr for lyr in valid_layers if not is_tile_layer(lyr)]
-        if not data_layers:
+        if not data_layers and extent_layers is None:
             return "no local data layers to render (only remote basemap layers present)"
         # The basemap is part of what the reader sees, so it belongs in the
         # snapshot -- but a tile server that does not answer must degrade to
         # a bare background, never to a failed render.
         render_layers = valid_layers if include_basemap else data_layers
 
+        extent_source = data_layers
+        if extent_layers is not None:
+            extent_source = [
+                lyr for lyr in extent_layers.values() if lyr.isValid() and not is_tile_layer(lyr)
+            ] or data_layers
+        # Removing the only analytical layer intentionally leaves an empty
+        # comparison canvas. Its frame/CRS still come from the full layer set.
         destination_authid = next(
-            (lyr.crs().authid() for lyr in data_layers if lyr.crs().authid()), None
+            (lyr.crs().authid() for lyr in extent_source if lyr.crs().authid()), None
         ) or project.crs().authid()
         if not destination_authid:
             return "no layer or project declares a usable CRS"
@@ -439,12 +446,6 @@ def _render_extent_png(
         # PyQGIS quirk where layer-attached CRS/transform objects report
         # isValid()==False even though the authid itself is well-formed.
         destination_crs = QgsCoordinateReferenceSystem(destination_authid)
-
-        extent_source = data_layers
-        if extent_layers is not None:
-            extent_source = [
-                lyr for lyr in extent_layers.values() if lyr.isValid() and not is_tile_layer(lyr)
-            ] or data_layers
 
         extent = None
         for lyr in extent_source:
@@ -649,8 +650,10 @@ def _manifest_layer_files(proj: dict[str, Any]) -> dict[str, list[str]]:
     an output may have several format variants) or an override layer id
     (``overrides[].layer`` → geometry_file path)."""
     resolved: dict[str, list[str]] = {}
-    for key, output in (proj.get("outputs") or {}).items():
-        if not (isinstance(output, dict) and output.get("path")):
+    outputs = proj.get("outputs")
+    outputs = outputs if isinstance(outputs, dict) else {}
+    for key, output in outputs.items():
+        if not (isinstance(key, str) and isinstance(output, dict) and isinstance(output.get("path"), str) and output["path"]):
             continue
         resolved.setdefault(key, []).append(output["path"])
         # Format variants convention: the same dataset may be emitted under
@@ -662,9 +665,11 @@ def _manifest_layer_files(proj: dict[str, Any]) -> dict[str, list[str]]:
         if base:
             resolved.setdefault(base, []).append(output["path"])
     for override in proj.get("overrides") or []:
+        if not isinstance(override, dict):
+            continue
         layer = override.get("layer")
         geometry_file = (override.get("geometry_file") or {}).get("path") if isinstance(override.get("geometry_file"), dict) else None
-        if layer and geometry_file:
+        if isinstance(layer, str) and layer and isinstance(geometry_file, str) and geometry_file:
             resolved.setdefault(layer, []).append(geometry_file)
     return resolved
 
@@ -678,7 +683,7 @@ def _acceptable_files(resolved: dict[str, list[str]], key: str | None) -> list[s
     and demanding the .qgz open the GeoJSON would force the desktop project
     onto the weaker file purely to satisfy a string match.
     """
-    if not key:
+    if not isinstance(key, str) or not key:
         return []
     files = list(resolved.get(key) or [])
     base = _base_output_key(key)

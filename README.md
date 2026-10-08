@@ -9,7 +9,7 @@ Install (assuming you have git and nodejs with npx already installed):
 npx skills@1.5.26 add jaakla/openmapstack-skills --skill open-map-stack -g
 ```
 
-OpenMapStack gives your favorite AI agent: Claude Code, Codex, Cursor, OpenCode, PI and 50+ other agents not just a one-off analysis, but a well-defined **workflow project** (`project.yaml`) defining from data discovery through reusable analysis (`pipeline.py`) to interactive web (`dashboard.html`) and GIS deliverables (QGIS `project.qgz`). The workflow becomes **inspectable** and **repeatable** as a clearly specified project with pinned sources, explicit assumptions and CRS choices and deterministic processing in a python script. It allows also isolated overrides, machine-readable validation, and surfaced provenance.
+OpenMapStack gives your favorite AI agent: Claude Code, Codex, Cursor, OpenCode, PI and 50+ other agents not just a one-off analysis, but a well-defined **workflow project** (`project.yaml`) defining from data discovery through reusable analysis (`pipeline.py`) to interactive web (`dashboard.html`) and selected deliverables (built-in dashboard by default; optional QGIS or Observable views). The workflow becomes **inspectable** and **repeatable** as a clearly specified project with pinned sources, explicit assumptions and CRS choices and deterministic processing in a python script. It allows also isolated overrides, machine-readable validation, and surfaced provenance.
 
 It is open-first (both data and code-wise) and cloud-native by default, built on shoulders of the established Open GIS stack: STAC for discovery; GeoParquet, COG, and PMTiles for storage and delivery; DuckDB and PostGIS for compute; and QGIS, MapLibre, and Martin for presentation. It also teaches to deploy GDAL/OGR, GeoPandas, xarray/rioxarray, PDAL, routing engines, spatial SQL, and pragmatic hosted services when scale or reliability requires them.
 
@@ -44,7 +44,7 @@ Includes all the skills.
 - [references/web-delivery.md](skills/open-map-stack/references/web-delivery.md) — renderer selection for maps, PMTiles, MVT, Martin, TiTiler, MapLibre, deck.gl, kepler.gl, and lonboard formats and engines.
 - [references/qgis.md](skills/open-map-stack/references/qgis.md) — QGIS desktop, plugins, PyQGIS, Processing, QGIS MCP.
 - [references/validation-and-ops.md](skills/open-map-stack/references/validation-and-ops.md) — validation, manifests, attribution, and deployment checks, including the machine-readable reproducible-project contract.
-- [references/project-spec.md](skills/open-map-stack/references/project-spec.md) — the specific`openmapstack-project/v1` schema: compiling any material analysis into a reproducible GIS project (`project.yaml`, pipeline, source provenance, overrides, validation, semantic presentation, QGIS output).
+- [references/project-spec.md](skills/open-map-stack/references/project-spec.md) — the specific`openmapstack-project/v1` schema: compiling any material analysis into a reproducible GIS project (`project.yaml`, pipeline, source provenance, overrides, validation, semantic presentation, selected delivery outputs).
 - [references/project-workflow.md](skills/open-map-stack/references/project-workflow.md) — the mandatory material-analysis workflow and delivery rules, loaded when a task needs a reproducible project.
 - [templates/](templates/) — ready scaffolds (`project.yaml`, `pipeline.py`, `presentation.yaml`, `validation.yaml`) for new projects.
 
@@ -63,7 +63,7 @@ agent to produce:
   executable logic, so derived results can be rebuilt without manual edits.
 - Machine-readable validation and run evidence, including a clean rerun, so
   failures and reproducibility claims can be checked.
-- QGIS and web presentation derived from the same project, so maps and reports
+- Selected web/desktop presentation derived from the same project, so maps and reports
   reflect the validated analysis.
 
 The skill includes its own [project templates](skills/reproducible-gis-project/templates/)
@@ -229,6 +229,48 @@ See the [0.4.0 release notes](https://github.com/jaakla/openmapstack-skills/rele
 for executed validation and installation checks, consumer migration and known
 limitations.
 
+## Selectable delivery profiles
+
+New project templates explicitly select the built-in dashboard using
+`delivery.schema: openmapstack-delivery/v1`. Users can replace that default with
+QGIS-only or Observable-only delivery, or choose multiple targets. Each target
+binds declared document/evidence outputs to the same validated analytical data.
+Unselected integrations have no artifact/runtime obligation; source provenance,
+CRS correctness, immutable overrides and clean reruns remain required.
+
+```yaml
+delivery:
+  schema: openmapstack-delivery/v1
+  targets:
+    - id: dashboard
+      kind: dashboard
+      output: dashboard
+      inputs: [candidate_parcels]
+      evidence: dashboard_evidence
+```
+
+`dashboard` and `dashboard_evidence` must be declared document outputs. The
+canonical pipeline embeds input-bound metadata, generates the view and writes
+its evidence before run hashes. Missing selected artifacts fail; unavailable
+browser/QGIS checks are `not_testable`. QGIS and Observable support here defines
+verified delivery/export contracts; turnkey tool adapters are separate work.
+Hosted Observable targets additionally retain an export, build/configuration,
+URL and retrieval identity. A URL alone is insufficient; verification does not
+certify current remote state or publish anything.
+
+Try the offline [delivery-profile example](examples/delivery-profiles/README.md),
+which demonstrates default, external-only and combined selections without
+cloud credentials. The Tartu worked example retains legacy combined delivery.
+
+**Migration is explicit:** existing v1 manifests without `delivery` retain their
+legacy presentation/QGIS obligations. Add the selection, update output/evidence
+bindings and canonical generation, deliberately remove obsolete target-specific
+dependencies/checks, and regenerate run evidence before `verify --rerun`. The CLI
+never silently migrates or deletes old outputs. Use a CLI whose check catalog
+contains `delivery.declaration_valid`; older tools that ignore the extension
+cannot certify it. Full semantics and migration instructions are in
+[project-spec.md section 2.0](skills/open-map-stack/references/project-spec.md#20-selectable-delivery--openmapstack-deliveryv1).
+
 ## Project CLI
 
 > The key innovation of the skill is not just do the work every time again and then forget it, but to create special well-defined project with data and process descriptions and rerunnable scripts, so the whole process becomes investigatable and repeatable.
@@ -366,8 +408,10 @@ extra. PyQGIS comes from a system QGIS install.
 
 See [the applicability reference](docs/verify-applicability.md) for the exact
 plan conditions, dependencies, current regression evidence, and deliberate
-exclusions. In particular, browser/dashboard checks are not yet part of the
-automatic `verify` plan.
+exclusions. Explicit delivery targets add input-bound view evidence and web
+smoke checks; selected map-primary built-in dashboards also run existing visual
+checks. Legacy projects retain their previous plan. These checks establish
+bounded properties, not every analytical or cartographic claim.
 
 Project-specific known answers can be declared under
 `validation.expectations[]`. The five allowlisted checks cover row count,

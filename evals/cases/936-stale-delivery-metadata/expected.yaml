@@ -1,0 +1,24 @@
+id: 936-stale-delivery-metadata
+case_type: mutation
+modes:
+- fixture
+score_types:
+  fixture: mutation_tests
+project_dir: project
+hard_gate: true
+mutation:
+  control_generator: '{python} {evals_dir}/fixtures/delivery/gen.py {project_dir}
+    --targets observable'
+fixture:
+  generator: '{python} {evals_dir}/fixtures/delivery/gen.py {project_dir} --targets
+    observable --break stale'
+  source_baseline:
+  - source: ../../fixtures/delivery/parcels.geojson
+    destination: data/source/parcels.geojson
+assertions:
+- assert: delivery.evidence_matches
+  expect: failed
+  expect_code: delivery_evidence_mismatch
+  args:
+    target_id: observable
+- assert: project.graph_resolves
