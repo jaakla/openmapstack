@@ -292,6 +292,19 @@ class CommittedWorkedExampleContractTests(unittest.TestCase):
         actual = "sha256:" + hashlib.sha256((EXAMPLE / "pipeline.py").read_bytes()).hexdigest()
         self.assertEqual(pipeline["sha256"], actual)
 
+    def test_latest_run_attests_the_declared_implementation_dependencies(self) -> None:
+        manifest = yaml.safe_load((EXAMPLE / "project.yaml").read_text(encoding="utf-8"))
+        record = json.loads((EXAMPLE / manifest["runs"]["latest"]["record"]["path"]).read_text())
+        inputs = {item["path"]: item["sha256"] for item in record["inputs"]}
+        for dependency in manifest["runtime"]["implementation"].get("dependencies", []):
+            path = EXAMPLE / dependency
+            for item in path.rglob("*") if path.is_dir() else [path]:
+                if item.is_file():
+                    relative = item.relative_to(EXAMPLE).as_posix()
+                    with self.subTest(path=relative):
+                        self.assertIn(relative, inputs)
+                        self.assertEqual(inputs[relative], "sha256:" + hashlib.sha256(item.read_bytes()).hexdigest())
+
     def test_qgis_layer_tree_matches_the_manifest(self) -> None:
         result = groups_match_manifest(EXAMPLE)
         self.assertEqual(result.status, "passed", result.detail)

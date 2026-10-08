@@ -154,7 +154,7 @@ def view_metadata(root: Path, project: dict[str, Any], target: dict[str, Any]) -
         path = project_path(root, project["outputs"][key]["path"])
         if path is None or not path.is_file():
             raise ValueError(f"missing analytical output: {key}")
-        analytical[key] = "sha256:" + sha256_file(path)
+        analytical[key] = sha256_file(path)
     # Normalize YAML timestamps and similar values to the JSON representation.
     semantics = json.loads(json.dumps(shared_semantics(project), default=str))
     return {"schema": METADATA_SCHEMA, "target": target["id"],
@@ -177,13 +177,13 @@ def evidence_payload(root: Path, project: dict[str, Any], target: dict[str, Any]
     if path is None or not path.is_file():
         raise ValueError(f"missing delivery output: {target['output']}")
     payload = {"schema": EVIDENCE_SCHEMA, "metadata": view_metadata(root, project, target),
-               "view_sha256": "sha256:" + sha256_file(path)}
+               "view_sha256": sha256_file(path)}
     if target.get("mode", "local") == "hosted":
         build = project_path(root, project["outputs"][target["build"]]["path"])
         if build is None or not build.is_file():
             raise ValueError(f"missing hosted build/export configuration: {target['build']}")
         payload["hosted"] = {"url": target["url"], "retrieved_at": str(target["retrieved_at"]),
-                             "build_sha256": "sha256:" + sha256_file(build)}
+                             "build_sha256": sha256_file(build)}
     return payload
 
 

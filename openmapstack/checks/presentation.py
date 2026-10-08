@@ -160,11 +160,13 @@ def tables_reference_table_outputs(workspace: Path, project_dir: str = ".") -> A
     return passed(f"{len(tables)} table view(s) show declared table outputs")
 
 
-def table_downloads_linked(workspace: Path, project_dir: str = ".", dashboard: str | None = None) -> AssertionResult:
+def table_downloads_linked(workspace: Path, project_dir: str = ".", dashboard: str | None = None,
+                           allow_identical_copies: bool = False) -> AssertionResult:
     """The delivered dashboard links every download file of every table it shows.
 
     The links must point at the files the pipeline wrote (hashed in the run
-    record), not at data regenerated in the browser."""
+    record), not at data regenerated in the browser. Static app builds may opt
+    into project-local bundled copies only when bytes match the declared file."""
     import os
     import re
 
@@ -197,7 +199,21 @@ def table_downloads_linked(workspace: Path, project_dir: str = ".", dashboard: s
         for relative in download_paths(output.get("path", ""), formats).values():
             expected = Path(os.path.relpath(root / relative, page.parent)).as_posix()
             if expected not in hrefs:
-                missing.append(relative)
+                matches = False
+                if allow_identical_copies:
+                    from ..integrity import sha256_file
+                    from ..project import project_path
+                    original = project_path(root, relative)
+                    if original is not None and original.is_file():
+                        for href in hrefs:
+                            if ":" in href or href.startswith("/"):
+                                continue
+                            alias = project_path(root, str(page.parent.relative_to(root) / href))
+                            if alias is not None and alias.is_file() and sha256_file(alias) == sha256_file(original):
+                                matches = True
+                                break
+                if not matches:
+                    missing.append(relative)
     if missing:
         return failed(f"{page.name} does not link downloads {missing}", code="table_download_unlinked", missing=missing)
     return passed(f"{page.name} links every declared table download")

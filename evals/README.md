@@ -854,3 +854,19 @@ the manifest. `geodata.dataset_crs_matches_storage_crs` compares that metadata
 with the project's declared `processing.storage_crs`, for tasks that leave the
 output CRS to the agent; it treats EPSG:4326 and GeoParquet's default
 OGC:CRS84 as the same.
+
+Established-stack contract case `024` and mutations `940`–`944` check bound
+owner definitions/summaries, frozen inputs and missing artifacts using the shared
+spatial SQL fixture. They do not claim that dlt, Dagster, Framework or native
+QGIS executed. Optional real runtime QA is documented in
+[the executable example](../examples/established-stack/README.md#maintainer-evidence)
+and uses `tests/test_established_stack_tools.py`; it needs only explicitly
+selected local runtimes, no paid accounts. Live mode remains subject to the
+repository's explicit model/budget policy.
+
+Mutations `945`–`946` use a synthetic complete HTML/JavaScript/data bundle and
+healthy control twins to reject missing Observable bundle declarations and
+receipts inside bundle directories. The controls execute and validate their
+canonical pipeline without claiming a Framework runtime. Unit tests also cover
+multiple selected targets, changed/deleted JS/CSS/data, and receipt placement
+before files exist.

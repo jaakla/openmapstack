@@ -8,3 +8,5 @@ PyYAML>=6.0
 # aborts outright when a declared concurrency library is missing, so greenlet
 # is required wherever `coverage run` runs -- with or without Playwright.
 greenlet>=3
+# Execute the same dbt SQL definitions in deterministic integration fixtures.
+Jinja2>=3.1,<4

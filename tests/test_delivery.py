@@ -13,7 +13,7 @@ import tempfile
 import unittest
 import zipfile
 import xml.etree.ElementTree as ET
-from contextlib import redirect_stdout
+from contextlib import redirect_stdout, nullcontext
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -204,7 +204,8 @@ class DeliveryTests(unittest.TestCase):
         surface.count.return_value = 1
         surface.is_visible.return_value = True
         surface.inner_text.return_value = self.project["sources"]["parcels"]["provider"]
-        with patch("openmapstack.checks.visual._playwright", return_value=context):
+        with patch("openmapstack.checks.visual._playwright", return_value=context), \
+             patch("openmapstack.checks.delivery._serve_bundle", side_effect=lambda path: nullcontext("http://example.invalid/index.html")):
             # Warning comparison must reflect the declared statement exactly.
             result = checks.web_view_loads(self.root, "observable")
             self.assertEqual(result.data["code"], "delivery_view_unhealthy")
@@ -220,6 +221,15 @@ class DeliveryTests(unittest.TestCase):
             self.assertEqual(checks.web_view_loads(self.root, "observable").status, "failed")
             context.return_value.__enter__.return_value.chromium.launch.side_effect = RuntimeError("missing system library")
             self.assertEqual(checks.web_view_loads(self.root, "observable").status, "not_testable")
+
+    def test_unavailable_local_http_is_a_capability_gap(self):
+        self.build(["observable"])
+        context = MagicMock()
+        with patch("openmapstack.checks.visual._playwright", return_value=context), \
+             patch("openmapstack.checks.delivery._serve_bundle", side_effect=PermissionError("loopback restricted")):
+            result = checks.web_view_loads(self.root, "observable")
+        self.assertEqual(result.status, "not_testable")
+        self.assertEqual(result.data["code"], "local_server_unavailable")
 
     def test_eval_source_fixture_matches_committed_example(self):
         fixture = EXAMPLE.parents[1] / "evals/fixtures/delivery/parcels.geojson"

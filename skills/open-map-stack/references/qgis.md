@@ -1,5 +1,9 @@
 # QGIS — Desktop, Plugins, and MCP
 
+For selected existing tools and runnable dlt/Dagster/dbt/Observable/QGIS examples,
+see `established-stack.md`. Keep one owner per transformation/dependency;
+optional tool runtimes are required only for selected integration work.
+
 QGIS is the open desktop GIS — full cartographic production, the Processing toolbox (a unified front-end for GDAL/GRASS/SAGA/WhiteboxTools/OTB), a mature plugin ecosystem (1500+ plugins), and a PyQGIS scripting API. It also has multiple MCP integrations now, which enable agentic / LLM-driven QGIS workflows.
 
 QGIS is an optional delivery integration for projects declaring
@@ -94,7 +98,7 @@ docker run --rm -u "$(id -u):$(id -g)" \
   qgis/qgis:3.44.3 python3 build_project.py
 ```
 
-`QT_QPA_PLATFORM=offscreen` is required — without it PyQGIS aborts on a missing display. `examples/tartu-development/pipeline.py` uses exactly this pattern, with a deterministic XML fallback when Docker is unavailable. If you need GDAL alone (no QGIS), use `ghcr.io/osgeo/gdal:alpine-small-latest`; the legacy Docker Hub path `osgeo/gdal` no longer publishes new images.
+`QT_QPA_PLATFORM=offscreen` is required — without it PyQGIS aborts on a missing display. The Tartu example's optional `qgis_delivery.py` adapter uses this pattern, with a deterministic XML fallback when Docker is unavailable. If you need GDAL alone (no QGIS), use `ghcr.io/osgeo/gdal:alpine-small-latest`; the legacy Docker Hub path `osgeo/gdal` no longer publishes new images.
 
 ## Processing toolbox — the unified algorithm front-end
 
@@ -399,7 +403,10 @@ layer.triggerRepaint()
 
 ## Reproducible project output (`project.qgz`)
 
-For any multi-stage analysis, generate `project.qgz` as a first-class, layer- and style-perfect companion to the web dashboard (see `project-spec.md` section 5). The QGIS project must **reference the exact generated/derived datasets and override files**, never an independent or disconnected analytical state:
+When QGIS is selected (or a legacy v1 project requires its companion), generate
+the declared desktop project as a first-class, layer- and style-perfect view
+(see `project-spec.md` section 5). Web delivery is required only when selected.
+The QGIS project must **reference the exact generated/derived datasets and override files**, never an independent or disconnected analytical state:
 
 ```text
 project.yaml

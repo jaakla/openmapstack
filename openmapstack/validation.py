@@ -12,6 +12,7 @@ from typing import Any, Iterable
 from .checks import project as project_checks
 from .checks import qgis as qgis_checks
 from .checks import delivery as delivery_checks
+from .checks import integration as integration_checks
 from .checks import presentation as presentation_checks
 from . import delivery
 from .integrity import (
@@ -154,6 +155,7 @@ class _Validator:
         self._overrides()
         self._processing_and_outputs()
         self._delivery()
+        self._integrations()
         self._presentation()
         self._warnings()
         self._runtime()
@@ -485,6 +487,15 @@ class _Validator:
         if "delivery" in self.project:
             result = presentation_checks.layers_reference_outputs(self.root)
             self.add("presentation.layers_reference_outputs", result.status, result.detail, **result.data)
+
+    def _integrations(self) -> None:
+        if "integrations" not in self.project:
+            return
+        result = integration_checks.bindings_valid(self.root)
+        self.add("integration.bindings", result.status, result.detail, **result.data)
+        if self.artifacts and result.status == "passed":
+            result = integration_checks.evidence_matches(self.root)
+            self.add("integration.evidence", result.status, result.detail, **result.data)
 
     def _delivery(self) -> None:
         if "delivery" not in self.project:

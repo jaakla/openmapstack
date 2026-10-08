@@ -11,6 +11,11 @@ Solve the query in the engine the user has chosen. Read
 `references/spatial-sql.md` for the relevant engine and query patterns, and
 `references/formats-and-crs.md` when coordinate or format semantics matter.
 
+When the user has dlt, Dagster, dbt, QGIS or Observable in their stack, read
+`references/established-stack.md` for ownership and integration boundaries.
+Preserve their chosen tools; retain source pins, GIS correctness and reproducible
+evidence. Do not duplicate their SQL, ingestion or scheduler definitions.
+
 ## Query workflow
 
 1. Establish the engine/version, available spatial functions, geometry versus

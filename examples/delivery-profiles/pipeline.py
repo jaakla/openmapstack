@@ -47,6 +47,7 @@ def main() -> None:
     completed = datetime.datetime.now(datetime.timezone.utc).isoformat()
     for target in targets(project):
         path = ROOT / project["outputs"][target["output"]]["path"]
+        path.parent.mkdir(parents=True, exist_ok=True)
         metadata = metadata_json(ROOT, project, target)
         providers = "; ".join(s["provider"] for s in project["sources"].values())
         limitations = " ".join(a["statement"] + " " + a["rationale"] for a in project["interpretation"]["assumptions"])

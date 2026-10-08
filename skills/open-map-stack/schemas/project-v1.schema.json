@@ -27,6 +27,100 @@
       }
     },
 
+    "integrations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "bindings",
+        "evidence"
+      ],
+      "properties": {
+        "schema": {
+          "const": "openmapstack-integrations/v1"
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_evidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bindings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "owner",
+              "role",
+              "definition",
+              "sha256",
+              "steps",
+              "steps_sha256"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "owner": {
+                "type": "string",
+                "minLength": 1
+              },
+              "role": {
+                "type": "string",
+                "minLength": 1
+              },
+              "definition": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "steps": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "steps_sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "bundles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "target",
+              "path"
+            ],
+            "properties": {
+              "target": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
     "delivery": {
       "type": "object",
       "required": ["schema", "targets"],
@@ -374,6 +468,7 @@
     }
   },
   "properties": {
+    "integrations": {"$ref": "#/$defs/integrations"},
     "delivery": {"$ref": "#/$defs/delivery"},
     "schema": {"const": "openmapstack-project/v1"},
     "project": {

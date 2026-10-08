@@ -1432,3 +1432,13 @@ Grab a scaffold from `../templates/` and copy/adapt:
 - `templates/validation.yaml` — validation rules + report starters
 
 A worked example implementing the acceptance (Tartu) scenario in `../examples/tartu-development/` contains a complete `project.yaml`, pipeline, overrides, validation, and a QGIS project pass.
+
+## Optional established-stack bindings
+
+`integrations.schema: openmapstack-integrations/v1` binds authoritative tool
+files and the derived execution summary without replacing the processing or
+provenance contract. See [established-stack.md](established-stack.md) for the
+integration boundary and examples; the packaged project JSON schema and
+`integration.bindings_valid` / `integration.evidence_matches` own its shape and
+checks. Absent integrations preserve existing v1 behavior. A clean rerun must
+retain declared ownership and delivery selection, and rebuild selected outputs.

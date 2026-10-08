@@ -13,6 +13,11 @@ they cannot meet a stated requirement; explain consequential changes before
 making them. Do not silently substitute a convenient proxy for the requested
 measurement.
 
+When the user has dlt, Dagster, dbt, QGIS or Observable in their stack, read
+`references/established-stack.md` for ownership and integration boundaries.
+Preserve their chosen tools; retain source pins, GIS correctness and reproducible
+evidence. Do not duplicate their SQL, ingestion or scheduler definitions.
+
 ## Compile or update the project
 
 Read `references/project-workflow.md` for mandatory workflow and delivery

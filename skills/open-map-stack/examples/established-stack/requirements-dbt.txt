@@ -1,0 +1,3 @@
+-r requirements-base.txt
+dbt-duckdb==1.11.0
+dbt-core==1.12.5

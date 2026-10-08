@@ -1,0 +1,17 @@
+version: 2
+sources:
+  - name: pinned
+    schema: raw
+    tables:
+      - name: parcels
+models:
+  - name: measured
+    columns:
+      - name: id
+        data_tests: [unique, not_null]
+      - name: area_m2
+        data_tests: [not_null]
+  - name: candidates
+    columns:
+      - name: id
+        data_tests: [unique, not_null]

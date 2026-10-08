@@ -229,6 +229,26 @@ See the [0.4.0 release notes](https://github.com/jaakla/openmapstack-skills/rele
 for executed validation and installation checks, consumer migration and known
 limitations.
 
+## Use your established stack
+
+OpenMapStack supplies GIS methodology, source provenance and an inspectable
+project contract around existing tools. It does not replace loaders, schedulers
+or BI platforms. Preserve the user's stack and give each transformation and
+dependency one authoritative owner.
+
+The [focused and composed examples](examples/established-stack/README.md) run
+dlt file ingestion/cursor state, dbt + DuckDB Spatial models/tests, Dagster assets
+and failure handling, real Observable Framework builds, and optional native QGIS
+delivery. The default example requires only the base spatial runtime and produces
+a dashboard. Choosing one integration does not install all tools. Composed runs
+use Dagster → dlt → dbt → Observable, with optional QGIS from the same validated
+outputs. Observable hosted notebook publication is not implemented.
+
+Read [the integration boundary](skills/open-map-stack/references/established-stack.md)
+for who benefits, ownership, optional versioned bindings, clean reruns, capability
+checks and future enterprise surfaces. MotherDuck/BigQuery source connectors
+already exist; remote compute, Snowflake and Esri integrations remain extensions.
+
 ## Selectable delivery profiles
 
 New project templates explicitly select the built-in dashboard using
@@ -252,8 +272,8 @@ delivery:
 `dashboard` and `dashboard_evidence` must be declared document outputs. The
 canonical pipeline embeds input-bound metadata, generates the view and writes
 its evidence before run hashes. Missing selected artifacts fail; unavailable
-browser/QGIS checks are `not_testable`. QGIS and Observable support here defines
-verified delivery/export contracts; turnkey tool adapters are separate work.
+browser/QGIS checks are `not_testable`. The [established-stack examples](examples/established-stack/README.md) add
+native optional QGIS generation and a real Observable Framework static build.
 Hosted Observable targets additionally retain an export, build/configuration,
 URL and retrieval identity. A URL alone is insufficient; verification does not
 certify current remote state or publish anything.
