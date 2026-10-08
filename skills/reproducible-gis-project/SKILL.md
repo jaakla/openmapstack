@@ -67,6 +67,7 @@ CLI setup and the worked example's runtime requirements.
 - Authoritative public inputs and catalog completeness: `references/data-sources.md`.
 - Validation and operational evidence: `references/validation-and-ops.md`.
 - QGIS delivery and runtime behavior: `references/qgis.md`.
+- Dashboards, reports and their checked interaction hooks: `references/design-language.md`.
 
 An installed `geospatial-data-discovery` or `spatial-sql` may help with a bounded
 source or query question. Their absence does not prevent this skill from using

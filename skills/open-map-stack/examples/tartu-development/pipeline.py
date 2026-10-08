@@ -1561,61 +1561,67 @@ def _override_cards() -> list[dict]:
 # The renderer. Placeholders (__TOKEN__) are substituted by render_dashboard, so
 # the CSS/JS below is plain text and needs no brace escaping.
 DASHBOARD_TEMPLATE = r"""<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-oms-state="canonical">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__TITLE__ — OpenMapStack project view</title>
 <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
 <style>
+/* openmapstack-views/0.1 · workspace
+   new: draft-override editor on the Edit tab, per-layer lineage, basemap
+   theme switch. */
+:root { --oms-exploratory: var(--oms-warn); }
 :root {
   color-scheme: light dark;
-  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --oms-font-body: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --oms-font-data: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
-  --bg: #eef1f5;
-  --surface: #ffffff;
-  --surface-2: #f4f6f9;
+  --oms-bg: #eef1f5;
+  --oms-surface: #ffffff;
+  --oms-surface-2: #f4f6f9;
   --surface-3: #e9edf2;
-  --border: #dde2ea;
+  --oms-border: #dde2ea;
   --border-strong: #c5cddb;
-  --text: #101720;
-  --text-muted: #5a6675;
+  --oms-text: #101720;
+  --oms-text-muted: #5a6675;
   --text-faint: #8c96a4;
-  --accent: #0f766e;
+  --oms-accent: #0f766e;
   --accent-text: #0b5c56;
   --accent-soft: rgba(15, 118, 110, 0.10);
-  --ok: #197a45;
+  --oms-ok: #197a45;
   --ok-soft: rgba(25, 122, 69, 0.12);
-  --warn: #a35a08;
+  --oms-warn: #a35a08;
   --warn-soft: rgba(163, 90, 8, 0.12);
-  --err: #b3261e;
+  --oms-error: #b3261e;
   --err-soft: rgba(179, 38, 30, 0.12);
   --info: #1d4ed8;
   --shadow-sm: 0 1px 2px rgba(16, 23, 32, 0.06), 0 1px 3px rgba(16, 23, 32, 0.05);
   --shadow-md: 0 4px 12px rgba(16, 23, 32, 0.10), 0 2px 4px rgba(16, 23, 32, 0.06);
-  --radius: 10px;
+  --oms-radius: 10px;
   --radius-sm: 7px;
   --panel-w: 384px;
+  --map-icon-filter: none;
 }
 :root[data-theme="dark"], :root:not([data-theme="light"]) {
-  --bg: #070b10;
-  --surface: #10161e;
-  --surface-2: #161e28;
+  --map-icon-filter: invert(1);
+  --oms-bg: #070b10;
+  --oms-surface: #10161e;
+  --oms-surface-2: #161e28;
   --surface-3: #1d2733;
-  --border: #232f3d;
+  --oms-border: #232f3d;
   --border-strong: #33445a;
-  --text: #e6ecf3;
-  --text-muted: #93a2b4;
+  --oms-text: #e6ecf3;
+  --oms-text-muted: #93a2b4;
   --text-faint: #6d7d90;
-  --accent: #2dd4bf;
+  --oms-accent: #2dd4bf;
   --accent-text: #5eead4;
   --accent-soft: rgba(45, 212, 191, 0.12);
-  --ok: #4ade80;
+  --oms-ok: #4ade80;
   --ok-soft: rgba(74, 222, 128, 0.13);
-  --warn: #fbbf24;
+  --oms-warn: #fbbf24;
   --warn-soft: rgba(251, 191, 36, 0.13);
-  --err: #f87171;
+  --oms-error: #f87171;
   --err-soft: rgba(248, 113, 113, 0.13);
   --info: #60a5fa;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -1623,23 +1629,24 @@ DASHBOARD_TEMPLATE = r"""<!DOCTYPE html>
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --bg: #eef1f5;
-    --surface: #ffffff;
-    --surface-2: #f4f6f9;
+    --map-icon-filter: none;
+    --oms-bg: #eef1f5;
+    --oms-surface: #ffffff;
+    --oms-surface-2: #f4f6f9;
     --surface-3: #e9edf2;
-    --border: #dde2ea;
+    --oms-border: #dde2ea;
     --border-strong: #c5cddb;
-    --text: #101720;
-    --text-muted: #5a6675;
+    --oms-text: #101720;
+    --oms-text-muted: #5a6675;
     --text-faint: #8c96a4;
-    --accent: #0f766e;
+    --oms-accent: #0f766e;
     --accent-text: #0b5c56;
     --accent-soft: rgba(15, 118, 110, 0.10);
-    --ok: #197a45;
+    --oms-ok: #197a45;
     --ok-soft: rgba(25, 122, 69, 0.12);
-    --warn: #a35a08;
+    --oms-warn: #a35a08;
     --warn-soft: rgba(163, 90, 8, 0.12);
-    --err: #b3261e;
+    --oms-error: #b3261e;
     --err-soft: rgba(179, 38, 30, 0.12);
     --info: #1d4ed8;
     --shadow-sm: 0 1px 2px rgba(16, 23, 32, 0.06), 0 1px 3px rgba(16, 23, 32, 0.05);
@@ -1651,11 +1658,11 @@ DASHBOARD_TEMPLATE = r"""<!DOCTYPE html>
 [hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
-  font-family: var(--font-sans);
+  font-family: var(--oms-font-body);
   font-size: 13px;
   line-height: 1.5;
-  color: var(--text);
-  background: var(--bg);
+  color: var(--oms-text);
+  background: var(--oms-bg);
   -webkit-font-smoothing: antialiased;
 }
 #app {
@@ -1667,8 +1674,8 @@ body {
 }
 a { color: var(--accent-text); text-decoration: none; }
 a:hover { text-decoration: underline; }
-code, .mono { font-family: var(--font-mono); font-size: 11px; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+code, .mono { font-family: var(--oms-font-data); font-size: 11px; }
+:focus-visible { outline: 2px solid var(--oms-accent); outline-offset: 2px; border-radius: 4px; }
 
 /* ---------------------------------------------------------------- topbar -- */
 .topbar {
@@ -1677,8 +1684,8 @@ code, .mono { font-family: var(--font-mono); font-size: 11px; }
   align-items: center;
   gap: 16px;
   padding: 0 16px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  background: var(--oms-surface);
+  border-bottom: 1px solid var(--oms-border);
   z-index: 5;
 }
 .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
@@ -1705,34 +1712,34 @@ code, .mono { font-family: var(--font-mono); font-size: 11px; }
   font-size: 10.5px; font-weight: 600;
   letter-spacing: 0.04em; text-transform: uppercase;
   padding: 4px 9px; border-radius: 999px;
-  border: 1px solid var(--border-strong); color: var(--text-muted);
+  border: 1px solid var(--border-strong); color: var(--oms-text-muted);
   white-space: nowrap;
 }
 .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.pill.ok { color: var(--ok); background: var(--ok-soft); border-color: transparent; }
-.pill.warn { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
-.pill.err { color: var(--err); background: var(--err-soft); border-color: transparent; }
+.pill.ok { color: var(--oms-ok); background: var(--ok-soft); border-color: transparent; }
+.pill.warn { color: var(--oms-warn); background: var(--warn-soft); border-color: transparent; }
+.pill.err { color: var(--oms-error); background: var(--err-soft); border-color: transparent; }
 .pill.info { color: var(--accent-text); background: var(--accent-soft); border-color: transparent; }
 
 .icon-btn {
   width: 32px; height: 32px; flex: none;
   display: grid; place-items: center;
-  border: 1px solid var(--border); border-radius: 8px;
-  background: var(--surface-2); color: var(--text-muted);
+  border: 1px solid var(--oms-border); border-radius: 8px;
+  background: var(--oms-surface-2); color: var(--oms-text-muted);
   cursor: pointer; font-size: 14px;
   transition: background 0.15s, color 0.15s;
 }
-.icon-btn:hover { background: var(--surface-3); color: var(--text); }
+.icon-btn:hover { background: var(--surface-3); color: var(--oms-text); }
 .mode-btn {
   display: inline-flex; align-items: center; gap: 7px;
   min-height: 32px; padding: 5px 11px;
   border: 1px solid var(--border-strong); border-radius: 8px;
-  background: var(--surface-2); color: var(--text-muted);
+  background: var(--oms-surface-2); color: var(--oms-text-muted);
   font: inherit; font-size: 11.5px; font-weight: 620; cursor: pointer;
 }
-.mode-btn:hover { border-color: var(--accent); color: var(--accent-text); }
+.mode-btn:hover { border-color: var(--oms-accent); color: var(--accent-text); }
 .mode-btn[aria-pressed="true"] {
-  color: var(--accent-text); background: var(--accent-soft); border-color: var(--accent);
+  color: var(--accent-text); background: var(--accent-soft); border-color: var(--oms-accent);
 }
 
 /* ----------------------------------------------------------------- panel -- */
@@ -1740,51 +1747,51 @@ code, .mono { font-family: var(--font-mono); font-size: 11px; }
   grid-area: panel;
   display: flex; flex-direction: column;
   min-height: 0;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
+  background: var(--oms-surface);
+  border-right: 1px solid var(--oms-border);
 }
 .tabs {
   display: flex; gap: 2px; padding: 8px 8px 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--oms-border);
 }
 .tab {
   flex: 1;
   appearance: none; border: 0; background: none;
   font: inherit; font-size: 12px; font-weight: 560;
-  color: var(--text-muted); cursor: pointer;
+  color: var(--oms-text-muted); cursor: pointer;
   padding: 8px 6px 9px; border-radius: 7px 7px 0 0;
   border-bottom: 2px solid transparent;
   transition: color 0.15s, background 0.15s;
 }
-.tab:hover { color: var(--text); background: var(--surface-2); }
-.tab[aria-selected="true"] { color: var(--accent-text); border-bottom-color: var(--accent); }
+.tab:hover { color: var(--oms-text); background: var(--oms-surface-2); }
+.tab[aria-selected="true"] { color: var(--accent-text); border-bottom-color: var(--oms-accent); }
 .tab .tab-badge {
   display: inline-block; margin-left: 5px;
   font-size: 10px; font-weight: 700;
-  color: var(--warn);
+  color: var(--oms-warn);
 }
 .panel-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .panel-scroll::-webkit-scrollbar { width: 10px; }
 .panel-scroll::-webkit-scrollbar-thumb {
   background: var(--border-strong); border-radius: 999px;
-  border: 3px solid var(--surface);
+  border: 3px solid var(--oms-surface);
 }
 .tabpanel { display: none; padding: 4px 0 28px; }
 .tabpanel.is-active { display: block; }
 
 /* ------------------------------------------------------------- accordion -- */
-.acc { border-bottom: 1px solid var(--border); }
+.acc { border-bottom: 1px solid var(--oms-border); }
 .acc > summary {
   list-style: none; cursor: pointer;
   display: flex; align-items: center; gap: 8px;
   padding: 11px 16px;
   font-size: 11px; font-weight: 700;
   letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--oms-text-muted);
   user-select: none;
 }
 .acc > summary::-webkit-details-marker { display: none; }
-.acc > summary:hover { color: var(--text); background: var(--surface-2); }
+.acc > summary:hover { color: var(--oms-text); background: var(--oms-surface-2); }
 .acc > summary .chev {
   margin-left: auto; flex: none;
   transition: transform 0.18s ease;
@@ -1797,33 +1804,33 @@ code, .mono { font-family: var(--font-mono); font-size: 11px; }
   padding: 1px 6px; border-radius: 999px; background: var(--surface-3);
 }
 .acc-body { padding: 2px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
-.acc-body p { color: var(--text-muted); }
-.acc-body p.lead { color: var(--text); }
+.acc-body p { color: var(--oms-text-muted); }
+.acc-body p.lead { color: var(--oms-text); }
 
 /* ---------------------------------------------------------------- pieces -- */
 .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .metric {
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 11px 12px;
+  background: var(--oms-surface-2); border: 1px solid var(--oms-border);
+  border-radius: var(--oms-radius); padding: 11px 12px;
 }
-.metric.primary { border-color: color-mix(in srgb, var(--accent) 35%, transparent); background: var(--accent-soft); }
+.metric.primary { border-color: color-mix(in srgb, var(--oms-accent) 35%, transparent); background: var(--accent-soft); }
 .metric .val {
   font-size: 22px; font-weight: 640; line-height: 1.1;
   letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
 }
 .metric.primary .val { color: var(--accent-text); }
-.metric .lbl { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
-.metric .delta { font-size: 10.5px; font-weight: 600; color: var(--warn); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.metric .lbl { font-size: 11px; color: var(--oms-text-muted); margin-top: 3px; }
+.metric .delta { font-size: 10.5px; font-weight: 600; color: var(--oms-warn); margin-top: 3px; font-variant-numeric: tabular-nums; }
 .metric .delta:empty { display: none; }
 
 .field { display: flex; flex-direction: column; gap: 7px; }
 .field-head { display: flex; align-items: baseline; gap: 8px; }
 .field-head .name { font-size: 12px; font-weight: 560; }
 .field-head .value {
-  margin-left: auto; font-family: var(--font-mono); font-size: 11.5px;
+  margin-left: auto; font-family: var(--oms-font-data); font-size: 11.5px;
   font-variant-numeric: tabular-nums; color: var(--accent-text);
 }
-.field-head .value.off-canonical { color: var(--warn); }
+.field-head .value.off-canonical { color: var(--oms-warn); }
 .field .hint { font-size: 11px; color: var(--text-faint); }
 
 input[type="range"] {
@@ -1841,35 +1848,35 @@ input[type="range"]::-moz-range-track {
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
   width: 15px; height: 15px; margin-top: -6px;
-  border-radius: 50%; background: var(--accent);
-  border: 2px solid var(--surface); box-shadow: var(--shadow-sm);
+  border-radius: 50%; background: var(--oms-accent);
+  border: 2px solid var(--oms-surface); box-shadow: var(--shadow-sm);
 }
 input[type="range"]::-moz-range-thumb {
   width: 15px; height: 15px; border-radius: 50%;
-  background: var(--accent); border: 2px solid var(--surface); box-shadow: var(--shadow-sm);
+  background: var(--oms-accent); border: 2px solid var(--oms-surface); box-shadow: var(--shadow-sm);
 }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip {
   appearance: none; font: inherit; font-size: 11px; font-weight: 550;
   padding: 5px 10px; border-radius: 999px; cursor: pointer;
-  border: 1px solid var(--border-strong); background: var(--surface);
-  color: var(--text-muted); transition: all 0.15s;
+  border: 1px solid var(--border-strong); background: var(--oms-surface);
+  color: var(--oms-text-muted); transition: all 0.15s;
 }
-.chip:hover { border-color: var(--accent); color: var(--text); }
+.chip:hover { border-color: var(--oms-accent); color: var(--oms-text); }
 .chip[aria-pressed="true"] {
-  background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent-soft); border-color: color-mix(in srgb, var(--oms-accent) 45%, transparent);
   color: var(--accent-text);
 }
 
 .switch-row {
   display: flex; align-items: flex-start; gap: 10px;
-  padding: 10px 11px; border-radius: var(--radius);
-  border: 1px solid var(--border); background: var(--surface-2);
+  padding: 10px 11px; border-radius: var(--oms-radius);
+  border: 1px solid var(--oms-border); background: var(--oms-surface-2);
 }
 .switch-row .body { flex: 1; min-width: 0; }
 .switch-row .title { font-size: 12px; font-weight: 570; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.switch-row .desc { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+.switch-row .desc { font-size: 11px; color: var(--oms-text-muted); margin-top: 3px; }
 .switch { position: relative; flex: none; width: 34px; height: 20px; margin-top: 1px; }
 .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
 .switch .track {
@@ -1883,159 +1890,162 @@ input[type="range"]::-moz-range-thumb {
   background: var(--text-faint); transition: transform 0.18s, background 0.18s;
   pointer-events: none;
 }
-.switch input:checked ~ .track { background: var(--accent-soft); border-color: var(--accent); }
-.switch input:checked ~ .knob { transform: translateX(14px); background: var(--accent); }
-.switch input:focus-visible ~ .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch input:checked ~ .track { background: var(--accent-soft); border-color: var(--oms-accent); }
+.switch input:checked ~ .knob { transform: translateX(14px); background: var(--oms-accent); }
+.switch input:focus-visible ~ .track { outline: 2px solid var(--oms-accent); outline-offset: 2px; }
 
 .layer-row {
+  /* Positioned so the hidden checkbox stays inside its row: focusing an
+     input that escapes the panel scroller scrolls the whole page. */
+  position: relative;
   display: flex; align-items: center; gap: 10px;
   padding: 7px 8px; border-radius: var(--radius-sm);
   cursor: pointer; transition: background 0.14s;
 }
-.layer-row:hover { background: var(--surface-2); }
+.layer-row:hover { background: var(--oms-surface-2); }
 .layer-row input { position: absolute; opacity: 0; pointer-events: none; }
 .layer-row .box {
   width: 16px; height: 16px; flex: none; border-radius: 5px;
-  border: 1.5px solid var(--border-strong); background: var(--surface);
+  border: 1.5px solid var(--border-strong); background: var(--oms-surface);
   display: grid; place-items: center; transition: all 0.14s;
 }
 .layer-row .box svg { opacity: 0; transform: scale(0.7); transition: all 0.14s; }
-.layer-row input:checked ~ .box { background: var(--accent); border-color: var(--accent); }
-.layer-row input:checked ~ .box svg { opacity: 1; transform: none; color: var(--surface); }
-.layer-row input:focus-visible ~ .box { outline: 2px solid var(--accent); outline-offset: 2px; }
+.layer-row input:checked ~ .box { background: var(--oms-accent); border-color: var(--oms-accent); }
+.layer-row input:checked ~ .box svg { opacity: 1; transform: none; color: var(--oms-surface); }
+.layer-row input:focus-visible ~ .box { outline: 2px solid var(--oms-accent); outline-offset: 2px; }
 .layer-row .swatch { flex: none; width: 18px; display: grid; place-items: center; }
 .layer-row .txt { flex: 1; min-width: 0; }
 .layer-row .txt .t { font-size: 12px; }
 .layer-row .txt .d { font-size: 10.5px; color: var(--text-faint); }
 .layer-row .n { font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .layer-row.is-off .txt .t, .layer-row.is-off .n { opacity: 0.45; }
-.layer-item { border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.layer-item { border-bottom: 1px solid var(--oms-border); padding-bottom: 4px; }
 .layer-item:last-child { border-bottom: 0; }
 .layer-lineage { margin: 0 8px 5px 52px; }
 .layer-lineage summary { color: var(--accent-text); cursor: pointer; font-size: 11px; line-height: 1.4; }
-.layer-lineage summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.layer-lineage summary:focus-visible { outline: 2px solid var(--oms-accent); outline-offset: 2px; }
 .lineage-flow { margin-top: 7px; border-left: 2px solid var(--border-strong); padding-left: 11px; }
 .lineage-stage { position: relative; padding: 0 0 13px; }
 .lineage-stage:last-child { padding-bottom: 2px; }
-.lineage-stage:not(:last-child)::after { content: "↓"; position: absolute; bottom: -2px; left: 0; color: var(--text-muted); }
-.lineage-stage .stage-name { color: var(--text-muted); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.lineage-stage ul { margin: 3px 0 0; padding-left: 16px; color: var(--text); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.lineage-stage:not(:last-child)::after { content: "↓"; position: absolute; bottom: -2px; left: 0; color: var(--oms-text-muted); }
+.lineage-stage .stage-name { color: var(--oms-text-muted); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.lineage-stage ul { margin: 3px 0 0; padding-left: 16px; color: var(--oms-text); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
 .lineage-stage li + li { margin-top: 2px; }
 #basemapLineage { margin: 8px 0 0; }
 #basemapSource { overflow-wrap: anywhere; }
 
 .sw-fill { width: 15px; height: 12px; border-radius: 3px; border: 1.5px solid; }
 .sw-line { width: 17px; height: 0; border-top-width: 3px; border-top-style: solid; border-radius: 2px; }
-.sw-dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--surface); }
+.sw-dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--oms-surface); }
 .sw-stack { display: flex; gap: 2px; align-items: center; }
 
 .note {
   display: flex; gap: 9px; padding: 10px 11px;
-  border-radius: var(--radius); font-size: 11.5px; line-height: 1.45;
+  border-radius: var(--oms-radius); font-size: 11.5px; line-height: 1.45;
   border: 1px solid transparent;
 }
 .note .ico { flex: none; font-size: 13px; line-height: 1.2; }
-.note.warn { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 28%, transparent); }
-.note.info { background: var(--accent-soft); color: var(--accent-text); border-color: color-mix(in srgb, var(--accent) 25%, transparent); }
+.note.warn { background: var(--warn-soft); color: var(--oms-warn); border-color: color-mix(in srgb, var(--oms-warn) 28%, transparent); }
+.note.info { background: var(--accent-soft); color: var(--accent-text); border-color: color-mix(in srgb, var(--oms-accent) 25%, transparent); }
 .note strong { font-weight: 640; }
 
 .btn {
   appearance: none; font: inherit; font-size: 11.5px; font-weight: 560;
   padding: 6px 11px; border-radius: 7px; cursor: pointer;
-  border: 1px solid var(--border-strong); background: var(--surface);
-  color: var(--text); transition: all 0.15s; white-space: nowrap;
+  border: 1px solid var(--border-strong); background: var(--oms-surface);
+  color: var(--oms-text); transition: all 0.15s; white-space: nowrap;
 }
-.btn:hover { border-color: var(--accent); color: var(--accent-text); }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #05201d; }
+.btn:hover { border-color: var(--oms-accent); color: var(--accent-text); }
+.btn.primary { background: var(--oms-accent); border-color: var(--oms-accent); color: #05201d; }
 .btn.primary:hover { filter: brightness(1.08); color: #05201d; }
-.btn.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 38%, var(--border)); }
+.btn.danger { color: var(--oms-error); border-color: color-mix(in srgb, var(--oms-error) 38%, var(--oms-border)); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
 .btn-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 
 .edit-empty {
   min-height: 116px; display: grid; place-items: center; text-align: center;
-  padding: 18px; border: 1px dashed var(--border-strong); border-radius: var(--radius);
-  color: var(--text-muted); background: var(--surface-2);
+  padding: 18px; border: 1px dashed var(--border-strong); border-radius: var(--oms-radius);
+  color: var(--oms-text-muted); background: var(--oms-surface-2);
 }
 .edit-form { display: flex; flex-direction: column; gap: 10px; }
-.edit-form label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--text-muted); }
+.edit-form label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--oms-text-muted); }
 .edit-form input, .edit-form select, .edit-form textarea {
   width: 100%; border: 1px solid var(--border-strong); border-radius: 7px;
-  background: var(--surface); color: var(--text); font: inherit; font-size: 12px;
+  background: var(--oms-surface); color: var(--oms-text); font: inherit; font-size: 12px;
   padding: 7px 9px;
 }
 .edit-form textarea { min-height: 62px; resize: vertical; line-height: 1.45; }
-.edit-form input:focus, .edit-form select:focus, .edit-form textarea:focus { border-color: var(--accent); outline: none; }
-.edit-error { color: var(--err); font-size: 11px; }
-.selection-card { border-left: 3px solid var(--accent); }
+.edit-form input:focus, .edit-form select:focus, .edit-form textarea:focus { border-color: var(--oms-accent); outline: none; }
+.edit-error { color: var(--oms-error); font-size: 11px; }
+.selection-card { border-left: 3px solid var(--oms-accent); }
 .draw-tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.draw-tools .btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-text); }
+.draw-tools .btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--oms-accent); color: var(--accent-text); }
 .op-list { display: flex; flex-direction: column; gap: 8px; }
-.op-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 9px 10px; background: var(--surface-2); }
+.op-card { border: 1px solid var(--oms-border); border-radius: var(--oms-radius); padding: 9px 10px; background: var(--oms-surface-2); }
 .op-card .op-head { display: flex; align-items: center; gap: 7px; }
 .op-card .op-title { flex: 1; min-width: 0; font-size: 11.5px; font-weight: 620; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .op-card .op-meta { margin-top: 4px; color: var(--text-faint); font-size: 10.5px; }
-.op-card .op-reason { margin-top: 5px; color: var(--text-muted); font-size: 11px; }
+.op-card .op-reason { margin-top: 5px; color: var(--oms-text-muted); font-size: 11px; }
 
 .card {
-  border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--surface-2); padding: 11px 12px;
+  border: 1px solid var(--oms-border); border-radius: var(--oms-radius);
+  background: var(--oms-surface-2); padding: 11px 12px;
   display: flex; flex-direction: column; gap: 6px;
 }
 .card .card-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .card .card-head .t { font-size: 12.5px; font-weight: 600; }
-.card .card-head .p { font-size: 11px; color: var(--text-muted); }
+.card .card-head .p { font-size: 11px; color: var(--oms-text-muted); }
 .kv { display: grid; grid-template-columns: 92px 1fr; gap: 2px 10px; font-size: 11px; }
 .kv dt { color: var(--text-faint); }
-.kv dd { color: var(--text-muted); word-break: break-word; }
-.kv dd.mono { font-family: var(--font-mono); font-size: 10.5px; }
+.kv dd { color: var(--oms-text-muted); word-break: break-word; }
+.kv dd.mono { font-family: var(--oms-font-data); font-size: 10.5px; }
 .schema-toggle { font-size: 11px; color: var(--accent-text); cursor: pointer; }
-.schema-cols { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); word-break: break-all; line-height: 1.5; }
+.schema-cols { font-family: var(--oms-font-data); font-size: 10px; color: var(--text-faint); word-break: break-all; line-height: 1.5; }
 
 .check-row {
   display: flex; align-items: center; gap: 8px;
   padding: 5px 0; font-size: 11.5px;
-  border-bottom: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--oms-border);
 }
 .check-row:last-child { border-bottom: 0; }
-.check-row .id { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+.check-row .id { font-family: var(--oms-font-data); font-size: 11px; color: var(--oms-text-muted); }
 .check-row .st {
   margin-left: auto; font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 7px; border-radius: 999px;
 }
-.check-row .st.passed { color: var(--ok); background: var(--ok-soft); }
-.check-row .st.warning { color: var(--warn); background: var(--warn-soft); }
-.check-row .st.failed { color: var(--err); background: var(--err-soft); }
+.check-row .st.passed { color: var(--oms-ok); background: var(--ok-soft); }
+.check-row .st.warning { color: var(--oms-warn); background: var(--warn-soft); }
+.check-row .st.failed { color: var(--oms-error); background: var(--err-soft); }
 .check-row .st.not_testable { color: var(--text-faint); background: var(--surface-3); }
 .check-reason { font-size: 10.5px; color: var(--text-faint); padding: 0 0 6px 2px; }
 
 .crit { display: flex; gap: 9px; font-size: 11.5px; align-items: flex-start; }
-.crit .mk { flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); margin-top: 7px; }
+.crit .mk { flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--oms-accent); margin-top: 7px; }
 .crit .body { flex: 1; }
 .crit .body b { font-weight: 600; }
 .crit .tag {
   font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
-  color: var(--warn); background: var(--warn-soft); padding: 1px 5px; border-radius: 4px; margin-left: 5px;
+  color: var(--oms-warn); background: var(--warn-soft); padding: 1px 5px; border-radius: 4px; margin-left: 5px;
 }
 
 /* ------------------------------------------------------------------- map -- */
 .mapwrap { grid-area: map; position: relative; min-width: 0; }
-#map { position: absolute; inset: 0; background: var(--surface-2); }
+#map { position: absolute; inset: 0; background: var(--oms-surface-2); }
 .map-chip {
   position: absolute; top: 12px; left: 12px; z-index: 2;
   display: none; align-items: center; gap: 9px;
   padding: 7px 9px 7px 11px; border-radius: 999px;
-  background: var(--surface); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
-  box-shadow: var(--shadow-md); font-size: 11.5px; color: var(--warn); font-weight: 560;
+  background: var(--oms-surface); border: 1px solid color-mix(in srgb, var(--oms-warn) 40%, transparent);
+  box-shadow: var(--shadow-md); font-size: 11.5px; color: var(--oms-warn); font-weight: 560;
 }
 .map-chip.is-on { display: flex; }
-.map-chip.draft { color: var(--accent-text); border-color: color-mix(in srgb, var(--accent) 42%, transparent); }
+.map-chip.draft { color: var(--accent-text); border-color: color-mix(in srgb, var(--oms-accent) 42%, transparent); }
 #mapChip.is-on + #draftChip.is-on { top: 58px; }
 .draw-hud {
   position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 3;
   display: none; align-items: center; gap: 8px; max-width: calc(100% - 280px);
-  padding: 7px 11px; border-radius: 999px; background: var(--surface);
-  border: 1px solid var(--accent); box-shadow: var(--shadow-md); color: var(--accent-text);
+  padding: 7px 11px; border-radius: 999px; background: var(--oms-surface);
+  border: 1px solid var(--oms-accent); box-shadow: var(--shadow-md); color: var(--accent-text);
   font-size: 11.5px; font-weight: 600;
 }
 .draw-hud.is-on { display: flex; }
@@ -2044,26 +2054,34 @@ input[type="range"]::-moz-range-thumb {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   max-width: calc(100% - 24px);
   padding: 6px 11px; border-radius: 999px;
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  background: color-mix(in srgb, var(--oms-surface) 88%, transparent);
   backdrop-filter: blur(8px);
-  border: 1px solid var(--border); box-shadow: var(--shadow-sm);
-  font-size: 11px; color: var(--text-muted);
+  border: 1px solid var(--oms-border); box-shadow: var(--shadow-sm);
+  font-size: 11px; color: var(--oms-text-muted);
 }
 .map-status .sep { width: 1px; height: 11px; background: var(--border-strong); }
-.map-status b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.map-status b { color: var(--oms-text); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .maplibregl-ctrl-group { border-radius: 8px !important; box-shadow: var(--shadow-md) !important; }
+/* The map engine's attribution is the page's only basemap credit: theme it
+   like the status pill so it stays readable in both themes. */
+.maplibregl-ctrl.maplibregl-ctrl-attrib {
+  background: color-mix(in srgb, var(--oms-surface) 88%, transparent);
+  color: var(--oms-text-muted);
+}
+.maplibregl-ctrl-attrib a { color: var(--oms-text-muted); }
+.maplibregl-ctrl-attrib-button { filter: var(--map-icon-filter); }
 .maplibregl-popup-content {
-  background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--oms-surface); color: var(--oms-text);
+  border: 1px solid var(--oms-border); border-radius: var(--oms-radius);
   padding: 13px 14px; font-size: 12px; box-shadow: var(--shadow-md);
   max-width: 320px;
 }
 .maplibregl-popup-close-button { color: var(--text-faint); font-size: 17px; padding: 2px 7px; }
-.maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: var(--surface); }
-.maplibregl-popup-anchor-top .maplibregl-popup-tip { border-bottom-color: var(--surface); }
-.maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: var(--surface); }
-.maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--surface); }
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: var(--oms-surface); }
+.maplibregl-popup-anchor-top .maplibregl-popup-tip { border-bottom-color: var(--oms-surface); }
+.maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: var(--oms-surface); }
+.maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--oms-surface); }
 .pop-badge {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
@@ -2072,16 +2090,16 @@ input[type="range"]::-moz-range-thumb {
 .pop-title { font-size: 13px; font-weight: 620; margin-bottom: 8px; letter-spacing: -0.01em; }
 .pop-kv { display: grid; grid-template-columns: 96px 1fr; gap: 3px 10px; font-size: 11.5px; }
 .pop-kv dt { color: var(--text-faint); }
-.pop-kv dd { color: var(--text); font-variant-numeric: tabular-nums; }
+.pop-kv dd { color: var(--oms-text); font-variant-numeric: tabular-nums; }
 .pop-foot {
-  margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border);
+  margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--oms-border);
   display: flex; align-items: center; gap: 8px; font-size: 10.5px; color: var(--text-faint);
 }
 .tooltip {
   position: absolute; z-index: 3; pointer-events: none;
   padding: 5px 9px; border-radius: 7px;
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  border: 1px solid var(--border); box-shadow: var(--shadow-md);
+  background: color-mix(in srgb, var(--oms-surface) 94%, transparent);
+  border: 1px solid var(--oms-border); box-shadow: var(--shadow-md);
   font-size: 11.5px; white-space: nowrap; display: none;
 }
 .tooltip.is-on { display: block; }
@@ -2090,10 +2108,15 @@ input[type="range"]::-moz-range-thumb {
 @media (max-width: 900px) {
   #app {
     width: 100%; overflow: hidden;
-    grid-template-columns: minmax(0, 1fr); grid-template-rows: 56px 44vh 1fr;
-    grid-template-areas: "top" "panel" "map";
+    grid-template-columns: minmax(0, 1fr); grid-template-rows: 56px 48vh 1fr;
+    grid-template-areas: "top" "map" "panel";
   }
-  .panel { border-right: 0; border-bottom: 1px solid var(--border); }
+  .panel { border-right: 0; border-top: 1px solid var(--oms-border); }
+  /* One line on a narrow map, so the scale and the basemap attribution
+     sit just above the pill instead of under it. */
+  .map-status { flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
+  .map-status .opt { display: none; }
+  .maplibregl-ctrl-bottom-right { bottom: 40px; }
   .topbar { min-width: 0; gap: 8px; padding: 0 10px; }
   .brand { flex: 1 1 0; overflow: hidden; }
   .topbar-right { flex: 0 0 auto; min-width: 0; }
@@ -2126,24 +2149,24 @@ input[type="range"]::-moz-range-thumb {
 
   <aside class="panel">
     <nav class="tabs" role="tablist" aria-label="Project view">
-      <button class="tab" role="tab" data-tab="analysis" aria-selected="true">Analysis</button>
-      <button class="tab" role="tab" data-tab="map" aria-selected="false">Map<span class="tab-badge" id="tabBadge" hidden>●</span></button>
-      <button class="tab" role="tab" data-tab="edit" aria-selected="false">Edit<span class="tab-badge" id="editBadge" hidden></span></button>
-      <button class="tab" role="tab" data-tab="data" aria-selected="false">Provenance</button>
+      <button class="tab" role="tab" id="tab-analysis" aria-controls="panel-analysis" data-tab="analysis" aria-selected="true">Analysis</button>
+      <button class="tab" role="tab" id="tab-map" aria-controls="panel-map" data-tab="map" aria-selected="false">Map<span class="tab-badge" id="tabBadge" hidden>●</span></button>
+      <button class="tab" role="tab" id="tab-edit" aria-controls="panel-edit" data-tab="edit" aria-selected="false">Edit<span class="tab-badge" id="editBadge" hidden></span></button>
+      <button class="tab" role="tab" id="tab-provenance" aria-controls="panel-provenance" data-tab="data" aria-selected="false">Provenance</button>
     </nav>
     <div class="panel-scroll">
-      <section class="tabpanel is-active" data-panel="analysis" role="tabpanel"></section>
-      <section class="tabpanel" data-panel="map" role="tabpanel"></section>
-      <section class="tabpanel" data-panel="edit" role="tabpanel"></section>
-      <section class="tabpanel" data-panel="data" role="tabpanel"></section>
+      <section class="tabpanel is-active" data-panel="analysis" role="tabpanel" id="panel-analysis" aria-labelledby="tab-analysis"></section>
+      <section class="tabpanel" data-panel="map" role="tabpanel" id="panel-map" aria-labelledby="tab-map"></section>
+      <section class="tabpanel" data-panel="edit" role="tabpanel" id="panel-edit" aria-labelledby="tab-edit"></section>
+      <section class="tabpanel" data-panel="data" role="tabpanel" id="panel-provenance" aria-labelledby="tab-provenance" data-testid="provenance"></section>
     </div>
   </aside>
 
   <main class="mapwrap">
     <div id="map"></div>
-    <div class="map-chip" id="mapChip">
+    <div class="map-chip" id="mapChip" data-oms-exploratory role="status">
       <span>Reconfigured view — not the accepted run</span>
-      <button class="btn" type="button" data-reset>Reset</button>
+      <button class="btn" type="button" data-reset data-oms-reset>Reset</button>
     </div>
     <div class="map-chip draft" id="draftChip">
       <span id="draftChipText"></span>
@@ -2449,13 +2472,14 @@ const POIS = __POIS__;
       + acc("results", "Results", metrics, true)
       + acc("criteria", "Criteria in force", criteria, true)
       + acc("assumptions", "Assumptions", assumptions, false, String(VIEW.assumptions.length))
-      + acc("warnings", "Warnings", warnings, false, String(VIEW.warnings.length));
+      + acc("warnings", "Warnings", warnings, true, String(VIEW.warnings.length));
   }
 
   function scenarioRows() {
     return VIEW.overrides.filter((o) => o.control).map((o) => (
       '<label class="switch-row">'
-      + '<span class="switch"><input type="checkbox" data-scenario="' + esc(o.control) + '"'
+      + '<span class="switch"><input type="checkbox" data-scenario="' + esc(o.control) + '" data-oms-control="'
+      + esc(o.control.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase())) + '"'
       + (state[o.control] ? " checked" : "") + '><span class="track"></span><span class="knob"></span></span>'
       + '<span class="body"><span class="title">' + esc(o.id)
       + '<span class="pill warn" style="text-transform:none;letter-spacing:0">hypothetical</span></span>'
@@ -2466,30 +2490,30 @@ const POIS = __POIS__;
   function filterFields() {
     const areaMax = Math.max(VIEW.areaBounds.max, VIEW.areaBounds.min + 10000);
     const landUse = VIEW.landUse.map((l) => (
-      '<button class="chip" type="button" data-landuse="' + esc(l.code) + '" aria-pressed="'
+      '<button class="chip" type="button" data-landuse="' + esc(l.code) + '" data-oms-value="' + esc(l.code) + '" aria-pressed="'
       + (state.landUse.has(l.code) ? "true" : "false") + '" title="' + esc(l.label) + '">'
       + esc(l.label) + "</button>"
     )).join("");
     return '<div class="field"><div class="field-head"><span class="name">Minimum parcel area</span>'
       + '<span class="value" id="valArea"></span></div>'
-      + '<input type="range" id="ctlArea" min="' + VIEW.areaBounds.min + '" max="' + areaMax
+      + '<input type="range" id="ctlArea" data-oms-control="min_area" min="' + VIEW.areaBounds.min + '" max="' + areaMax
       + '" step="5000" value="' + state.minAreaM2 + '"></div>'
 
       + '<div class="field"><div class="field-head"><span class="name">Max distance to highway</span>'
       + '<span class="value" id="valRoad"></span></div>'
-      + '<input type="range" id="ctlRoad" min="0" max="' + C.maxRoadM + '" step="100" value="' + state.maxRoadM + '">'
+      + '<input type="range" id="ctlRoad" data-oms-control="max_road_distance" min="0" max="' + C.maxRoadM + '" step="100" value="' + state.maxRoadM + '">'
       + '<span class="hint">The run only measured parcels within ' + km(C.maxRoadM)
       + " of a highway, so this control can tighten the rule but never widen it.</span></div>"
 
       + '<div class="field"><div class="field-head"><span class="name">Walking time threshold</span>'
       + '<span class="value" id="valEdu"></span></div>'
-      + '<input type="range" id="ctlEdu" min="0" max="' + (VIEW.catchmentMinutes.length - 1)
+      + '<input type="range" id="ctlEdu" data-oms-control="education_threshold" data-oms-values="' + esc(JSON.stringify(VIEW.catchmentMinutes)) + '" min="0" max="' + (VIEW.catchmentMinutes.length - 1)
       + '" step="1" value="' + VIEW.catchmentMinutes.indexOf(state.educationMinutes) + '">'
       + '<span class="hint">Selects precomputed pedestrian-network catchments and parcel overlaps. '
       + "Contours model walking to facilities; overlap does not establish a usable parcel entrance.</span></div>"
 
       + '<div class="field"><div class="field-head"><span class="name">Land use</span></div>'
-      + '<div class="chips">' + landUse + "</div></div>";
+      + '<div class="chips" role="group" aria-label="Land use" data-oms-control="land_use">' + landUse + "</div></div>";
   }
 
   function swatch(kind) {
@@ -2572,7 +2596,7 @@ const POIS = __POIS__;
     return VIEW.layerGroups.map((g) => (
       '<div class="layer-item"><label class="layer-row' + (state.layers[g.id] ? "" : " is-off")
       + '" data-layerrow="' + esc(g.id) + '">'
-      + '<input type="checkbox" data-layer="' + esc(g.id) + '"' + (state.layers[g.id] ? " checked" : "") + ">"
+      + '<input type="checkbox" data-layer="' + esc(g.id) + '" data-oms-layer-group="' + esc(g.id) + '"' + (state.layers[g.id] ? " checked" : "") + ">"
       + '<span class="box">' + TICK + "</span>"
       + '<span class="swatch">' + swatch(g.swatch) + "</span>"
       + '<span class="txt"><span class="t">' + esc(g.title) + "</span></span>"
@@ -2674,7 +2698,7 @@ const POIS = __POIS__;
       + '<label>New value<span id="editValueSlot">' + valueControl(first, fieldValue(first, p)) + "</span></label>"
       + '<label>Interpretation<select id="editKind"><option value="source_correction">Source correction</option>'
       + '<option value="scenario">Hypothetical scenario</option><option value="decision">Review decision</option></select></label>'
-      + '<label>Rationale <span style="color:var(--err)">*</span><textarea id="editReason" placeholder="Why should this differ from the pinned source?"></textarea></label>'
+      + '<label>Rationale <span style="color:var(--oms-error)">*</span><textarea id="editReason" placeholder="Why should this differ from the pinned source?"></textarea></label>'
       + '<label>Evidence URL or note<input id="editEvidence" type="text" placeholder="https://… or document reference"></label>'
       + '<div class="edit-error" id="editError" hidden></div>'
       + '<div class="btn-row">'
@@ -2712,7 +2736,7 @@ const POIS = __POIS__;
       + '<div class="edit-form"><label>Name<input id="drawName" type="text" placeholder="Scenario feature or annotation"></label>'
       + '<label>Kind<select id="drawKind"><option value="scenario">Hypothetical scenario</option>'
       + '<option value="annotation">Annotation</option><option value="aoi">Area of interest</option></select></label>'
-      + '<label>Rationale <span style="color:var(--err)">*</span><textarea id="drawReason" placeholder="What does this user-drawn geometry represent?"></textarea></label>'
+      + '<label>Rationale <span style="color:var(--oms-error)">*</span><textarea id="drawReason" placeholder="What does this user-drawn geometry represent?"></textarea></label>'
       + '<div class="edit-error" id="drawError" hidden></div>'
       + '<div class="btn-row"><button class="btn primary" type="button" data-finish-drawing disabled>Record drawing</button>'
       + '<button class="btn" type="button" data-undo-vertex disabled>Undo vertex</button>'
@@ -3054,9 +3078,9 @@ const POIS = __POIS__;
     ];
     $("#criteria").innerHTML = rows.map((r) => (
       '<div class="crit"><span class="mk"></span><div class="body"><b>' + esc(r[0]) + "</b>" + mark(r[2])
-      + '<div style="color:var(--text-muted)">' + esc(r[1]) + "</div></div></div>"
+      + '<div style="color:var(--oms-text-muted)">' + esc(r[1]) + "</div></div></div>"
     )).join("")
-      + '<div style="border-top:1px solid var(--border);padding-top:9px;display:flex;flex-direction:column;gap:7px">'
+      + '<div style="border-top:1px solid var(--oms-border);padding-top:9px;display:flex;flex-direction:column;gap:7px">'
       + tierChip("tier1", stats.tier1, stats.areaTier1)
       + tierChip("tier2", stats.tier2, stats.areaTier2)
       + tierChip("tier3", stats.tier3, stats.areaTier3) + "</div>";
@@ -3097,12 +3121,12 @@ const POIS = __POIS__;
     const draftCount = activeOperations().length;
     $("#mapStatus").innerHTML = "<span><b>" + int(stats.shown) + "</b> parcels in scope</span>"
       + '<span class="sep"></span><span><b>' + int(stats.tier1) + "</b> prime</span>"
-      + '<span class="sep"></span><span><b>' + int(fc.school) + "</b> schools · <b>"
+      + '<span class="sep opt"></span><span class="opt"><b>' + int(fc.school) + "</b> schools · <b>"
       + int(fc.kindergarten) + "</b> kindergartens</span>"
-      + '<span class="sep"></span><span>' + esc(VIEW.project.analysis_crs) + "</span>"
+      + '<span class="sep opt"></span><span class="opt">' + esc(VIEW.project.analysis_crs) + "</span>"
       + (draftCount ? '<span class="sep"></span><span style="color:var(--accent-text)"><b>'
         + int(draftCount) + "</b> draft " + (draftCount === 1 ? "edit" : "edits") + "</span>" : "")
-      + '<span class="sep"></span><span class="mono">' + esc(VIEW.run.id) + "</span>";
+      + '<span class="sep opt"></span><span class="mono opt">' + esc(VIEW.run.id) + "</span>";
   }
 
   function updateReconfigured() {
@@ -3110,6 +3134,7 @@ const POIS = __POIS__;
     $("#mapChip").classList.toggle("is-on", modified);
     $("#reconfNote").hidden = !modified;
     $("#tabBadge").hidden = !modified;
+    document.documentElement.dataset.omsState = modified ? "exploratory" : "canonical";
   }
 
   function updateDraftUI() {
@@ -3339,7 +3364,7 @@ const POIS = __POIS__;
       + "<dt>To highway</dt><dd>" + int(p._road) + " m · " + esc(p.nearest_road_source) + "</dd>"
       + "<dt>School access</dt><dd>" + contour(p._ds) + "</dd>"
       + "<dt>Kindergarten access</dt><dd>" + contour(p._dk) + "</dd>"
-      + (drifted ? '<dt>Canonical run</dt><dd style="color:var(--warn)">' + esc(canonicalTier) + "</dd>" : "")
+      + (drifted ? '<dt>Canonical run</dt><dd style="color:var(--oms-warn)">' + esc(canonicalTier) + "</dd>" : "")
       + "</dl>"
       + '<div class="pop-foot"><span>' + esc(cadastreSource.provider || "") + " · "
       + esc(cadastreSource.version || "") + "</span>"
@@ -3350,7 +3375,7 @@ const POIS = __POIS__;
     const inactive = p[facilityClass()] === "scenario_inactive";
     const label = p.amenity === "school" ? "School" : "Kindergarten";
     return (inactive
-      ? '<div class="pop-badge" style="background:var(--err-soft);color:var(--err)">'
+      ? '<div class="pop-badge" style="background:var(--err-soft);color:var(--oms-error)">'
         + esc(p.override_id || "scenario") + " · excluded</div>"
       : '<div class="pop-badge" style="background:var(--accent-soft);color:var(--accent-text)">'
         + esc(label) + "</div>")
@@ -3360,7 +3385,7 @@ const POIS = __POIS__;
       + "<dt>Ownership</dt><dd>" + esc(p.ownership) + "</dd>"
       + "<dt>Address</dt><dd>" + esc(p.address || "—") + "</dd>"
       + "<dt>In analysis</dt><dd>" + (inactive
-        ? '<span style="color:var(--warn)">excluded by a hypothetical outage — the source still lists it as active</span>'
+        ? '<span style="color:var(--oms-warn)">excluded by a hypothetical outage — the source still lists it as active</span>'
         : "active, per the authoritative source") + "</dd>"
       + "<dt>Source ID</dt><dd class=\"mono\">" + esc(p.source_id) + "</dd></dl>"
       + '<div class="pop-foot"><span>' + esc(poiSource.provider || "") + " · retrieved "
@@ -3368,10 +3393,10 @@ const POIS = __POIS__;
   }
 
   function overridePopup(o) {
-    return '<div class="pop-badge" style="background:var(--warn-soft);color:var(--warn)">'
+    return '<div class="pop-badge" style="background:var(--warn-soft);color:var(--oms-warn)">'
       + esc(o.id) + " · hypothetical</div>"
       + '<div class="pop-title">' + esc(o.target) + "</div>"
-      + "<p style=\"font-size:11.5px;color:var(--text-muted)\">" + esc(o.rationale) + "</p>"
+      + "<p style=\"font-size:11.5px;color:var(--oms-text-muted)\">" + esc(o.rationale) + "</p>"
       + '<div class="pop-foot"><span>Scenario geometry — not an approved or planned road</span></div>';
   }
 
@@ -3449,7 +3474,7 @@ const POIS = __POIS__;
         new maplibregl.Popup({ maxWidth: "320px" }).setLngLat(e.lngLat)
           .setHTML('<div class="pop-badge" style="background:var(--accent-soft);color:var(--accent-text)">draft · unvalidated</div>'
             + '<div class="pop-title">' + esc(operationTitle(operation)) + "</div>"
-            + '<p style="font-size:11.5px;color:var(--text-muted)">' + esc(operation.rationale) + "</p>")
+            + '<p style="font-size:11.5px;color:var(--oms-text-muted)">' + esc(operation.rationale) + "</p>")
           .addTo(map);
       });
     });
@@ -3504,6 +3529,8 @@ const POIS = __POIS__;
 
   $('[data-panel="analysis"]').innerHTML = analysisTab();
   $('[data-panel="map"]').innerHTML = mapTab();
+  $('[data-acc="layers"]').setAttribute("data-testid", "legend");
+  $('[data-acc="warnings"]').setAttribute("data-testid", "warnings");
   $('[data-panel="edit"]').innerHTML = editorTab();
   $('[data-panel="data"]').innerHTML = dataTab();
 

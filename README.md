@@ -394,7 +394,9 @@ geometry read back through DuckDB Spatial, dataset CRS read from the artifact
 rather than the manifest's claim, validation evidence recomputed from the
 geodata it summarises, non-spatial `kind: table` outputs read back as tables
 (declared columns and types, unique key, CSV/XLSX downloads holding the same
-rows), and QGIS project structure and runtime loading where PyQGIS is available.
+rows), QGIS project structure and runtime loading where PyQGIS is available, and
+— for projects that declare a design-language version — every dashboard or
+report page operated in a real browser.
 
 ```bash
 openmapstack verify path/to/project.yaml
@@ -424,7 +426,17 @@ is counted separately — never a silent pass. A mixture of executed and
 `applicable`, `executed`, and `execution_rate` coverage. Install
 `openmapstack[geo]` for the DuckDB-backed geodata checks and for reading XLSX
 (DuckDB `excel` extension) and Parquet tables; CSV and JSON tables need nothing
-extra. PyQGIS comes from a system QGIS install.
+extra. PyQGIS comes from a system QGIS install. For the browser check, install
+`openmapstack[visual]` and run `python -m playwright install chromium`.
+
+The browser check runs when the manifest sets `presentation.design_language`
+(see `references/design-language.md`). It opens every declared page and
+operates each declared control through the language's state hooks, including
+controls on inactive tabs: a control must change the page, an exploratory one
+must show the exploratory label, and the reset must restore the published
+state. Projects without a language version keep their existing plan: selected
+web delivery targets receive smoke checks, and selected map-primary dashboards
+also receive the existing visual check.
 
 See [the applicability reference](docs/verify-applicability.md) for the exact
 plan conditions, dependencies, current regression evidence, and deliberate

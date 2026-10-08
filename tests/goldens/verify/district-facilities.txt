@@ -26,4 +26,4 @@ PASS presentation.controls_match_pipeline: 0 filter control(s) and 0 scenario co
 PASS presentation.edit_targets_reference_real_sources: no edit targets declared (vacuously true)
 PASS rerun.no_chat_dependency: canonical project dependencies contain no chat/transcript references
 WARNING: $PROJECT/project.yaml (25 passed, 1 warnings, 1 not testable, 0 failed; 26/27 applicable checks executed)
-  NOTE  some checks could not run here; install openmapstack[geo] for geodata checks, QGIS for the .qgz checks
+  NOTE  some checks could not run here; install openmapstack[geo] for geodata checks, openmapstack[visual] plus `python -m playwright install chromium` for browser checks, QGIS for the .qgz checks

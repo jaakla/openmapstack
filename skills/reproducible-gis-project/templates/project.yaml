@@ -240,7 +240,7 @@ presentation:
     off_canonical_labelling: required
     filters: []                    # id, label, type, field(s), unit, canonical, step/options
     scenarios: []                  # id, override, canonical, baseline_fields
-    views: []                      # id, options, canonical, output, fields (precomputed variants)
+    variants: []                   # id, options, canonical, output, fields (precomputed variants)
   tables: []                       # output, title, downloads, default_sort (kind: table outputs)
   map:
     engine_preference: maplibre    # maplibre | deck | kepler
@@ -301,6 +301,13 @@ presentation:
       #   id_field: feature_id             #   options?, source_value_field?}]
       #   label_field: name
       #   fields: []
+
+# views:                             # only when the result needs several pages
+#   - id: overview                   # (project-spec.md s. 2.7, Pages and the
+#     output: dashboard              #  design language); without it the project
+#     archetype: workspace           #  has one page, its dashboard
+#     scope: study_area
+#     entry: true
 
 warnings: []
   # Known unresolved data-quality limits, surfaced in UX. See section 2.8.

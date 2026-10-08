@@ -43,6 +43,8 @@ artifacts. Target selection cannot opt out of them.
   `delivery.<id>.dashboard_loads_in_browser`, using the existing visual checker.
   Its failure and missing-capability semantics remain unchanged. External BI
   views do not inherit dashboard-specific tabs/controls.
+  With a declared design language, `visual.dashboard_loads_in_browser` checks
+  all declared pages once; absent `views:`, it uses the selected web output paths.
 - Table download links are inspected in each selected web view; desktop-only
   delivery does not require a dashboard. Shared table/source/CRS/control
   semantics remain checked.
@@ -94,8 +96,9 @@ checker where applicable.
 | `presentation.tables_reference_table_outputs` | `presentation.tables` is declared | every table view shows a `kind: table` output and offers only its declared downloads | none | direct presentation tests |
 | `presentation.table_downloads_linked` | `presentation.tables` is declared | the delivered dashboard links every declared download file | no dashboard HTML is `not_testable` | direct presentation tests |
 | `presentation.layers_use_semantic_roles` | always | declared map layers carry semantic roles | no layers produces a warning | 001, 006 |
-| `presentation.controls_match_pipeline` | always | canonical controls agree with processing expressions and overrides; view switches open at one of their options and show declared columns | controls without an addressable matching step are currently outside the predicate | 001, 003, 006 |
+| `presentation.controls_match_pipeline` | always | top-level and page-specific canonical controls agree with processing expressions and overrides; variant switches open at one of their options and show declared columns | controls without an addressable matching step are currently outside the predicate | 001, 003, 006; direct page-control tests |
 | `presentation.edit_targets_reference_real_sources` | always | editing targets resolve to declared sources | none; no targets is valid | 001, 003, 006 |
+| `visual.dashboard_loads_in_browser` | `presentation.design_language` is declared | every page in `views:` (or the dashboard) loads without errors and every declared control, layer group, panel and reset works through the state protocol of `design-language.md` s. 5, on whichever tab it sits, without scrolling the page outside a report; the mobile map keeps half the screen width | Playwright with Chromium (`openmapstack[visual]`); missing Playwright or browser, and remote scripts or styles that cannot be fetched from this machine, are `not_testable`; an unknown language version fails | direct state-protocol browser tests |
 | `qgis.static_valid` | `project.qgz` exists | archive, document, and local datasource structure are valid; local datasources are relative paths | none | 001, 910, 913 |
 | `qgis.datasources_portable` | `project.qgz` exists | local file datasources use an allowlisted format every QGIS build reads (GeoPackage, GeoJSON, FlatGeobuf, Shapefile, GeoTIFF) | other formats warn (`datasource_format_not_portable`); remote/provider datasources are out of scope; malformed QGIS document fails | 001 |
 | `qgis.styles_declared` | `project.qgz` exists | vector layers declare renderers/styles | malformed QGIS document fails | 001, 006, 912 |
@@ -125,9 +128,9 @@ address them without guessing:
   backend-specific evidence;
 - cross-project presentation consistency requires an explicit comparison
   project;
-- legacy browser/dashboard behaviour and additional cartographic predicates
-  are outside the automatic plan; explicit delivery targets execute the bounded
-  checks above. Playwright being installed does not prove any unplanned check ran;
+- browser behaviour runs for projects declaring `presentation.design_language`
+  and for the selected map-primary delivery targets above; legacy projects keep
+  their previous plan. Additional cartographic predicates remain outside it;
 - validation evidence recomputation requires machine-readable declarations
   mapping report fields to artifacts and metrics;
 - clean-rerun checks run only when the user supplies `--rerun`, and declared

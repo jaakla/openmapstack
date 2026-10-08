@@ -99,6 +99,8 @@ jobs:
       - name: Install H3 extensions in the PostGIS service
         run: |
           container_id=$(docker ps --filter 'ancestor=postgis/postgis:16-3.4' --format '{{.ID}}')
+          # This pinned image uses bullseye, whose PGDG packages moved to the archive.
+          docker exec "$container_id" sed -i -E 's|https?://apt.postgresql.org/pub/repos/apt|https://apt-archive.postgresql.org/pub/repos/apt|g' /etc/apt/sources.list.d/pgdg.list
           docker exec "$container_id" bash -c 'apt-get update -qq && apt-get install -y -qq postgresql-16-h3'
 
       - uses: actions/setup-python@v5

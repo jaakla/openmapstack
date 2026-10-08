@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .checks import AssertionResult, not_testable
+from .checks import AssertionResult, failed, not_testable
 from .checks import geodata as geodata_checks
 from .checks import metamorphic as metamorphic_checks
 from .checks import overrides as overrides_checks
@@ -376,6 +376,15 @@ def verify_project(
     ):
         if "delivery" not in manifest or name != "layers_use_semantic_roles" or get_in(manifest, "presentation", "map"):
             _run(runs, f"presentation.{name}", fn, root)
+    # The browser check runs for projects that opt into a design-language
+    # version (ADR 0007); without a browser it is not_testable, never passed.
+    language = get_in(manifest, "presentation", "design_language")
+    if language in presentation_checks.DESIGN_LANGUAGES:
+        _run(runs, "visual.dashboard_loads_in_browser", visual_checks.dashboard_loads_in_browser, root)
+    elif language is not None:
+        runs.append(CheckRun("visual.dashboard_loads_in_browser", failed(
+            f"presentation.design_language {language!r} is not a known version "
+            f"{sorted(presentation_checks.DESIGN_LANGUAGES)}", code="design_language_unknown"), {}))
     qgis_targets = [("qgis", "project.qgz")] if "delivery" not in manifest and (root / "project.qgz").is_file() else []
     for target in selected_targets:
         if target.get("kind") == "qgis":
@@ -395,7 +404,7 @@ def verify_project(
             ("every_declared_layer_renders", qgis_checks.every_declared_layer_renders),
         ):
             _run(runs, f"{prefix}.{name}", fn, root, **({"path": path} if prefix != "qgis" else {}))
-    if "delivery" in manifest and get_in(manifest, "presentation", "primary_view") == "map":
+    if language not in presentation_checks.DESIGN_LANGUAGES and "delivery" in manifest and get_in(manifest, "presentation", "primary_view") == "map":
         for target in selected_targets:
             if target.get("kind") == "dashboard":
                 path = get_in(manifest, "outputs", target.get("output"), "path")

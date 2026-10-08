@@ -14,6 +14,8 @@ dist/
 
 .e2e-venv/
 .openmapstack/venvs/
+# `uv run` writes a lockfile; the repository installs with pip and keeps none.
+/uv.lock
 # regenerable outputs from the example's run_e2e.py
 examples/tartu-development/data/source/
 examples/tartu-development/data/derived/

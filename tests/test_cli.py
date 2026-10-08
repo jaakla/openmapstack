@@ -14,7 +14,7 @@ import yaml
 
 from openmapstack.cli import main
 from openmapstack.integrity import canonical_file_set_hash, declared_input_paths, file_inventory
-from openmapstack.validation import validate_project
+from openmapstack.validation import Check, validate_project
 
 
 class OpenMapStackCliTests(unittest.TestCase):
@@ -53,6 +53,114 @@ class OpenMapStackCliTests(unittest.TestCase):
         result = validate_project(path)
         self.assertEqual(result.status, "passed", [check.to_dict() for check in result.checks])
         self.assertTrue(result.ok())
+
+    def views_manifest(self) -> dict:
+        project = valid_manifest()
+        project["outputs"]["screening"] = {"path": "index.html", "format": "HTML", "kind": "document", "generated_by": "export"}
+        project["outputs"]["report"] = {"path": "report.html", "format": "HTML", "kind": "document", "generated_by": "export"}
+        project["presentation"]["design_language"] = "openmapstack-views/0.1"
+        project["views"] = [
+            {"id": "screening", "output": "screening", "archetype": "workspace", "scope": "citywide", "entry": True},
+            {"id": "detail", "output": "report", "archetype": "report", "scope": "north-west",
+             "presentation": {"controls": {"variants": [
+                 {"id": "scenario", "options": ["T", "M"], "canonical": "T", "effect": "published"}]}}},
+        ]
+        return project
+
+    def views_check(self, project: dict) -> Check:
+        result = validate_project(self.write_project(project), artifacts=False)
+        return next(c for c in result.checks if c.id == "views.declaration")
+
+    def test_declared_pages_pass(self) -> None:
+        check = self.views_check(self.views_manifest())
+        self.assertEqual(check.status, "passed", check.message)
+
+    def test_a_page_must_be_a_declared_html_output(self) -> None:
+        project = self.views_manifest()
+        project["views"][0]["output"] = "missing"
+        project["views"][1]["output"] = "candidate"
+        check = self.views_check(project)
+        self.assertEqual(check.status, "failed")
+        self.assertIn("unknown output 'missing'", check.message)
+        self.assertIn("is not an HTML page", check.message)
+
+    def test_exactly_one_page_is_the_entry(self) -> None:
+        project = self.views_manifest()
+        project["views"][1]["entry"] = True
+        check = self.views_check(project)
+        self.assertEqual(check.status, "failed")
+        self.assertIn("exactly one view must be the entry page; found 2", check.message)
+
+    def test_archetype_must_exist_in_the_declared_language(self) -> None:
+        project = self.views_manifest()
+        project["views"][0]["archetype"] = "carousel"
+        check = self.views_check(project)
+        self.assertEqual(check.status, "failed")
+        self.assertIn("'carousel' is not one of ['workspace', 'report']", check.message)
+        # Without a language version the archetype is descriptive only.
+        del project["presentation"]["design_language"]
+        self.assertEqual(self.views_check(project).status, "passed")
+
+    def test_a_page_control_effect_is_published_or_exploratory(self) -> None:
+        project = self.views_manifest()
+        project["views"][1]["presentation"]["controls"]["variants"][0]["effect"] = "final"
+        check = self.views_check(project)
+        self.assertEqual(check.status, "failed")
+        self.assertIn("effect 'final'", check.message)
+
+    def test_page_controls_use_the_same_pipeline_contract(self) -> None:
+        from openmapstack.checks.presentation import controls_match_pipeline
+
+        for controls, fragment in (
+            ({"variants": [{"id": "mode", "options": ["walk", "bike"], "canonical": "car"}]}, "canonical 'car'"),
+            ({"scenarios": [{"id": "closure", "override": "absent", "canonical": True}]}, "unknown override"),
+            ({"views": [{"id": "mode", "options": ["walk", "bike"], "canonical": "walk"}]}, "renamed"),
+            ({"filters": [{"id": "area", "field": "area_m2", "canonical": 40}]}, "not found"),
+        ):
+            with self.subTest(controls=controls):
+                project = self.views_manifest()
+                project["processing"]["steps"][0]["expression"] = "area_m2 >= 20"
+                project["views"][1]["presentation"]["controls"] = controls
+                check = self.views_check(project)
+                self.assertEqual(check.status, "failed", check.message)
+                self.assertIn(fragment, check.message)
+                result = controls_match_pipeline(self.root)
+                self.assertEqual(result.status, "failed", result.detail)
+                self.assertIn("view detail", result.detail)
+
+        project = self.views_manifest()
+        self.assertEqual(self.views_check(project).status, "passed")
+        self.assertEqual(controls_match_pipeline(self.root).status, "passed")
+
+    def test_page_controls_use_the_shared_json_schema(self) -> None:
+        for controls in ({"filters": [{"canonical": 20}]},
+                         {"variants": [{"id": "mode", "options": []}]},
+                         {"filters": "malformed"}, {"scenarios": 42}):
+            with self.subTest(controls=controls):
+                project = self.views_manifest()
+                project["views"][1]["presentation"]["controls"] = controls
+                result = validate_project(self.write_project(project), artifacts=False)
+                schema = next(c for c in result.checks if c.id == "manifest.json_schema")
+                self.assertEqual(schema.status, "failed", schema.message)
+                self.assertIn("views", schema.message)
+
+    def test_unknown_language_and_effect_fail_the_schema(self) -> None:
+        project = self.views_manifest()
+        project["presentation"]["design_language"] = "openmapstack-views/9"
+        project["presentation"]["controls"] = {"filters": [{"id": "min_area", "effect": "maybe"}]}
+        result = validate_project(self.write_project(project), artifacts=False)
+        schema = next(c for c in result.checks if c.id == "manifest.json_schema")
+        self.assertEqual(schema.status, "failed")
+        self.assertIn("design_language", schema.message)
+        self.assertIn("effect", schema.message)
+
+    def test_renamed_variant_key_fails_the_presentation_declaration(self) -> None:
+        project = valid_manifest()
+        project["presentation"]["controls"] = {"views": [{"id": "mode", "options": ["walk", "bike"], "canonical": "walk"}]}
+        result = validate_project(self.write_project(project))
+        check = next(c for c in result.checks if c.id == "presentation.declaration")
+        self.assertEqual(check.status, "failed")
+        self.assertIn("presentation.controls.variants", check.message)
 
     def test_aoi_bounds_are_validated_without_local_outputs(self) -> None:
         for outputs in ({"report": {"path": "report.csv", "format": "CSV", "kind": "table"}},

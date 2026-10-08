@@ -266,7 +266,8 @@ def _print_verify(result: VerifyResult, *, verbose: bool, stream: Any = None) ->
     if counts["not_testable"]:
         print(
             "  NOTE  some checks could not run here; install openmapstack[geo] "
-            "for geodata checks, QGIS for the .qgz checks",
+            "for geodata checks, openmapstack[visual] plus `python -m playwright install chromium` "
+            "for browser checks, QGIS for the .qgz checks",
             file=out,
         )
 

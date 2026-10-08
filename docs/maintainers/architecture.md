@@ -177,7 +177,7 @@ These are intentionally linked rather than restated as roadmap:
 
 - issue #13 — project QA, metamorphic checks, source pinning, and OpenMapBench interoperability;
 - issue #11 — optional QGIS generation/edit round-trip evolution;
-- issue #6 — standard dashboard renderer and presentation-to-render validation;
+- issue #6 — views follow a versioned design language and are checked through a state protocol ([ADR 0007](decisions/0007-dashboard-design-language.md));
 - `evals/COVERAGE.md` — explicit current GIS coverage gaps.
 
 When one of these changes a durable boundary above, update this document in the same PR.

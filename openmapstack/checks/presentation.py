@@ -9,6 +9,80 @@ from pathlib import Path
 
 from . import AssertionResult, failed, get_in, load_project_yaml, not_testable, passed, project_root, warning
 
+# Design-language versions a manifest may declare (ADR 0007), each with the
+# page archetypes it defines. A project that declares none keeps the checks
+# that predate the language.
+DESIGN_LANGUAGES = {"openmapstack-views/0.1": ("workspace", "report")}
+CONTROL_KINDS = ("filters", "scenarios", "variants")
+CONTROL_EFFECTS = ("exploratory", "published")
+
+
+def declared_views(proj: dict) -> list[dict]:
+    """The project's pages: ``id``, ``path``, ``archetype``, ``scope``,
+    ``entry`` and the ``presentation`` that applies to that page.
+
+    A view's own ``presentation`` block overrides top-level keys for that page
+    only. Without top-level ``views:`` the dashboard is the one implicit view.
+    Entries whose output does not resolve are skipped here; validation reports
+    them.
+    """
+    base = proj.get("presentation") if isinstance(proj.get("presentation"), dict) else {}
+    views = proj.get("views")
+    if not isinstance(views, list) or not views:
+        # Explicit delivery selection names the web artifacts; a custom output
+        # path must not accidentally activate an unrelated dashboard.html.
+        from .. import delivery
+
+        web_views = []
+        outputs = proj.get("outputs") or {}
+        for target in delivery.targets(proj):
+            if target.get("kind") not in {"dashboard", "observable"}:
+                continue
+            output = outputs.get(target.get("output"))
+            if isinstance(output, dict) and output.get("path"):
+                web_views.append({"id": target["id"], "path": str(output["path"]),
+                                  "archetype": None, "scope": None,
+                                  "entry": not web_views, "presentation": base})
+        if web_views:
+            return web_views
+        return [{"id": "dashboard", "path": "dashboard.html", "archetype": None, "scope": None,
+                 "entry": True, "presentation": base}]
+    outputs = proj.get("outputs") or {}
+    result = []
+    for view in views:
+        if not isinstance(view, dict):
+            continue
+        output = outputs.get(view.get("output"))
+        if not isinstance(output, dict) or not output.get("path"):
+            continue
+        override = view.get("presentation") if isinstance(view.get("presentation"), dict) else {}
+        result.append({
+            "id": str(view.get("id")),
+            "path": str(output["path"]),
+            "archetype": view.get("archetype"),
+            "scope": view.get("scope"),
+            "entry": bool(view.get("entry")) or len(views) == 1,
+            "presentation": {**base, **override},
+        })
+    return result
+
+
+def declared_controls(presentation: dict) -> list[dict]:
+    """Every declared control of one page with its kind and effect.
+
+    ``effect`` defaults to ``exploratory``: only a control explicitly marked
+    ``published`` may leave its canonical position without the view saying so.
+    """
+    controls = presentation.get("controls") if isinstance(presentation.get("controls"), dict) else {}
+    found = []
+    for kind in CONTROL_KINDS:
+        entries = controls.get(kind) or []
+        for control in entries if isinstance(entries, list) else []:
+            if isinstance(control, dict) and control.get("id") is not None:
+                found.append({**control, "kind": kind, "effect": control.get("effect") or "exploratory"})
+    return found
+
+
 SEMANTIC_ROLES = {
     "primary_result", "secondary_result", "source", "context", "constraint",
     "excluded_area", "warning", "user_override", "planned", "hypothetical",
@@ -69,15 +143,33 @@ def controls_match_pipeline(workspace: Path, project_dir: str = ".") -> Assertio
     if proj is None:
         return failed("project.yaml missing", code="manifest_missing")
 
+    presentations = [("presentation", proj.get("presentation") or {})]
+    for view in declared_views(proj) if proj.get("views") else []:
+        presentations.append((f"view {view['id']}", view["presentation"]))
+    errors = []
+    for name, presentation in presentations:
+        errors.extend(f"{name}: {error}" for error in control_pipeline_errors(proj, presentation))
+    if errors:
+        return failed("; ".join(errors), errors=errors, code="control_pipeline_drift")
+    controls = (proj.get("presentation") or {}).get("controls") or {}
+    filters, scenarios, variants = (controls.get(kind) or [] for kind in CONTROL_KINDS)
+    detail = f"{len(filters)} filter control(s) and {len(scenarios)} scenario control(s) consistent"
+    if variants:
+        detail = f"{len(filters)} filter control(s), {len(scenarios)} scenario control(s) and {len(variants)} variant control(s) consistent"
+    return passed(detail)
+
+
+def control_pipeline_errors(proj: dict, presentation: dict) -> list[str]:
+    """Check a page's effective controls against the shared analytical contract."""
     override_ids = {o.get("id") for o in (proj.get("overrides") or [])}
-    scenarios = get_in(proj, "presentation.controls.scenarios", []) or []
+    scenarios = [c for c in declared_controls(presentation) if c["kind"] == "scenarios"]
     errors: list[str] = []
     for s in scenarios:
         if s.get("override") not in override_ids:
             errors.append(f"scenario {s.get('id')} references unknown override {s.get('override')!r}")
 
     steps = get_in(proj, "processing.steps", []) or []
-    filters = get_in(proj, "presentation.controls.filters", []) or []
+    filters = [c for c in declared_controls(presentation) if c["kind"] == "filters"]
     for f in filters:
         field = f.get("field")
         canonical = f.get("canonical")
@@ -101,36 +193,35 @@ def controls_match_pipeline(workspace: Path, project_dir: str = ".") -> Assertio
                 f"control {f.get('id')} canonical value(s) {absent!r} not found in matching step expression(s)"
             )
 
-    # View switches between variants the pipeline already measured (travel
-    # mode, analysis year, metric). They change which precomputed columns the
-    # view shows, never the analysis, so they reference outputs, not overrides.
+    # Variant switches choose between results the pipeline already measured
+    # (travel mode, analysis year, metric). They change which precomputed
+    # columns the view shows, never the analysis, so they reference outputs,
+    # not overrides.
+    if get_in(presentation, "controls.views") is not None:
+        errors.append("presentation.controls.views was renamed to presentation.controls.variants")
     outputs = proj.get("outputs") or {}
-    views = get_in(proj, "presentation.controls.views", []) or []
-    for v in views:
+    variants = [c for c in declared_controls(presentation) if c["kind"] == "variants"]
+    for v in variants:
         options = v.get("options") or []
         if not options or len(set(map(str, options))) != len(options):
-            errors.append(f"view {v.get('id')} needs a non-empty list of distinct options")
+            errors.append(f"variant {v.get('id')} needs a non-empty list of distinct options")
             continue
         if v.get("canonical") not in options:
-            errors.append(f"view {v.get('id')} canonical {v.get('canonical')!r} is not one of its options")
+            errors.append(f"variant {v.get('id')} canonical {v.get('canonical')!r} is not one of its options")
         fields = v.get("fields") or {}
         output = outputs.get(v.get("output")) if v.get("output") else None
         if fields and v.get("output") and not isinstance(output, dict):
-            errors.append(f"view {v.get('id')} references unknown output {v.get('output')!r}")
+            errors.append(f"variant {v.get('id')} references unknown output {v.get('output')!r}")
             continue
         declared = {c.get("name") if isinstance(c, dict) else c for c in get_in(output or {}, "table.columns", []) or []}
         for option in options:
             if fields and str(option) not in {str(k) for k in fields}:
-                errors.append(f"view {v.get('id')} option {option!r} has no fields mapping")
+                errors.append(f"variant {v.get('id')} option {option!r} has no fields mapping")
             for column in (fields.get(option) or fields.get(str(option)) or []) if fields else []:
                 if declared and column not in declared:
-                    errors.append(f"view {v.get('id')} option {option!r} shows undeclared column {column!r}")
+                    errors.append(f"variant {v.get('id')} option {option!r} shows undeclared column {column!r}")
 
-    if errors:
-        return failed("; ".join(errors), errors=errors, code="control_pipeline_drift")
-    if views:
-        return passed(f"{len(filters)} filter control(s), {len(scenarios)} scenario control(s) and {len(views)} view control(s) consistent")
-    return passed(f"{len(filters)} filter control(s) and {len(scenarios)} scenario control(s) consistent")
+    return errors
 
 
 def tables_reference_table_outputs(workspace: Path, project_dir: str = ".") -> AssertionResult:
