@@ -534,6 +534,10 @@ def build(
                     "environment": {"python": "3.12", "duckdb": duckdb.__version__}},
     }
 
+    if break_mode == "invalid_assumption":
+        # Truthy metadata must not masquerade as the required rationale text.
+        project["interpretation"]["assumptions"][0]["rationale"] = {"scope": "distance"}
+
     if break_mode:
         project["warnings"].append({
             "id": "EVAL-BREAK", "severity": "high", "layer": "n/a", "issue": break_mode,

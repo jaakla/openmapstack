@@ -46,7 +46,8 @@ project:
 interpretation:
   objective: >-
     TODO analyst interpretation of the objective in one or two sentences.
-  assumptions:
+  assumptions:              # each item: nonblank id/statement/rationale; unique ids
+    # Extra fields are metadata only; built-in tools do not interpret them.
     - id: A1
       statement: >-
         TODO the assumption made ("near" = <= N meters, etc.).

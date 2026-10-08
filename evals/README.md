@@ -121,6 +121,10 @@ Scenario input files are checked in under
 `evals/fixtures/spatial-scenarios/<scenario>/`, and the runner's automatic
 byte-identity check verifies the generator copies them unmodified.
 
+Case `933-invalid-assumption` replaces the required rationale text with a mapping
+and requires `project.conforms_to_schema` to reject it. Its healthy control twin
+proves that the normal assumption record still passes.
+
 ## Coordinate-order boundary regression
 
 Case `018-coordinate-order-boundaries` is a focused fixture/live task for the
@@ -156,10 +160,11 @@ every selected view/receipt from the staged immutable fixture in a clean workspa
 `delivery.evidence_matches` reads actual embedded metadata and binds the view
 bytes to shared semantics and analytical output hashes.
 
-Mutations `934`–`939` reject unknown targets, missing selected artifacts, stale
+Mutations `934`–`940` reject unknown targets, missing selected artifacts, stale
 embedded metadata even with a rewritten receipt, unpinned sources, geographic
-metric CRS and unresolved presentation lineage. Every mutation has a healthy
-control twin. Legacy v1 compatibility is covered by the existing contract cases
+metric CRS, unresolved presentation lineage, and missing desktop-visible QGIS
+provenance despite correct hidden metadata and a rewritten receipt. Every
+mutation has a healthy control twin. Legacy v1 compatibility is covered by the existing contract cases
 and `tests/test_delivery.py`; fixture/example source identity is also tested.
 
 The five positives also declare live tasks to evaluate shipped skill behavior.
@@ -176,7 +181,8 @@ python3 evals/run.py --mode fixture --case 019-dashboard-delivery \
   --case 022-combined-delivery --case 023-hosted-delivery-evidence \
   --case 934-unknown-delivery-target --case 935-selected-delivery-missing \
   --case 936-stale-delivery-metadata --case 937-delivery-unpinned-source \
-  --case 938-delivery-wrong-metric-crs --case 939-delivery-unresolved-layer
+  --case 938-delivery-wrong-metric-crs --case 939-delivery-unresolved-layer \
+  --case 940-qgis-visible-provenance
 ```
 
 ## Visual integration (PyQGIS + browser)
@@ -810,8 +816,11 @@ geometry-validity, duplicate-ID, and null-ID counters from actual geodata.
 Live cases that name a semantic result use `$OUTPUT:candidate_parcels` to read its
 path from `outputs.candidate_parcels` in project.yaml. This also resolves nested
 validation evidence and clean-rerun paths; it never guesses another file when
-the declared output is missing. Supported spatial formats remain readable by
-the existing geodata checks. Storage CRS must match the actual dataset metadata,
+the declared output is missing. `$DELIVERY:qgis` resolves the output bound by
+the selected target with ID `qgis`, allowing its output key and path to vary.
+Missing, ambiguous or unsafe bindings fail grading without a filename fallback.
+Supported spatial formats remain readable by the existing geodata checks.
+Storage CRS must match the actual dataset metadata,
 while metric analysis still requires a suitable CRS.
 
 Live benchmark CI uses Ubuntu 24.04's `python3-qgis` system package and a

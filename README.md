@@ -56,7 +56,9 @@ execute and verify the result without the original conversation. It guides the
 agent to produce:
 
 - A `project.yaml` manifest with pinned sources, CRS, assumptions, ordered steps
-  and outputs, so the inputs and decisions are explicit.
+  and outputs, so the inputs and decisions are explicit. Its
+  [contract](skills/open-map-stack/references/project-spec.md#2-projectyaml-schema-openmapstack-projectv1)
+  permits project-specific metadata in open objects; extra fields have no built-in behavior.
 - One canonical pipeline with corrections and scenarios recorded as data or
   executable logic, so derived results can be rebuilt without manual edits.
 - Machine-readable validation and run evidence, including a clean rerun, so

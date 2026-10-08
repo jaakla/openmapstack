@@ -12,6 +12,7 @@ import sys
 import tempfile
 import unittest
 import zipfile
+import xml.etree.ElementTree as ET
 from contextlib import redirect_stdout, nullcontext
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -308,6 +309,84 @@ class DeliveryTests(unittest.TestCase):
         static = next(c for c in plan.checks if c.name.endswith("qgis.static_valid"))
         self.assertEqual(static.args["path"], "desktop.qgz")
         self.assertEqual(static.result.status, "passed")
+
+    def test_qgis_visible_metadata_is_required_even_with_matching_receipt(self):
+        self.build(["qgis"])
+        self.project["warnings"] = [{"statement": "Synthetic results have no real-world validity."}]
+        self.project["sources"]["parcels"]["provider"] = "Synthetic & illustrative <provider>"
+        self.save()
+        subprocess.run([sys.executable, str(self.root / "pipeline.py")], check=True, capture_output=True)
+        self.project = yaml.safe_load((self.root / "project.yaml").read_text())
+        path = self.root / "project.qgz"
+        with zipfile.ZipFile(path) as archive:
+            healthy = ET.fromstring(archive.read("project.qgs"))
+
+        def check_tree(tree):
+            with zipfile.ZipFile(path, "w") as archive:
+                archive.writestr("project.qgs", ET.tostring(tree))
+            # A fresh receipt and correct hidden JSON cannot replace visible metadata.
+            delivery.write_evidence(self.root, self.project)
+            return checks.evidence_matches(self.root, "qgis")
+
+        self.assertEqual(check_tree(healthy).status, "passed")
+        mutations = ["missing", "empty", "duplicate", self.project["sources"]["parcels"]["provider"],
+                     self.project["interpretation"]["assumptions"][0]["statement"],
+                     self.project["interpretation"]["assumptions"][0]["rationale"],
+                     self.project["warnings"][0]["statement"]]
+        for mutation in mutations:
+            with self.subTest(mutation=mutation):
+                tree = copy.deepcopy(healthy)
+                metadata = tree.find("projectMetadata")
+                if mutation == "missing":
+                    tree.remove(metadata)
+                elif mutation == "empty":
+                    metadata.clear()
+                elif mutation == "duplicate":
+                    tree.append(copy.deepcopy(metadata))
+                else:
+                    abstract = metadata.find("abstract")
+                    abstract.text = abstract.text.replace(mutation, "")
+                result = check_tree(tree)
+                self.assertEqual(result.status, "failed", result.detail)
+                self.assertEqual(result.data["code"], "delivery_provenance_missing")
+        abstract = healthy.find("projectMetadata/abstract")
+        abstract.text = abstract.text.replace(" ", "\n")
+        self.assertEqual(check_tree(healthy).status, "passed")
+
+    def test_delivery_evals_follow_selected_qgis_output_key_and_nested_path(self):
+        from tests.test_evals import eval_runner
+        from openmapstack.checks import not_testable
+
+        for case_id, kinds in (("020-qgis-only-delivery", ["qgis"]),
+                               ("022-combined-delivery", ["dashboard", "qgis", "observable"])):
+            with self.subTest(case=case_id):
+                self.build(kinds)
+                (self.root / "desktop").mkdir(exist_ok=True)
+                self.project["outputs"]["desktop_view"] = self.project["outputs"].pop("qgis")
+                self.project["outputs"]["desktop_view"]["path"] = "desktop/selected.qgz"
+                target = next(t for t in self.project["delivery"]["targets"] if t["id"] == "qgis")
+                target["output"] = "desktop_view"
+                with zipfile.ZipFile(self.root / "project.qgz") as archive:
+                    xml = archive.read("project.qgs").decode().replace("./data/", "../data/")
+                with zipfile.ZipFile(self.root / "desktop/selected.qgz", "w") as archive:
+                    archive.writestr("project.qgs", xml)
+                (self.root / "project.qgz").unlink()
+                self.save()
+                delivery.write_evidence(self.root, self.project)
+                case = yaml.safe_load((EXAMPLE.parents[1] / "evals/cases" / case_id / "expected.yaml").read_text())
+                entries = [entry for entry in case["assertions"] if entry["assert"].startswith("qgis.")]
+                with patch.object(qgis, "runtime_load", return_value=not_testable("PyQGIS unavailable")) as runtime:
+                    results, _ = eval_runner._evaluate_assertions(case, self.root, entries, {}, None)
+                    runtime.assert_called_once_with(self.root, path="desktop/selected.qgz")
+                self.assertEqual(results[0]["actual_status"], "passed", results)
+                self.assertEqual(results[1]["actual_status"], "not_testable")
+                self.assertTrue(all(result["args"]["path"] == "desktop/selected.qgz" for result in results))
+                # Even a valid legacy archive cannot rescue a missing selected artifact.
+                with zipfile.ZipFile(self.root / "project.qgz", "w") as archive:
+                    archive.writestr("project.qgs", xml.replace("../data/", "./data/"))
+                (self.root / "desktop/selected.qgz").unlink()
+                failed_results, _ = eval_runner._evaluate_assertions(case, self.root, entries[:1], {}, None)
+                self.assertEqual(failed_results[0]["actual_code"], "file_missing")
 
     def test_nested_qgis_artifact_resolves_datasources_relative_to_archive(self):
         self.build(["qgis"])

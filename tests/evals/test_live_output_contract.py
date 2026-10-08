@@ -1,6 +1,7 @@
 """Outcome-based live grading: formats may vary; parcel positions may not."""
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 import tempfile
@@ -51,6 +52,29 @@ class OutputReferenceTests(unittest.TestCase):
             {"case_type": "positive"}, self.root,
             [{"assert": "project.exists", "args": {"path": "$OUTPUT:candidate_parcels"}}], {}, None)
         self.assertEqual(results[0]["actual_code"], "file_missing")
+
+    def test_missing_ambiguous_or_escaping_delivery_binding_fails_grading(self):
+        healthy = {"outputs": {"desktop": {"path": "desktop/selected.qgz"}},
+                   "delivery": {"targets": [{"id": "qgis", "output": "desktop"}]}}
+        mutations = [lambda p: p.pop("delivery"),
+                     lambda p: p["delivery"]["targets"].append(p["delivery"]["targets"][0].copy()),
+                     lambda p: p["delivery"]["targets"][0].pop("output"),
+                     lambda p: p["delivery"]["targets"][0].update(output=[]),
+                     lambda p: p["delivery"]["targets"][0].update(output="unknown"),
+                     lambda p: p["outputs"]["desktop"].update(path="../outside.qgz")]
+        (self.root / "project.yaml").write_text(yaml.safe_dump(healthy))
+        self.assertEqual(eval_runner._resolve_output_references({"path": "$DELIVERY:qgis"}, self.root),
+                         {"path": "desktop/selected.qgz"})
+        for index, mutate in enumerate(mutations):
+            with self.subTest(index=index):
+                project = copy.deepcopy(healthy)
+                mutate(project)
+                (self.root / "project.yaml").write_text(yaml.safe_dump(project))
+                results, _ = eval_runner._evaluate_assertions(
+                    {"case_type": "positive"}, self.root,
+                    [{"assert": "project.exists", "args": {"path": "$DELIVERY:qgis"}}], {}, None)
+                self.assertEqual(results[0]["actual_status"], "failed")
+                self.assertEqual(results[0]["actual_code"], "output_reference_invalid")
 
 
 class SourceGeometryTests(unittest.TestCase):
