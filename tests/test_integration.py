@@ -58,6 +58,18 @@ class IntegrationTests(unittest.TestCase):
             plan = verify_project(self.root / 'project.yaml')
         self.assertEqual([c.result.status for c in plan.checks if c.name.startswith('integration.')], ['passed', 'passed'])
 
+    @unittest.skipUnless(importlib.util.find_spec('qgis'), 'native QGIS integration requires PyQGIS')
+    def test_qgis_adapter_exposes_assumption_rationales_in_native_metadata(self):
+        from openmapstack.integrations.qgis import generate
+
+        fixture.create(self.root, ['qgis'])
+        subprocess.run([sys.executable, str(self.root / 'pipeline.py')], check=True, capture_output=True)
+        project = yaml.safe_load((self.root / 'project.yaml').read_text())
+        generate(self.root, project, 'qgis')
+        delivery.write_evidence(self.root, project)
+        result = delivery_checks.evidence_matches(self.root, 'qgis')
+        self.assertEqual(result.status, 'passed', result.detail)
+
     def test_model_and_step_summary_drift_fail(self):
         (self.root / 'definitions/model.sql').write_text('select 2')
         self.assertEqual(checks.bindings_valid(self.root).data['code'], 'integration_binding_invalid')

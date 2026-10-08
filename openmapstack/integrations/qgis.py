@@ -99,7 +99,7 @@ def generate(root: Path, project: dict, target_id: str) -> Path:
         for source in project["sources"].values():
             lines.append(f"{source['provider']}: {source.get('dataset')}; "
                          f"{source.get('version')}; {source.get('license')}")
-        lines += [str(a["statement"]) for a in project["interpretation"]["assumptions"]]
+        lines += [f"{a['statement']} {a['rationale']}" for a in project["interpretation"]["assumptions"]]
         lines += [str(w["statement"]) for w in project.get("warnings") or []]
         metadata.setAbstract("\n".join(lines))
         desktop.setMetadata(metadata)
