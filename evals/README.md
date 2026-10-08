@@ -149,6 +149,19 @@ python3 evals/run.py --mode fixture --case 018-coordinate-order-boundaries \
   --case 931-leaflet-latlng-coordinate-swapped --case 932-leaflet-geojson-coordinate-swapped
 ```
 
+## Layer placement against the area of interest
+
+Case `025-layers-within-aoi` declares a hand-placed Tartu `project.aoi` and
+requires every local output, stored in EPSG:3301 or EPSG:4326, to lie inside it
+(`geodata.layer_extent_within_aoi`). The check is oracle-free once the manifest
+declares the AOI: it transforms the grown AOI into each layer's CRS and never
+pushes suspect coordinates through a projection. Mutation `945` writes the
+WGS84 road as lat/lon and pins `axis_swap_suspected`; `946` labels EPSG:3301
+metres as EPSG:4326 in both file and manifest, so every CRS-label check agrees
+with the lie, and pins `extent_outside_aoi`. Both keep the other layers healthy
+and require a healthy control twin. These prove the check, not that a live
+agent declares an AOI or acts on the finding.
+
 ## Selectable delivery contract
 
 Cases `019`–`023` cover the explicit new-project dashboard default, QGIS-only,

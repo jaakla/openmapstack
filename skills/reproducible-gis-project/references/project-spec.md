@@ -198,6 +198,9 @@ project:
   created_at: 2026-08-25T08:15:03+03:00
   updated_at: 2026-08-25T08:42:11+03:00
   status: validated        # draft | in_progress | validated | warning | failed
+  aoi:                     # optional area of interest; local outputs must lie near it
+    bbox: [640000, 6455000, 685000, 6500000]   # minx, miny, maxx, maxy in crs x/y order
+    crs: EPSG:3301
   author:                  # who the analysis is made for and by; shown in the credits header
     name: Mari Maasikas
     email: mari.maasikas@example.org
@@ -241,6 +244,21 @@ credits header (section 3) renders them. Fill `author` from the requesting user 
 their version-control identity (`git config user.name` / `user.email`) and ask when
 neither is known; never invent an author or leave a placeholder in a delivered view.
 A manifest can be schema-valid and still fail the semantic audit.
+
+Declare `project.aoi` whenever the question has a bounded place: a city, county,
+country or study area. `bbox` is `[minx, miny, maxx, maxy]` in the x/y order of
+`crs` (longitude/latitude or easting/northing), whatever a service's own bbox
+order is. Both `openmapstack validate` and `verify` reject non-finite, inverted,
+or zero-width/height bounds independently of the outputs. `openmapstack verify`
+then runs `geodata.layer_extent_within_aoi` on every local geodata output: the AOI is grown by half its width and height on each side,
+transformed into the layer's own CRS, and compared with every feature. A layer
+entirely outside fails (`axis_swap_suspected` when flipping x/y would put a strict
+majority of the outside features inside, otherwise `extent_outside_aoi`); some
+features outside is a warning. Invalid AOI CRS declarations or coordinates fail
+as `aoi_invalid`; unavailable transformation capabilities remain `not_testable`.
+These checks catch what CRS labels and coordinate ranges cannot: near Tartu, `(26.7, 58.4)` and
+`(58.4, 26.7)` are both legal lon/lat. A suspected swap is a diagnosis to explain,
+not permission to swap without source evidence (`formats-and-crs.md`).
 
 ### 2.2 Sources
 
@@ -459,6 +477,10 @@ outputs:
 ```
 
 Output dataset are defined as first-class, with generated-by traces back to a step.
+
+Geodata outputs are `extent: local` by default and must lie near `project.aoi`.
+Mark an intentionally wider layer, such as a world locator frame or a global
+reference grid, `extent: global` to exempt it from that check.
 
 An output that exists to feed a control rather than to answer the question must
 say so. Mark it `role: exploratory_companion` and name the accepted result in

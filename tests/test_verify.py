@@ -107,6 +107,62 @@ class VerifyPlanTests(unittest.TestCase):
         self.assertEqual(geo[0].result.status, "not_testable")
         self.assertEqual(geo[0].result.data.get("code"), "unsupported_format")
 
+    def test_declared_aoi_places_local_outputs_and_exempts_global_ones(self) -> None:
+        workspace = make_workspace()
+        project = minimal_project()
+        project["project"]["aoi"] = {"bbox": [26.65, 58.32, 26.80, 58.42], "crs": "EPSG:4326"}
+        project["outputs"] = {
+            "result": {"path": "data/derived/result.geojson", "format": "GeoJSON (EPSG:4326)"},
+            "world": {"path": "data/derived/world.geojson", "format": "GeoJSON (EPSG:4326)", "extent": "global"},
+        }
+        write_project(workspace, project)
+        result = verify_project(workspace / "project.yaml")
+        placed = [r.args.get("path") for r in result.checks if r.name == "geodata.layer_extent_within_aoi"]
+        self.assertEqual(placed, ["data/derived/result.geojson"])
+
+    def test_no_aoi_adds_no_extent_check(self) -> None:
+        workspace = make_workspace()
+        project = minimal_project()
+        project["outputs"] = {"result": {"path": "data/derived/result.geojson", "format": "GeoJSON (EPSG:4326)"}}
+        write_project(workspace, project)
+        result = verify_project(workspace / "project.yaml")
+        self.assertIsNone(_status_of(result, "geodata.layer_extent_within_aoi"))
+
+    def test_aoi_bounds_are_validated_without_local_outputs(self) -> None:
+        from tests.test_cli import valid_manifest
+
+        for outputs in ({"report": {"path": "report.csv", "format": "CSV", "kind": "table"}},
+                        {"world": {"path": "world.geojson", "format": "GeoJSON", "extent": "global"}}):
+            for bbox, expected in (([26.65, 58.32, 26.80, 58.42], "passed"),
+                                   ([26.80, 58.32, 26.65, 58.42], "failed"),
+                                   ([26.65, 58.42, 26.80, 58.32], "failed"),
+                                   ([26.65, 58.32, 26.80, 58.32], "failed")):
+                with self.subTest(outputs=outputs, bbox=bbox):
+                    workspace = make_workspace()
+                    project = valid_manifest()
+                    project["outputs"] = outputs
+                    project["project"]["aoi"] = {"bbox": bbox, "crs": "EPSG:4326"}
+                    write_project(workspace, project)
+                    result = verify_project(workspace / "project.yaml")
+                    self.assertEqual(_status_of(result, "project.conforms_to_schema"), expected)
+                    self.assertIsNone(_status_of(result, "geodata.layer_extent_within_aoi"))
+                    if expected == "failed":
+                        self.assertFalse(result.ok())
+
+    def test_invalid_aoi_crs_is_a_blocking_extent_failure(self) -> None:
+        workspace = make_workspace()
+        project = minimal_project()
+        project["project"]["aoi"] = {"bbox": [26.65, 58.32, 26.80, 58.42], "crs": "EPSG:bogus"}
+        project["outputs"] = {"result": {"path": "result.geojson", "format": "GeoJSON (EPSG:4326)"}}
+        (workspace / "result.geojson").write_text(json.dumps({
+            "type": "FeatureCollection", "features": [{"type": "Feature", "properties": {},
+                "geometry": {"type": "Point", "coordinates": [26.72, 58.38]}}]}), encoding="utf-8")
+        write_project(workspace, project)
+        result = verify_project(workspace / "project.yaml")
+        extent = next(run.result for run in result.checks if run.name == "geodata.layer_extent_within_aoi")
+        self.assertEqual((extent.status, extent.data["code"]), ("failed", "aoi_invalid"))
+        self.assertFalse(result.ok())
+
     def test_a_raising_check_is_not_testable_not_a_crash(self) -> None:
         # One broken check must not take down a report the user is relying on
         # for everything else -- but it must never read as a pass either.

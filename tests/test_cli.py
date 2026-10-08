@@ -54,6 +54,25 @@ class OpenMapStackCliTests(unittest.TestCase):
         self.assertEqual(result.status, "passed", [check.to_dict() for check in result.checks])
         self.assertTrue(result.ok())
 
+    def test_aoi_bounds_are_validated_without_local_outputs(self) -> None:
+        for outputs in ({"report": {"path": "report.csv", "format": "CSV", "kind": "table"}},
+                        {"world": {"path": "world.geojson", "format": "GeoJSON", "extent": "global"}}):
+            for bbox, expected in (([26.65, 58.32, 26.80, 58.42], "passed"),
+                                   ([26.80, 58.32, 26.65, 58.42], "failed"),
+                                   ([26.65, 58.42, 26.80, 58.32], "failed"),
+                                   ([26.65, 58.32, 26.65, 58.42], "failed"),
+                                   ([26.65, 58.32, float("inf"), 58.42], "failed")):
+                with self.subTest(outputs=outputs, bbox=bbox):
+                    project = valid_manifest()
+                    project["outputs"] = outputs
+                    project["project"]["aoi"] = {"bbox": bbox, "crs": "EPSG:4326"}
+                    result = validate_project(self.write_project(project), artifacts=False)
+                    check = self._check(result, "manifest.json_schema")
+                    self.assertEqual(check.status, expected, check.to_dict())
+                    if expected == "failed":
+                        self.assertFalse(result.ok())
+                        self.assertIn("project.aoi.bbox", check.message)
+
     # ---- qgis.layer_crs -------------------------------------------------
     # A layer with no <srs> is assumed to be in the project CRS and never
     # reprojected, so a Web Mercator basemap in an EPSG:3301 project draws

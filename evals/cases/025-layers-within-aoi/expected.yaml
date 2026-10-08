@@ -1,0 +1,26 @@
+id: 025-layers-within-aoi
+case_type: positive
+modes: [fixture]
+score_types: {fixture: contract_ci}
+project_dir: project
+hard_gate: true
+fixture:
+  generator: "{python} {evals_dir}/fixtures/reference_pipeline/gen_spatial.py {project_dir} --scenario=extent"
+  source_baseline:
+    - {source: ../../fixtures/spatial-scenarios/crs/parcels-3301.geojson, destination: data/source/parcels-3301.geojson}
+    - {source: ../../fixtures/spatial-scenarios/crs/road-4326.geojson, destination: data/source/road-4326.geojson}
+    - {source: ../../fixtures/spatial-scenarios/crs/road-3301.geojson, destination: data/source/road-3301.geojson}
+
+# project.aoi is a hand-placed Tartu bbox that independently contains the
+# fixture parcels and road; each local output must lie inside it, whatever CRS
+# it is stored in. The global world frame is exempt (see tests/test_verify.py).
+assertions:
+  - assert: project.conforms_to_schema
+  - assert: project.graph_resolves
+  - assert: validation.run_record_matches
+  - assert: geodata.layer_extent_within_aoi
+    args: {path: data/derived/candidates.parquet}
+  - assert: geodata.layer_extent_within_aoi
+    args: {path: data/derived/road.geojson}
+  - assert: geodata.layer_extent_within_aoi
+    args: {path: data/derived/parcels.geojson}
