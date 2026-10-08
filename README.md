@@ -225,8 +225,9 @@ does not require a project; material multi-stage analyses retain the complete
 reproducibility contract. Casual place lookups and ordinary non-spatial coding
 are outside the collection's scope.
 
-See [0.4.0 release preparation](docs/release-0.4.0.md) for executed installation
-checks, consumer migration and remaining release acceptance.
+See the [0.4.0 release notes](https://github.com/jaakla/openmapstack-skills/releases/tag/v0.4.0)
+for executed validation and installation checks, consumer migration and known
+limitations.
 
 ## Project CLI
 
