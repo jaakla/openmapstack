@@ -12,6 +12,8 @@ import math
 from pathlib import Path
 from typing import Any
 
+from openmapstack.schema import aoi_bbox_errors
+
 from . import AssertionResult, failed, get_in, not_testable, passed, project_root, warning
 from .spatial import connect_spatial
 
@@ -539,18 +541,12 @@ def layer_extent_within_aoi(
         aoi_bbox, aoi_crs = _aoi_from_manifest(workspace, project_dir)
         if aoi_bbox is None and aoi_crs is None:
             return not_testable("project.aoi is not declared", code="aoi_undeclared")
-    try:
-        minx, miny, maxx, maxy = (float(value) for value in aoi_bbox)
-        bbox_ok = (all(math.isfinite(value) for value in (minx, miny, maxx, maxy))
-                   and minx < maxx and miny < maxy
-                   and not any(isinstance(value, bool) for value in aoi_bbox))
-    except (TypeError, ValueError):
-        bbox_ok = False
-    if not bbox_ok or not isinstance(aoi_crs, str) or not aoi_crs.strip():
+    if aoi_bbox_errors(aoi_bbox) or not isinstance(aoi_crs, str) or not aoi_crs.strip():
         return failed(
             "AOI needs bbox [minx, miny, maxx, maxy] with min < max and a crs",
             code="aoi_invalid", aoi_bbox=aoi_bbox, aoi_crs=aoi_crs,
         )
+    minx, miny, maxx, maxy = (float(value) for value in aoi_bbox)
     if isinstance(margin, bool) or not isinstance(margin, (int, float)) or not math.isfinite(margin) or margin < 0:
         raise ValueError("margin must be a finite non-negative number")
     target = project_root(workspace, project_dir) / path
@@ -560,6 +556,33 @@ def layer_extent_within_aoi(
     if con is None:
         return not_testable("duckdb spatial not available in this environment", code="duckdb_unavailable")
     try:
+        # An identity transform resolves the AOI CRS without depending on a
+        # layer CRS or a datum transformation's optional grid files.
+        try:
+            con.execute(
+                "SELECT ST_Transform(ST_Point(0, 0), ?, ?, always_xy := true)",
+                [aoi_crs.strip(), aoi_crs.strip()],
+            ).fetchone()
+        except Exception as exc:  # noqa: BLE001
+            if "Could not create projection" in str(exc):
+                return failed(f"AOI CRS is not recognized: {aoi_crs}", code="aoi_invalid",
+                              aoi_bbox=aoi_bbox, aoi_crs=aoi_crs)
+            return not_testable(f"could not resolve the AOI CRS: {exc}", code="aoi_transform_failed")
+        # Validate the original AOI before adding a margin, which can itself
+        # exceed a projection's domain even for a valid declared AOI.
+        try:
+            geographic_bounds = con.execute(
+                "WITH t AS (SELECT ST_Transform(ST_GeomFromText(?), ?, 'EPSG:4326', always_xy := true) AS g) "
+                "SELECT ST_XMin(g), ST_YMin(g), ST_XMax(g), ST_YMax(g) FROM t",
+                [_densified_ring(minx, miny, maxx, maxy), aoi_crs.strip()],
+            ).fetchone()
+        except Exception as exc:  # noqa: BLE001
+            return not_testable(f"could not transform the AOI: {exc}", code="aoi_transform_failed")
+        if (geographic_bounds is None
+                or not all(value is not None and math.isfinite(value) for value in geographic_bounds)
+                or not -90 <= geographic_bounds[1] <= geographic_bounds[3] <= 90):
+            return failed("AOI coordinates are outside the declared CRS domain", code="aoi_invalid",
+                          aoi_bbox=aoi_bbox, aoi_crs=aoi_crs)
         rel = _read(con, target)
         expression = _geometry_expression(con, rel, geometry_field)
         if expression is None:
@@ -574,11 +597,15 @@ def layer_extent_within_aoi(
         layer_crs_name = next(iter(layer_crs))
         grow_x, grow_y = (maxx - minx) * margin, (maxy - miny) * margin
         ring = _densified_ring(minx - grow_x, miny - grow_y, maxx + grow_x, maxy + grow_y)
-        bounds = con.execute(
-            "WITH t AS (SELECT ST_Transform(ST_GeomFromText(?), ?, ?, always_xy := true) AS g) "
-            "SELECT ST_XMin(g), ST_YMin(g), ST_XMax(g), ST_YMax(g) FROM t",
-            [ring, aoi_crs.strip(), layer_crs_name],
-        ).fetchone()
+        try:
+            bounds = con.execute(
+                "WITH t AS (SELECT ST_Transform(ST_GeomFromText(?), ?, ?, always_xy := true) AS g) "
+                "SELECT ST_XMin(g), ST_YMin(g), ST_XMax(g), ST_YMax(g) FROM t",
+                [ring, aoi_crs.strip(), layer_crs_name],
+            ).fetchone()
+        except Exception as exc:  # noqa: BLE001
+            return not_testable(f"could not transform the AOI into {path}'s CRS: {exc}",
+                                code="aoi_transform_failed", layer_crs=layer_crs_name)
         if bounds is None or not all(value is not None and math.isfinite(value) for value in bounds):
             return not_testable(
                 f"the AOI cannot be expressed in {path}'s CRS {layer_crs_name}",
@@ -616,7 +643,7 @@ def layer_extent_within_aoi(
         return passed(f"all {placed} features of {path} lie within the AOI (margin {margin})", **evidence)
     # Edge features of a buffered fetch can flip just outside the AOI too;
     # a majority landing inside is the swap signature.
-    swap = swapped_inside * 2 >= outside
+    swap = swapped_inside * 2 > outside
     code = "axis_swap_suspected" if swap else ("extent_outside_aoi" if outside == placed else "features_outside_aoi")
     cause = ("their flipped x/y would fall inside, so suspect a lon/lat axis swap" if swap
              else "suspect a wrong CRS label, a datum or unit error, or a wrong-area source filter")

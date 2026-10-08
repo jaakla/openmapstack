@@ -368,6 +368,60 @@ def _aoi_workspace(features, crs="EPSG:4326", aoi=_TARTU_AOI):
 
 
 class LayerExtentWithinAoiTests(unittest.TestCase):
+    def test_tied_swap_evidence_keeps_the_generic_diagnosis(self) -> None:
+        for inside in ([], [_point_feature({"id": 3}, coords=_TARTU)]):
+            with self.subTest(partial=bool(inside)):
+                workspace = _aoi_workspace(inside + [
+                    _point_feature({"id": 1}, coords=_TARTU[::-1]),
+                    _point_feature({"id": 2}, coords=(24.75, 59.44)),
+                ])
+                result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+                self.assertEqual(result.status, "warning" if inside else "failed")
+                self.assertEqual(result.data["code"], "features_outside_aoi" if inside else "extent_outside_aoi")
+                self.assertEqual(result.data["features_swapped_inside"], 1)
+
+    def test_strict_majority_of_outside_features_suggests_a_swap(self) -> None:
+        workspace = _aoi_workspace([
+            _point_feature({"id": 1}, coords=_TARTU),
+            _point_feature({"id": 2}, coords=_TARTU[::-1]),
+            _point_feature({"id": 3}, coords=(58.37, 26.73)),
+            _point_feature({"id": 4}, coords=(24.75, 59.44)),
+        ])
+        result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+        self.assertEqual((result.status, result.data["code"]), ("warning", "axis_swap_suspected"))
+
+    def test_unrecognized_aoi_crs_fails(self) -> None:
+        for crs in ("EPSG:bogus", "EPSG:999999", "not a CRS"):
+            with self.subTest(crs=crs):
+                workspace = _aoi_workspace([_point_feature({"id": 1}, coords=_TARTU)],
+                    aoi={"bbox": _TARTU_AOI["bbox"], "crs": crs})
+                result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+                self.assertEqual((result.status, result.data["code"]), ("failed", "aoi_invalid"), result.detail)
+
+    def test_aoi_coordinates_outside_the_crs_domain_fail(self) -> None:
+        workspace = _aoi_workspace([_point_feature({"id": 1}, coords=_TARTU)],
+            aoi={"bbox": [26.65, 100, 26.80, 101], "crs": "EPSG:4326"})
+        result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+        self.assertEqual((result.status, result.data["code"]), ("failed", "aoi_invalid"))
+
+    def test_environmental_transform_failure_remains_not_testable(self) -> None:
+        workspace = _aoi_workspace([_point_feature({"id": 1}, coords=_TARTU)])
+        con = geodata._connect()
+        self.assertIsNotNone(con)
+
+        class UnavailableTransform:
+            def execute(self, query, args=None):
+                if "ST_Transform" in query and "ST_GeomFromText" in query:
+                    raise RuntimeError("required datum grid unavailable")
+                return con.execute(query, args)
+
+            def close(self):
+                con.close()
+
+        with patch.object(geodata, "_connect", return_value=UnavailableTransform()):
+            result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+        self.assertEqual((result.status, result.data["code"]), ("not_testable", "aoi_transform_failed"))
+
     def test_local_layer_inside_the_aoi_passes(self) -> None:
         workspace = _aoi_workspace([_point_feature({"id": 1}, coords=_TARTU)])
         result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
