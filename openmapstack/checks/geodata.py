@@ -12,7 +12,7 @@ import math
 from pathlib import Path
 from typing import Any
 
-from . import AssertionResult, failed, get_in, not_testable, passed, project_root
+from . import AssertionResult, failed, get_in, not_testable, passed, project_root, warning
 from .spatial import connect_spatial
 
 
@@ -485,3 +485,141 @@ def dataset_crs_matches_storage_crs(
             match = next((result for result in results if result.status == "passed"), None)
             return match or results[0]
     return dataset_crs_is(workspace, path, declared, geometry_field, project_dir)
+
+
+def _aoi_from_manifest(workspace: Path, project_dir: str) -> tuple[Any, Any]:
+    from . import load_project_yaml
+
+    proj = load_project_yaml(workspace, project_dir) or {}
+    aoi = get_in(proj, "project.aoi")
+    if not isinstance(aoi, dict):
+        return None, None
+    return aoi.get("bbox"), aoi.get("crs")
+
+
+def _densified_ring(minx: float, miny: float, maxx: float, maxy: float, steps: int = 16) -> str:
+    """WKT polygon of a bbox with intermediate edge vertices, so a transformed
+    AOI keeps its curved edges instead of only its four corners."""
+    points = []
+    for index in range(steps):
+        points.append((minx + (maxx - minx) * index / steps, miny))
+    for index in range(steps):
+        points.append((maxx, miny + (maxy - miny) * index / steps))
+    for index in range(steps):
+        points.append((maxx - (maxx - minx) * index / steps, maxy))
+    for index in range(steps):
+        points.append((minx, maxy - (maxy - miny) * index / steps))
+    points.append(points[0])
+    return "POLYGON((" + ", ".join(f"{x!r} {y!r}" for x, y in points) + "))"
+
+
+def layer_extent_within_aoi(
+    workspace: Path,
+    path: str,
+    aoi_bbox: list[float] | None = None,
+    aoi_crs: str | None = None,
+    margin: float = 0.5,
+    geometry_field: str | None = None,
+    project_dir: str = ".",
+) -> AssertionResult:
+    """Every feature of a local layer lies near the project's area of interest.
+
+    A local layer that lands outside a city- or country-sized AOI usually
+    means a lon/lat axis swap, a wrong CRS label, or a source filter that
+    fetched the wrong place; a CRS label and legal coordinate ranges cannot
+    reveal any of these. The AOI (``project.aoi`` unless given) is grown by
+    ``margin`` times its width and height on each side and transformed into the
+    layer's own CRS, so suspect coordinates are never pushed through a
+    projection. A whole layer outside fails; some features outside is a
+    warning. ``axis_swap_suspected`` means most outside features would fall
+    inside with x/y flipped; it is a diagnosis, not permission to swap without
+    source evidence.
+    """
+    if aoi_bbox is None and aoi_crs is None:
+        aoi_bbox, aoi_crs = _aoi_from_manifest(workspace, project_dir)
+        if aoi_bbox is None and aoi_crs is None:
+            return not_testable("project.aoi is not declared", code="aoi_undeclared")
+    try:
+        minx, miny, maxx, maxy = (float(value) for value in aoi_bbox)
+        bbox_ok = (all(math.isfinite(value) for value in (minx, miny, maxx, maxy))
+                   and minx < maxx and miny < maxy
+                   and not any(isinstance(value, bool) for value in aoi_bbox))
+    except (TypeError, ValueError):
+        bbox_ok = False
+    if not bbox_ok or not isinstance(aoi_crs, str) or not aoi_crs.strip():
+        return failed(
+            "AOI needs bbox [minx, miny, maxx, maxy] with min < max and a crs",
+            code="aoi_invalid", aoi_bbox=aoi_bbox, aoi_crs=aoi_crs,
+        )
+    if isinstance(margin, bool) or not isinstance(margin, (int, float)) or not math.isfinite(margin) or margin < 0:
+        raise ValueError("margin must be a finite non-negative number")
+    target = project_root(workspace, project_dir) / path
+    if not target.is_file():
+        return failed(f"{path} does not exist", code="file_missing")
+    con = _connect()
+    if con is None:
+        return not_testable("duckdb spatial not available in this environment", code="duckdb_unavailable")
+    try:
+        rel = _read(con, target)
+        expression = _geometry_expression(con, rel, geometry_field)
+        if expression is None:
+            return failed(f"{path} has no geometry column", code="geometry_column_missing")
+        crs_rows = con.execute(
+            f"SELECT DISTINCT ST_CRS({expression}) FROM {rel} WHERE {expression} IS NOT NULL"
+        ).fetchall()
+        layer_crs = {row[0] for row in crs_rows}
+        if len(layer_crs) != 1 or None in layer_crs or "" in layer_crs:
+            return not_testable(f"{path} lacks one known CRS, so it cannot be placed",
+                                code="dataset_crs_missing")
+        layer_crs_name = next(iter(layer_crs))
+        grow_x, grow_y = (maxx - minx) * margin, (maxy - miny) * margin
+        ring = _densified_ring(minx - grow_x, miny - grow_y, maxx + grow_x, maxy + grow_y)
+        bounds = con.execute(
+            "WITH t AS (SELECT ST_Transform(ST_GeomFromText(?), ?, ?, always_xy := true) AS g) "
+            "SELECT ST_XMin(g), ST_YMin(g), ST_XMax(g), ST_YMax(g) FROM t",
+            [ring, aoi_crs.strip(), layer_crs_name],
+        ).fetchone()
+        if bounds is None or not all(value is not None and math.isfinite(value) for value in bounds):
+            return not_testable(
+                f"the AOI cannot be expressed in {path}'s CRS {layer_crs_name}",
+                code="aoi_transform_failed", layer_crs=layer_crs_name,
+            )
+        envelope = "POLYGON(({0!r} {1!r}, {2!r} {1!r}, {2!r} {3!r}, {0!r} {3!r}, {0!r} {1!r}))".format(*bounds)
+        placed, outside, swapped_inside = con.execute(
+            f"WITH f AS (SELECT {expression} AS g FROM {rel}), "
+            "a AS (SELECT ST_GeomFromText(?) AS aoi), "
+            "p AS (SELECT g, NOT ST_Intersects(ST_Envelope(g), aoi) AS out, aoi "
+            "      FROM f, a WHERE g IS NOT NULL AND NOT ST_IsEmpty(g)) "
+            "SELECT COUNT(*), COUNT(*) FILTER (WHERE out), "
+            "COUNT(*) FILTER (WHERE out AND ST_Intersects(ST_Envelope(ST_FlipCoordinates(g)), aoi)) FROM p",
+            [envelope],
+        ).fetchone()
+        extent = con.execute(
+            f"SELECT ST_XMin(e), ST_YMin(e), ST_XMax(e), ST_YMax(e) FROM "
+            f"(SELECT ST_Extent_Agg({expression}) AS e FROM {rel})"
+        ).fetchone()
+    except Exception as exc:  # noqa: BLE001
+        return not_testable(f"could not compare {path} with the AOI: {exc}", code="read_error")
+    finally:
+        con.close()
+    evidence = {
+        "layer_crs": layer_crs_name,
+        "layer_extent": list(extent) if extent and None not in extent else None,
+        "aoi_in_layer_crs": list(bounds),
+        "features_checked": placed,
+        "features_outside": outside,
+        "features_swapped_inside": swapped_inside,
+    }
+    if placed == 0:
+        return not_testable(f"{path} has no non-empty geometry to place", code="empty_layer", **evidence)
+    if outside == 0:
+        return passed(f"all {placed} features of {path} lie within the AOI (margin {margin})", **evidence)
+    # Edge features of a buffered fetch can flip just outside the AOI too;
+    # a majority landing inside is the swap signature.
+    swap = swapped_inside * 2 >= outside
+    code = "axis_swap_suspected" if swap else ("extent_outside_aoi" if outside == placed else "features_outside_aoi")
+    cause = ("their flipped x/y would fall inside, so suspect a lon/lat axis swap" if swap
+             else "suspect a wrong CRS label, a datum or unit error, or a wrong-area source filter")
+    if outside == placed:
+        return failed(f"no feature of {path} lies within the AOI; {cause}", code=code, **evidence)
+    return warning(f"{outside} of {placed} features of {path} lie outside the AOI; {cause}", code=code, **evidence)

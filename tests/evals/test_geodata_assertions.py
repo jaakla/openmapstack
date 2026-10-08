@@ -352,5 +352,111 @@ class DatasetCrsMatchesStorageCrsTests(unittest.TestCase):
         self.assertEqual(result.data.get("code"), "storage_crs_missing")
 
 
+# Tartu, in lon/lat; points are (lon, lat) unless a test swaps them.
+_TARTU_AOI = {"bbox": [26.65, 58.32, 26.80, 58.42], "crs": "EPSG:4326"}
+_TARTU = (26.72, 58.38)
+
+
+def _aoi_workspace(features, crs="EPSG:4326", aoi=_TARTU_AOI):
+    workspace = make_workspace()
+    project = minimal_project()
+    if aoi is not None:
+        project["project"]["aoi"] = aoi
+    write_project(workspace, project)
+    _write_geojson(workspace / "layer.geojson", features, crs=crs)
+    return workspace
+
+
+class LayerExtentWithinAoiTests(unittest.TestCase):
+    def test_local_layer_inside_the_aoi_passes(self) -> None:
+        workspace = _aoi_workspace([_point_feature({"id": 1}, coords=_TARTU)])
+        result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+        self.assertEqual(result.status, "passed", result.detail)
+        self.assertEqual(result.data["features_outside"], 0)
+
+    def test_projected_layer_is_compared_in_its_own_crs(self) -> None:
+        # Tartu in L-EST97; the lon/lat AOI is transformed, not the data.
+        workspace = _aoi_workspace([_point_feature({"id": 1}, coords=(659000, 6474000))], crs="EPSG:3301")
+        result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+        self.assertEqual(result.status, "passed", result.detail)
+        self.assertEqual(result.data["layer_crs"], "EPSG:3301")
+
+    def test_lat_lon_swapped_layer_fails_as_axis_swap(self) -> None:
+        # (58.38, 26.72) is legal as lon/lat, so ranges and the label pass.
+        workspace = _aoi_workspace([_point_feature({"id": 1}, coords=_TARTU[::-1])])
+        result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.data.get("code"), "axis_swap_suspected")
+
+    def test_swapped_projected_layer_fails_as_axis_swap(self) -> None:
+        workspace = _aoi_workspace([_point_feature({"id": 1}, coords=(6474000, 659000))], crs="EPSG:3301")
+        result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+        self.assertEqual(result.data.get("code"), "axis_swap_suspected")
+
+    def test_metres_labelled_as_degrees_fail_outside_the_aoi(self) -> None:
+        workspace = _aoi_workspace([_point_feature({"id": 1}, coords=(659000, 6474000))], crs="EPSG:4326")
+        result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.data.get("code"), "extent_outside_aoi")
+
+    def test_degrees_labelled_as_metres_fail_outside_the_aoi(self) -> None:
+        workspace = _aoi_workspace([_point_feature({"id": 1}, coords=_TARTU)], crs="EPSG:3301")
+        result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.data.get("code"), "extent_outside_aoi")
+
+    def test_some_features_outside_is_a_warning_naming_the_count(self) -> None:
+        workspace = _aoi_workspace([
+            _point_feature({"id": 1}, coords=_TARTU),
+            _point_feature({"id": 2}, coords=(26.73, 58.37)),
+            _point_feature({"id": 3}, coords=(24.75, 59.44)),  # Tallinn, 160 km away
+        ])
+        result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+        self.assertEqual(result.status, "warning")
+        self.assertEqual(result.data.get("code"), "features_outside_aoi")
+        self.assertEqual((result.data["features_outside"], result.data["features_checked"]), (1, 3))
+
+    def test_margin_admits_a_buffered_fetch_and_zero_margin_does_not(self) -> None:
+        # 0.05 degrees east of a 0.15-degree-wide AOI.
+        workspace = _aoi_workspace([_point_feature({"id": 1}, coords=(26.85, 58.38))])
+        self.assertEqual(geodata.layer_extent_within_aoi(workspace, path="layer.geojson").status, "passed")
+        strict = geodata.layer_extent_within_aoi(workspace, path="layer.geojson", margin=0)
+        self.assertEqual(strict.status, "failed")
+
+    def test_explicit_aoi_arguments_override_the_manifest(self) -> None:
+        workspace = _aoi_workspace([_point_feature({"id": 1}, coords=_TARTU)], aoi=None)
+        result = geodata.layer_extent_within_aoi(
+            workspace, path="layer.geojson", aoi_bbox=[-74.3, 40.5, -73.7, 40.95], aoi_crs="EPSG:4326")
+        self.assertEqual(result.data.get("code"), "extent_outside_aoi")
+
+    def test_undeclared_aoi_is_not_testable_not_passed(self) -> None:
+        workspace = _aoi_workspace([_point_feature({"id": 1}, coords=_TARTU)], aoi=None)
+        result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+        self.assertEqual(result.status, "not_testable")
+        self.assertEqual(result.data.get("code"), "aoi_undeclared")
+
+    def test_inverted_or_incomplete_aoi_fails(self) -> None:
+        for aoi in ({"bbox": [26.8, 58.32, 26.65, 58.42], "crs": "EPSG:4326"},
+                    {"bbox": [26.65, 58.32, 26.8], "crs": "EPSG:4326"},
+                    {"bbox": [26.65, 58.32, 26.80, 58.42]}):
+            workspace = _aoi_workspace([_point_feature({"id": 1}, coords=_TARTU)], aoi=aoi)
+            result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+            self.assertEqual(result.data.get("code"), "aoi_invalid", aoi)
+
+    def test_empty_layer_is_not_testable(self) -> None:
+        workspace = _aoi_workspace([])
+        result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+        self.assertEqual(result.status, "not_testable")
+
+    def test_missing_layer_fails_and_missing_runtime_is_not_testable(self) -> None:
+        workspace = _aoi_workspace([_point_feature({"id": 1}, coords=_TARTU)])
+        missing = geodata.layer_extent_within_aoi(workspace, path="absent.geojson")
+        self.assertEqual(missing.data.get("code"), "file_missing")
+        with patch.object(geodata, "_connect", return_value=None):
+            result = geodata.layer_extent_within_aoi(workspace, path="layer.geojson")
+        self.assertEqual(result.status, "not_testable")
+        self.assertEqual(result.data.get("code"), "duckdb_unavailable")
+
+
 if __name__ == "__main__":
     unittest.main()

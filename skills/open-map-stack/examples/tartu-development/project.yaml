@@ -8,6 +8,13 @@ project:
   created_at: 2026-08-25 08:15:03+03:00
   updated_at: '2026-09-28T20:57:04.069801+00:00'
   status: warning
+  aoi:
+    bbox:
+    - 640000
+    - 6455000
+    - 685000
+    - 6500000
+    crs: EPSG:3301
 interpretation:
   objective: Find cadastral parcels in Tartu satisfying stated land-use, minimum size (>= 2 ha), primary
     road accessibility (<= 2000 m), and overlap with 25-minute pedestrian-network catchments of verified

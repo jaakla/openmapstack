@@ -339,7 +339,16 @@
         "question": {"type": "string", "minLength": 1},
         "created_at": {"type": "string", "minLength": 1},
         "updated_at": {"type": "string", "minLength": 1},
-        "status": {"enum": ["draft", "in_progress", "validated", "warning", "failed"]}
+        "status": {"enum": ["draft", "in_progress", "validated", "warning", "failed"]},
+        "aoi": {
+          "type": "object",
+          "description": "Area of interest. bbox is [minx, miny, maxx, maxy] in the crs's x/y order (lon/lat or easting/northing); min < max is checked beyond JSON Schema. Local geodata outputs are compared against it.",
+          "required": ["bbox", "crs"],
+          "properties": {
+            "bbox": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"}},
+            "crs": {"type": "string", "minLength": 1}
+          }
+        }
       }
     },
     "interpretation": {
@@ -386,6 +395,10 @@
         "type": "object",
         "properties": {
           "kind": {"enum": ["geodata", "table", "document"]},
+          "extent": {
+            "enum": ["local", "global"],
+            "description": "local (default) geodata must lie near project.aoi; global layers are exempt from that check."
+          },
           "table": {
             "type": "object",
             "properties": {

@@ -41,6 +41,7 @@ Legend: ✅ covered · ⚠️ partially covered · ❌ not covered (tracked belo
 | Legitimate EPSG:4326 storage followed by projected metric analysis | 007 | — |
 | CRS/output-metadata mismatch | 007 (real 3301 coordinates vs declared CRS cross-checked) | 914 `crs-metadata-mismatch` (relabelled output CRS) |
 | Coordinate order at API/representation boundaries | 018 (same asymmetric named point in GeoJSON, MapLibre, Leaflet LatLng and Leaflet GeoJSON; fixture/live) | 929–932 `coordinate_pair_mismatch` (one interface swapped per mutation) |
+| Local layer placed outside the area of interest (axis swap, wrong CRS label) | 025 (three local outputs in two CRSs inside a declared Tartu `project.aoi`; global world frame exempt) | 945 `axis_swap_suspected` (WGS84 road written lat/lon), 946 `extent_outside_aoi` (EPSG:3301 metres labelled EPSG:4326 in file and manifest) |
 | Wrong analysis CRS | 001 (analysis_crs enforced) | 902 `wrong-crs` |
 | Geographic CRS used for metric operations | every case (`geodata.crs_not_used_for_metrics`) | — |
 | Complete QGIS layer CRS + project reprojection enabled | every visual-leg case | 922 `qgis-incomplete-crs` |

@@ -15,7 +15,7 @@ the cases are true oracles, not self-consistency checks.
 Usage:
     python gen_spatial.py <output_dir> --scenario=<name> [--break=<bug>]
 
-Scenarios: boundary | join | crs | health | formats | overrides
+Scenarios: boundary | join | crs | health | formats | overrides | extent
 """
 from __future__ import annotations
 
@@ -606,6 +606,86 @@ def build_overrides(output_dir: Path, break_mode: str | None) -> None:
     _finish(output_dir, project, _standard_checks(count, [extra]))
 
 
+def build_extent(output_dir: Path, break_mode: str | None) -> None:
+    """Every local output lies inside the declared Tartu AOI; a world layer is
+    declared global. Mutants keep valid geometry and an honest-looking CRS
+    label: ``axis-swapped`` flips the WGS84 road to lat/lon, and
+    ``crs-mislabelled`` writes EPSG:3301 metres under an EPSG:4326 label."""
+    _copy_inputs("crs", output_dir)
+    derived = output_dir / "data" / "derived"
+    con = _connect_spatial()
+    try:
+        parcels = (output_dir / "data/source/parcels-3301.geojson").as_posix()
+        road = (output_dir / "data/source/road-4326.geojson").as_posix()
+        con.execute(f"""
+            CREATE TABLE candidates AS
+            SELECT p.parcel_id, ROUND(ST_Distance(p.geom, ST_Transform(r.geom, 'EPSG:4326', 'EPSG:3301', true)), 2) AS dist_m,
+                   p.geom
+            FROM ST_Read('{parcels}') p, ST_Read('{road}') r
+            WHERE ST_Distance(p.geom, ST_Transform(r.geom, 'EPSG:4326', 'EPSG:3301', true)) <= 200
+            ORDER BY parcel_id
+        """)
+        con.execute(f"COPY candidates TO '{(derived / 'candidates.parquet').as_posix()}' (FORMAT PARQUET)")
+        count = con.execute("SELECT COUNT(*) FROM candidates").fetchone()[0]
+    finally:
+        con.close()
+
+    epsg_4326 = {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::4326"}}
+    road_data = json.loads((output_dir / "data/source/road-4326.geojson").read_text(encoding="utf-8"))
+    if break_mode == "axis-swapped":
+        # Right place, wrong tuple order: every position becomes [lat, lon].
+        for feature in road_data["features"]:
+            feature["geometry"]["coordinates"] = [[y, x] for x, y in feature["geometry"]["coordinates"]]
+    (derived / "road.geojson").write_text(json.dumps(road_data, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+
+    parcel_data = json.loads((output_dir / "data/source/parcels-3301.geojson").read_text(encoding="utf-8"))
+    parcel_crs = "EPSG:3301"
+    if break_mode == "crs-mislabelled":
+        # Relabel, don't transform: projected metres claim to be degrees, and
+        # the manifest agrees, so only the data's location can expose it.
+        parcel_data["crs"] = epsg_4326
+        parcel_crs = "EPSG:4326"
+    (derived / "parcels.geojson").write_text(json.dumps(parcel_data, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+
+    world = {"type": "FeatureCollection", "crs": epsg_4326, "features": [{
+        "type": "Feature", "properties": {"name": "world"},
+        "geometry": {"type": "Polygon", "coordinates": [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]]]}}]}
+    (derived / "world.geojson").write_text(json.dumps(world, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+
+    outputs = {
+        "candidates": {"path": "data/derived/candidates.parquet", "format": "GeoParquet (EPSG:3301)",
+                       "generated_by": "distance_filter"},
+        "road": {"path": "data/derived/road.geojson", "format": "GeoJSON (EPSG:4326)",
+                 "generated_by": "load_road"},
+        "parcels": {"path": "data/derived/parcels.geojson", "format": f"GeoJSON ({parcel_crs})",
+                    "generated_by": "load_parcels"},
+        "world": {"path": "data/derived/world.geojson", "format": "GeoJSON (EPSG:4326)",
+                  "generated_by": "world_frame", "extent": "global",
+                  "note": "Locator frame; deliberately global, so exempt from the AOI check."},
+    }
+    project = _project(
+        output_dir,
+        title="Layer extent fixture",
+        question="Which parcels near Tartu lie within 200 m of the road?",
+        sources={
+            "parcel_source": _source_entry("crs/parcels-3301.geojson", "synthetic parcels (EPSG:3301)", 3,
+                                           "Analysis side, already projected."),
+            "road_source": _source_entry("crs/road-4326.geojson", "synthetic road (EPSG:4326 storage)", 1,
+                                         "Geographic storage; reprojected before metric use."),
+        },
+        steps=[
+            {"id": "load_parcels", "operation": "read", "source": "parcel_source", "output": "parcels"},
+            {"id": "load_road", "operation": "read", "source": "road_source", "output": "road"},
+            {"id": "distance_filter", "operation": "distance_filter", "input": "parcels",
+             "target": "road", "max_distance_m": 200, "crs": ANALYSIS_CRS, "output": "candidates"},
+            {"id": "world_frame", "operation": "constant", "output": "world"},
+        ],
+        outputs=outputs,
+    )
+    project["project"]["aoi"] = {"bbox": [26.65, 58.27, 26.85, 58.42], "crs": "EPSG:4326"}
+    _finish(output_dir, project, _standard_checks(count))
+
+
 BUILDERS = {
     "boundary": build_boundary,
     "join": build_join,
@@ -613,6 +693,7 @@ BUILDERS = {
     "health": build_health,
     "formats": build_formats,
     "overrides": build_overrides,
+    "extent": build_extent,
 }
 
 

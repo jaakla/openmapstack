@@ -287,6 +287,7 @@ def verify_project(
             )
 
     # -- geodata: read the produced files, do not trust what the manifest says
+    outputs_spec = manifest.get("outputs") if isinstance(manifest.get("outputs"), dict) else {}
     _run(runs, "geodata.crs_not_used_for_metrics", geodata_checks.crs_not_used_for_metrics, root)
     for name, path, epsg in _declared_output_paths(manifest):
         if Path(path).suffix.lower() not in GEODATA_SUFFIXES:
@@ -317,9 +318,12 @@ def verify_project(
                     {"path": path},
                 )
             )
+        # A declared AOI places every local layer; global layers are exempt.
+        spec = outputs_spec.get(name) if isinstance(outputs_spec.get(name), dict) else {}
+        if isinstance(get_in(manifest, "project", "aoi"), dict) and spec.get("extent") != "global":
+            _run(runs, "geodata.layer_extent_within_aoi", geodata_checks.layer_extent_within_aoi, root, path=path)
 
     # -- tables: non-spatial outputs are read back as tables, never as geodata
-    outputs_spec = manifest.get("outputs") if isinstance(manifest.get("outputs"), dict) else {}
     for name, path, _ in _declared_output_paths(manifest, kind="table"):
         spec = outputs_spec.get(name) or {}
         table = spec.get("table") if isinstance(spec.get("table"), dict) else {}
