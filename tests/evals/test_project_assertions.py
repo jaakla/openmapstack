@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from copy import deepcopy
+from pathlib import Path
 
 from .helpers import make_workspace, minimal_project, write_project
 
@@ -144,6 +145,76 @@ class ConformsToSchemaTests(unittest.TestCase):
         result = project_assertions.conforms_to_schema(workspace)
         self.assertEqual(result.status, "failed")
         self.assertEqual(result.data.get("code"), "manifest_schema_invalid")
+
+    def basemap_validator(self):
+        import jsonschema
+        import json
+
+        schema = json.loads((Path(__file__).resolve().parents[2] /
+                             "openmapstack/schemas/project-v1.schema.json").read_text())
+        basemap_schema = schema["properties"]["presentation"]["properties"]["map"]["properties"]["basemap"]
+        return jsonschema.Draft202012Validator(basemap_schema)
+
+    def test_basemap_kind_and_kind_specific_endpoint_are_required(self):
+        validator = self.basemap_validator()
+        common = {"id": "custom", "attribution": "Custom provider"}
+        style_url = "https://example.org/style.json"
+        tile_url = "https://example.org/{z}/{x}/{y}.png"
+        healthy = [
+            {**common, "kind": "vector-style", "url": style_url},
+            *({**common, "kind": kind, **endpoint}
+              for kind in ("raster-xyz", "raster-wms")
+              for endpoint in ({"tiles": [tile_url]}, {"url": tile_url})),
+        ]
+        for basemap in healthy:
+            with self.subTest(healthy=basemap):
+                self.assertEqual(list(validator.iter_errors(basemap)), [])
+        invalid = [
+            {**common, "url": style_url},
+            {**common, "tiles": [tile_url]},
+            {**common, "kind": "vector-style", "tiles": [tile_url]},
+            {**common, "kind": "vector-style", "tilejson": "https://example.org/planet.json"},
+            *({**common, "kind": kind} for kind in ("raster-xyz", "raster-wms")),
+            {**common, "kind": "unknown", "url": style_url},
+        ]
+        for basemap in invalid:
+            with self.subTest(invalid=basemap):
+                self.assertTrue(list(validator.iter_errors(basemap)))
+
+    def test_kindless_basemap_fails_project_validation(self):
+        workspace = make_workspace()
+        project = minimal_project()
+        project["runs"] = {"latest": {
+            "id": "run-1",
+            "started_at": "2026-01-01T00:00:00Z",
+            "completed_at": "2026-01-01T00:00:01Z",
+            "status": "passed",
+            "inputs_hash": "sha256:" + "0" * 64,
+            "outputs_hash": "sha256:" + "0" * 64,
+            "validation_report": {"path": "validation/latest-report.json"},
+        }}
+        project["presentation"]["map"]["basemap"] = {
+            "id": "custom", "url": "https://example.org/style.json", "attribution": "Custom provider"}
+        write_project(workspace, project)
+        result = project_assertions.conforms_to_schema(workspace)
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.data.get("code"), "manifest_schema_invalid")
+        self.assertIn("kind", result.detail)
+        project["presentation"]["map"]["basemap"]["kind"] = "vector-style"
+        write_project(workspace, project)
+        result = project_assertions.conforms_to_schema(workspace)
+        self.assertEqual(result.status, "passed", result.detail)
+
+    def test_optional_vector_basemap_endpoints_are_nonempty_strings(self):
+        validator = self.basemap_validator()
+        base = {"id": "custom", "kind": "vector-style", "url": "https://example.org/style.json",
+                "attribution": "Custom provider"}
+        self.assertEqual(list(validator.iter_errors(base)), [])
+        for field in ("dark_url", "tilejson"):
+            with self.subTest(field=field):
+                self.assertEqual(list(validator.iter_errors({**base, field: "https://example.org/pinned.json"})), [])
+                for value in ("", None, [], 42):
+                    self.assertTrue(list(validator.iter_errors({**base, field: value})))
 
     def test_missing_manifest_fails(self) -> None:
         result = project_assertions.conforms_to_schema(make_workspace())

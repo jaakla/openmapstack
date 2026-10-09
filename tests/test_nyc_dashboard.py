@@ -13,6 +13,7 @@ import yaml
 
 from openmapstack.checks.spatial import connect_spatial
 from openmapstack.integrity import declared_input_paths
+from tests.test_tartu_dashboard_sources import route_basemap
 
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "examples/nyc-private-mobility"
@@ -45,6 +46,7 @@ class NycDashboardTests(unittest.TestCase):
         self.assertEqual(sum("2016 TLC pickup" in feature["properties"]["location_basis"]
                              for feature in payload["fleet_points"]["features"]), 281)
         self.assertEqual(payload["run_id"], self.manifest["runs"]["latest"]["id"])
+        self.assertEqual(payload["basemap"], self.manifest["presentation"]["map"]["basemap"])
         self.assertEqual(len(payload["sources"]), len(self.manifest["sources"]))
         self.assertIn("Seeded demo data.", rendered)
         self.assertIn("not NYC taxi zones", rendered)
@@ -73,6 +75,65 @@ class NycDashboardTests(unittest.TestCase):
 
 
 class DashboardBrowserTests(unittest.TestCase):
+    def test_vector_basemap_credit_and_toggles_preserve_analysis_and_manifest_choice(self):
+        try:
+            from playwright.sync_api import Error, sync_playwright
+        except ImportError:
+            self.skipTest("Playwright unavailable")
+        with sync_playwright() as runtime:
+            try:
+                browser = runtime.chromium.launch(headless=True)
+            except Error as error:
+                self.skipTest(f"Chromium unavailable: {error}")
+            with browser, tempfile.TemporaryDirectory() as directory:
+                for custom in (False, True):
+                    with self.subTest(custom=custom):
+                        rendered = (EXAMPLE / "dashboard.html").read_text()
+                        if custom:
+                            match = re.search(r'(<script type="application/json" id="dashboard-data">)(.*?)(</script>)', rendered, re.S)
+                            payload = json.loads(match.group(2))
+                            payload["basemap"] = {"id": "regional-custom", "kind": "vector-style",
+                                                 "url": "https://custom.example/style.json", "attribution": "Regional provider"}
+                            rendered = rendered[:match.start(2)] + json.dumps(payload) + rendered[match.end(2):]
+                        target = Path(directory) / "dashboard.html"
+                        target.write_text(rendered)
+                        context = browser.new_context(viewport={"width": 1440, "height": 960})
+                        page = context.new_page()
+                        seen = route_basemap(page, source_id="zones", layer_id="hubs")
+                        errors = []
+                        page.on("pageerror", lambda error: errors.append(str(error)))
+                        page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
+                        page.goto(target.as_uri(), wait_until="domcontentloaded")
+                        page.wait_for_function("window.testMap && testMap.isStyleLoaded() && !!testMap.getLayer('basemap-land') && !!testMap.getLayer('zone-fill')")
+                        credit = "Regional provider" if custom else "Protomaps tiles by goplex.ee"
+                        self.assertIn(credit, page.locator(".maplibregl-ctrl-attrib").inner_text())
+                        selected = page.locator(".zone-row").nth(1).get_attribute("data-zone")
+                        page.locator(".zone-row").nth(1).click()
+                        page.locator("#search").fill(selected)
+                        page.locator("#tab-map").click()
+                        page.locator("#layer-fleet").uncheck()
+                        for visible in (False, True):
+                            loads = page.evaluate("testStyleLoads")
+                            page.locator("#layer-basemap").set_checked(visible)
+                            page.wait_for_function("previous => testStyleLoads > previous && testMap.isStyleLoaded() && !!testMap.getLayer('zone-fill')", arg=loads)
+                            self.assertEqual(page.evaluate("!!testMap.getLayer('basemap-land')"), visible)
+                            self.assertEqual(page.evaluate("testMap.getSource('zones').type"), "geojson")
+                            self.assertEqual(page.evaluate("testMap.getLayoutProperty('fleet', 'visibility')"), "none")
+                            self.assertIn(f"Zone {selected}", page.locator("#inspector").inner_text())
+                            self.assertIn(credit, page.locator(".maplibregl-ctrl-attrib").inner_text())
+                        page.locator("#tab-analysis").click()
+                        self.assertEqual(page.locator(".zone-row").count(), 1)
+                        self.assertEqual(page.locator("#search").input_value(), selected)
+                        if custom:
+                            self.assertIn("https://custom.example/style.json", seen)
+                            self.assertFalse(any("tiles.goplex.ee" in url for url in seen))
+                        else:
+                            self.assertIn("https://tiles.goplex.ee/styles/5.7.2/white.json", seen)
+                            self.assertIn("https://tiles.goplex.ee/planet-20261006.json", seen)
+                        self.assertTrue(any(url.endswith(".mvt") for url in seen))
+                        self.assertEqual(errors, [])
+                        context.close()
+
     def test_offline_controls_selection_and_responsive_layout(self):
         try:
             from playwright.sync_api import Error, sync_playwright
@@ -111,7 +172,7 @@ class DashboardBrowserTests(unittest.TestCase):
         page.locator("#layer-fleet").uncheck()
         self.assertIn("fleet=0", page.url)
         page.locator("#lineage-basemap summary").click()
-        self.assertIn("cartodb-positron", page.locator("#lineage-basemap").inner_text())
+        self.assertIn("goplex-protomaps", page.locator("#lineage-basemap").inner_text())
         self.assertEqual(page.locator("#lineage-basemap .lineage-stage").count(), 1)
         page.locator("#layer-hubs").uncheck()
         self.assertIn("data/derived/existing-hubs.geojson", page.locator("#lineage-hubs").inner_text())

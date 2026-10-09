@@ -64,6 +64,8 @@ QGIS and Observable are optional targets. Existing manifests without `delivery`
 retain legacy v1 behavior until explicitly migrated. Source provenance, GIS
 correctness and clean reruns are required for every selection.
 
+For dashboard basemaps, honor user choices and appropriate local/regional services; otherwise use the preconfigured goplex.ee Protomaps fallback in `references/web-delivery.md`, with light/dark switching and visible provider attribution.
+
 For a bounded one-shot SQL, CRS or conversion question, the relevant domain
 reference is sufficient; a full project artifact and its methodology are not needed.
 

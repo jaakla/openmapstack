@@ -21,6 +21,7 @@ import struct
 import zlib
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin
 
 from . import AssertionResult, failed, get_in, load_project_yaml, not_testable, passed, project_root
 from .presentation import DESIGN_LANGUAGES, declared_controls, declared_views
@@ -462,6 +463,9 @@ def _panel_and_basemap_problems(
     presentation: dict,
     warnings: list,
     requested_urls: list[str],
+    responses: dict,
+    evidence: dict,
+    evidence_key: str = "basemap_tile_requests",
     reveal: bool = False,
 ) -> None:
     """Declared legend, provenance and warnings panels are visible; a declared
@@ -503,17 +507,17 @@ def _panel_and_basemap_problems(
     # attribution is really visible.
     basemap = get_in(presentation, "map.basemap")
     if basemap:
-        # Match any tile under the basemap's URL template:
-        # "https://host/{z}/{x}/{y}.png" -> "https://host/".
-        tile_prefix = ((basemap.get("tiles") or [basemap.get("url") or ""])[0] or "").split("{z}")[0]
-        tile_requests = [url for url in requested_urls if tile_prefix and url.startswith(tile_prefix)]
+        templates = _basemap_tile_templates(basemap, responses)
+        tile_requests = [url for url in requested_urls
+                         if any(_matches_tile_url(url, template) for template in templates)]
+        evidence[evidence_key] = tile_requests
         if _first_visible(page, f'{_MAP_SELECTOR}, .maplibregl-canvas') is None:
             problems.add("basemap_absent", "manifest declares a basemap but no interactive map canvas is rendered")
         if not tile_requests:
             problems.add(
                 "basemap_absent",
                 f"manifest declares basemap {basemap.get('id')!r} but the product never "
-                f"requested its tiles ({tile_prefix}...) — the background map is not interactive",
+                f"requested its tiles ({templates!r}) — the background map is not interactive",
             )
         attribution = basemap.get("attribution")
         if attribution:
@@ -534,6 +538,63 @@ def _checkbox_states(page: Any) -> dict[str, bool]:
             .map(cb => [cb.dataset.layerGroup || cb.dataset.scenario || cb.id || cb.name || '', cb.checked])
         )"""
     )
+
+
+def _basemap_tile_templates(basemap: dict, responses: dict) -> list[str]:
+    """Resolve only observed basemap style/TileJSON responses, without new IO.
+
+    Metadata and fonts are not tile evidence. Relative source and tile URLs
+    resolve against their containing document, as they do in a web renderer.
+    """
+    templates = list(basemap.get("tiles") or [])
+    visited: set[str] = set()
+
+    def document(url: str) -> None:
+        if url in visited:
+            return
+        visited.add(url)
+        response = responses.get(url)
+        if response is None or not response.ok:
+            return
+        try:
+            data = response.json()
+        except Exception:  # A non-JSON response cannot establish tile URLs.
+            return
+        if not isinstance(data, dict):
+            return
+        templates.extend(urljoin(url, tile) for tile in data.get("tiles", []) if isinstance(tile, str))
+        for source in (data.get("sources") or {}).values():
+            if not isinstance(source, dict) or source.get("type") not in {"vector", "raster"}:
+                continue
+            templates.extend(urljoin(url, tile) for tile in source.get("tiles", []) if isinstance(tile, str))
+            if source.get("url"):
+                document(urljoin(url, source["url"]))
+
+    if basemap.get("kind") == "vector-style":
+        for field in ("url", "dark_url"):
+            if basemap.get(field):
+                document(basemap[field])
+    if basemap.get("tilejson"):
+        document(basemap["tilejson"])
+    if not templates and basemap.get("kind") != "vector-style" and basemap.get("url"):
+        templates.append(basemap["url"])
+    return list(dict.fromkeys(templates))
+
+
+def _matches_tile_url(url: str, template: str) -> bool:
+    # Match the complete template, not a shared host/path prefix that could
+    # also match a style, TileJSON, sprite, or unrelated provider resource.
+    parts = re.split(r"(\{[^{}]+\})", template)
+    # Standard-resolution tiles have no ratio suffix; Retina tiles use @2x.
+    # Coordinates must stay numeric: an adjacent wildcard could otherwise
+    # swallow an invalid ratio suffix or stand in for a missing coordinate.
+    placeholders = {"{ratio}": r"(?:@2x)?", "{z}": r"[0-9]+",
+                    "{x}": r"[0-9]+", "{y}": r"[0-9]+"}
+    pattern = "".join(
+        placeholders.get(part, r"[^/?&]+") if part.startswith("{") else re.escape(part)
+        for part in parts
+    )
+    return re.fullmatch(pattern, url) is not None
 
 
 # ---------------------------------------------------------------------------
@@ -932,9 +993,11 @@ def _protocol_check(
                     page_errors: list[str] = []
                     console_errors: list[str] = []
                     requested_urls: list[str] = []
+                    responses: dict[str, Any] = {}
                     page.on("pageerror", lambda exc, errors=page_errors: errors.append(str(exc)))
                     page.on("console", lambda msg, errors=console_errors: errors.append(msg.text) if msg.type == "error" else None)
                     page.on("request", lambda request, urls=requested_urls: urls.append(request.url))
+                    page.on("response", lambda response, out=responses: out.__setitem__(response.url, response))
                     unreachable: list[str] = []
                     page.on("requestfailed", lambda request, out=unreachable: out.append(request.url)
                             if request.url.startswith(("http://", "https://"))
@@ -967,7 +1030,8 @@ def _protocol_check(
 
                     _panel_and_basemap_problems(
                         page, page_problems, presentation=view["presentation"], warnings=warnings,
-                        requested_urls=requested_urls, reveal=True,
+                        requested_urls=requested_urls, responses=responses, evidence=evidence,
+                        evidence_key=f"{view['id']}:basemap_tile_requests", reveal=True,
                     )
                     _protocol_page_problems(
                         page, page_problems, view=view, shot_prefix=shot_prefix,
@@ -1116,12 +1180,14 @@ def dashboard_loads_in_browser(
                 page_errors: list[str] = []
                 console_errors: list[str] = []
                 requested_urls: list[str] = []
+                responses: dict[str, Any] = {}
                 page.on("pageerror", lambda exc: page_errors.append(str(exc)))
                 page.on(
                     "console",
                     lambda msg: console_errors.append(msg.text) if msg.type == "error" else None,
                 )
                 page.on("request", lambda request: requested_urls.append(request.url))
+                page.on("response", lambda response: responses.__setitem__(response.url, response))
                 # `domcontentloaded` rather than the default `load`: a slow or
                 # unreachable third-party subresource must not decide whether
                 # the dashboard is judged at all. `_settle` then gives tiles
@@ -1162,7 +1228,7 @@ def dashboard_loads_in_browser(
 
                 _panel_and_basemap_problems(
                     page, problems, presentation=proj.get("presentation") or {},
-                    warnings=warnings, requested_urls=requested_urls,
+                    warnings=warnings, requested_urls=requested_urls, responses=responses, evidence=evidence,
                 )
 
                 # --- layer toggles must affect the render ----------------

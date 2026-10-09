@@ -277,7 +277,7 @@ class DeliveryTests(unittest.TestCase):
         path = self.build(["qgis"])
         self.project.pop("delivery")
         self.project["presentation"].update(primary_view="map", layout={"type": "map"}, provenance_ui={"show_assumptions": True})
-        self.project["presentation"]["map"]["basemap"] = {"id": "osm", "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], "attribution": "OSM"}
+        self.project["presentation"]["map"]["basemap"] = {"id": "osm", "kind": "raster-xyz", "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], "attribution": "OSM"}
         self.save()
         (self.root / "project.qgz").unlink()
         self.assertFalse(project_schema_errors(self.project))

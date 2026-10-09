@@ -23,7 +23,7 @@ class TartuRunEvidenceTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="oms-tartu-run-")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        for relative in ("pipeline.py", "project.yaml", "routing.py", "qgis_delivery.py", "requirements.txt"):
+        for relative in ("pipeline.py", "project.yaml", "dashboard-template.html", "routing.py", "qgis_delivery.py", "requirements.txt"):
             shutil.copy(EXAMPLE / relative, self.root / relative)
         # Only the finalizer executes; no GIS engine, routing or network is needed.
         spec = importlib.util.spec_from_file_location("tartu_run_evidence", self.root / "pipeline.py")
@@ -61,6 +61,7 @@ class TartuRunEvidenceTests(unittest.TestCase):
         report, record = self.finalize()
         inputs = {entry["path"] for entry in record["inputs"]}
         self.assertIn("qgis_delivery.py", inputs)
+        self.assertIn("dashboard-template.html", inputs)
         self.assertIn("helpers/settings.json", inputs)
         self.assertEqual(len(inputs), len(record["inputs"]))
         self.assertEqual(inputs, set(declared_input_paths(self.root, self.pipeline.PROJECT)))

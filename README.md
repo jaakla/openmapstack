@@ -13,6 +13,10 @@ OpenMapStack gives your favorite AI agent: Claude Code, Codex, Cursor, OpenCode,
 
 It is open-first (both data and code-wise) and cloud-native by default, built on shoulders of the established Open GIS stack: STAC for discovery; GeoParquet, COG, and PMTiles for storage and delivery; DuckDB and PostGIS for compute; and QGIS, MapLibre, and Martin for presentation. It also teaches to deploy GDAL/OGR, GeoPandas, xarray/rioxarray, PDAL, routing engines, spatial SQL, and pragmatic hosted services when scale or reliability requires them.
 
+Dashboard basemaps honor user choices and appropriate local or regional services, then fall back to preconfigured goplex.ee Protomaps vector tiles with light/dark switching and visible provider credit. See [web-delivery.md](skills/open-map-stack/references/web-delivery.md#style-and-basemap-sources-open) for the configuration.
+
+Existing v1 manifests with a map must declare `presentation.map.basemap.kind` (`raster-xyz`, `raster-wms`, or `vector-style`). Vector basemaps require a style `url`; add the actual kind to older manifests before validation or regeneration. See the [basemap contract](skills/open-map-stack/references/project-spec.md#27-presentation-semantics).
+
 ## What's in this repo
 
 The skill collection has four independently installable skills:

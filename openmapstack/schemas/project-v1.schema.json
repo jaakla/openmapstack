@@ -627,16 +627,20 @@
           "properties": {
             "basemap": {
               "type": "object",
-              "required": ["id", "attribution"],
+              "required": ["id", "kind", "attribution"],
               "properties": {
                 "id": {"type": "string", "minLength": 1},
                 "kind": {"enum": ["raster-xyz", "raster-wms", "vector-style"]},
                 "tiles": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
                 "url": {"type": "string", "minLength": 1},
+                "dark_url": {"type": "string", "minLength": 1},
+                "tilejson": {"type": "string", "minLength": 1},
                 "attribution": {"type": "string", "minLength": 1},
                 "default_visible": {"type": "boolean"}
               },
-              "anyOf": [{"required": ["tiles"]}, {"required": ["url"]}]
+              "anyOf": [{"required": ["tiles"]}, {"required": ["url"]}],
+              "if": {"properties": {"kind": {"const": "vector-style"}}, "required": ["kind"]},
+              "then": {"required": ["url"]}
             }
           }
         }

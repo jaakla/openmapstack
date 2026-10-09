@@ -6,7 +6,7 @@ project:
     walking distance to city-owned kindergarten and school), and land-use criteria in Tartu, and show
     them on an interactive map with education POIs and catchment areas.
   created_at: 2026-08-25 08:15:03+03:00
-  updated_at: '2026-10-08T21:15:06.807766+00:00'
+  updated_at: '2026-10-09T09:04:23.901780+00:00'
   status: warning
   aoi:
     bbox:
@@ -441,6 +441,8 @@ validation:
   - name: education_ownership_check
     expression: ownership = 'municipal' AND active = true
 presentation:
+  dashboard:
+    template: dashboard-template.html
   design_language: openmapstack-views/0.1
   intent: analytical_workspace
   primary_view: map
@@ -550,15 +552,16 @@ presentation:
       hover_tooltip: true
       zoom_to_selection: true
     basemap:
-      id: cartodb-positron
+      id: goplex-protomaps
       kind: vector-style
-      url: https://basemaps.cartocdn.com/gl/positron-gl-style/style.json
-      attribution: © OpenStreetMap contributors © CARTO
+      url: https://tiles.goplex.ee/styles/5.7.2/white.json
+      dark_url: https://tiles.goplex.ee/styles/5.7.2/dark.json
+      tilejson: https://tiles.goplex.ee/planet-20261006.json
+      attribution: © OpenStreetMap contributors, Protomaps tiles by goplex.ee
       default_visible: true
-      note: The MapLibre style dashboard.html actually loads (its dark counterpart is the matching dark-matter-gl-style).
-        project.qgz cannot read a MapLibre style, and CARTO's raster XYZ tiles now answer unauthenticated
-        requests with an "API KEY REQUIRED" watermark, so the QGIS companion carries the Maa- ja Ruumiamet
-        Baaskaart WMS as its default background and OpenStreetMap XYZ as the unchecked alternative.
+      note: The web dashboard uses the global fallback with matching light/dark styles. The QGIS companion
+        retains the appropriate Maa- ja Ruumiamet Baaskaart WMS as its default background and OpenStreetMap
+        XYZ as the unchecked alternative.
     layer_groups:
     - id: candidates_tier1
       title: Prime Candidates (Road + School + Kindergarten)
@@ -751,6 +754,7 @@ runtime:
     preferred_engine: duckdb-spatial
     pipeline: pipeline.py
     dependencies:
+    - dashboard-template.html
     - routing.py
     - qgis_delivery.py
     - requirements.txt
@@ -764,13 +768,13 @@ runtime:
     osmium: 4.3.1
 runs:
   latest:
-    id: run-20261008-211215
-    started_at: '2026-10-08T21:12:15.866805+00:00'
-    completed_at: '2026-10-08T21:15:06.807766+00:00'
+    id: run-20261009-090336
+    started_at: '2026-10-09T09:03:36.518904+00:00'
+    completed_at: '2026-10-09T09:04:23.901780+00:00'
     status: warning
-    inputs_hash: sha256:15b6963a33d02abe7fc8f1d1114cd6924d5775705b548c50d892f65b04fb7078
+    inputs_hash: sha256:b3661890364f321d9cf0e5b18700fe9c5f99ee9da0d5a45564ed44e29767ee05
     outputs_hash: sha256:282abf6cf522e94a1bb9518201dcfae0f8d3f28835115bb4e91ec87eb1402913
     record:
-      path: runs/run-20261008-211215.json
+      path: runs/run-20261009-090336.json
     validation_report:
       path: validation/latest-report.json

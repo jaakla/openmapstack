@@ -178,11 +178,31 @@
     updateMap();element("fit").disabled=false;element("fit-visible").disabled=!visible.length;
   }
   const plainStyle=()=>({version:8,sources:{},layers:[{id:"background",type:"background",paint:{"background-color":css("--nyc-map-bg")}}]});
+  function prepareBasemap(style,url){
+    // Resolve provider assets before handing a fetched style object to MapLibre.
+    const absolute=value=>new URL(value,url).href.replaceAll("%7B","{").replaceAll("%7D","}");
+    if(style.glyphs)style.glyphs=absolute(style.glyphs);
+    if(typeof style.sprite==="string")style.sprite=absolute(style.sprite);
+    else if(Array.isArray(style.sprite))style.sprite=style.sprite.map(sprite=>({...sprite,url:absolute(sprite.url)}));
+    for(const source of Object.values(style.sources)){
+      if(source.url)source.url=absolute(source.url);
+      if(source.tiles)source.tiles=source.tiles.map(absolute);
+      if(source.type==="vector"&&data.basemap.tilejson){source.url=absolute(data.basemap.tilejson);delete source.tiles;}
+      source.attribution=data.basemap.attribution;
+    }
+    // Keep provider IDs separate from the dashboard's analytical layers/sources.
+    const id=value=>"basemap-"+value;
+    style.sources=Object.fromEntries(Object.entries(style.sources).map(([key,source])=>[id(key),source]));
+    style.layers=style.layers.map(layer=>({...layer,id:id(layer.id),...(layer.source?{source:id(layer.source)}:{}),...(layer.ref?{ref:id(layer.ref)}:{})}));
+    if(style.terrain)style.terrain.source=id(style.terrain.source);
+    return style;
+  }
   function applyBasemap(){if(map)map.setStyle(state.basemap&&basemapStyle?basemapStyle:plainStyle(),{diff:false});}
   function message(text){element("map-message").hidden=!text;element("map-message").textContent=text;}
   async function startMap(){
     try{
-      map=new maplibregl.Map({container:"map",style:plainStyle(),bounds:bounds(zones),fitBoundsOptions:{padding:fitPadding()},attributionControl:true});
+      map=new maplibregl.Map({container:"map",style:plainStyle(),bounds:bounds(zones),fitBoundsOptions:{padding:fitPadding()},attributionControl:false});
+      map.addControl(new maplibregl.AttributionControl({customAttribution:data.basemap.attribution,compact:false}));
       map.addControl(new maplibregl.NavigationControl({showCompass:false}),"top-right");map.on("style.load",addLayers);
       map.on("click",event=>{
         const features=map.queryRenderedFeatures(event.point,{layers:["hubs","fleet","zone-fill","zone-context"].filter(layer=>map.getLayer(layer))});const hit=features[0];if(!hit)return;
@@ -193,7 +213,7 @@
       map.on("mousemove",event=>{const layers=["hubs","fleet","zone-fill"].filter(layer=>map.getLayer(layer));map.getCanvas().style.cursor=layers.length&&map.queryRenderedFeatures(event.point,{layers}).length?"pointer":"";});
       map.on("error",()=>message("Some map resources are unavailable. Embedded zones and the shortlist remain usable."));
       const controller=new AbortController();basemapTimer=setTimeout(()=>controller.abort(),8000);
-      try{const response=await fetch(data.basemap.url,{signal:controller.signal});if(!response.ok)throw new Error("basemap");basemapStyle=await response.json();applyBasemap();message("");}catch{message("Street basemap unavailable. Showing embedded grid cells, fleet points and hubs; no analysis data is missing.");}finally{clearTimeout(basemapTimer);}
+      try{const response=await fetch(data.basemap.url,{signal:controller.signal});if(!response.ok)throw new Error("basemap");basemapStyle=prepareBasemap(await response.json(),data.basemap.url);applyBasemap();message("");}catch{message("Street basemap unavailable. Showing embedded grid cells, fleet points and hubs; no analysis data is missing.");}finally{clearTimeout(basemapTimer);}
     }catch{map=null;element("fit").disabled=true;element("fit-visible").disabled=true;message("Interactive map unavailable in this browser. Use the linked shortlist, zone details and CSV export.");}
   }
   function notify(text){element("notice").textContent=text;element("notice").hidden=false;setTimeout(()=>element("notice").hidden=true,2500);}
@@ -228,7 +248,7 @@
     {name:'Latest points',items:['one located observation per synthetic vehicle; position_id breaks timestamp ties']},
     {name:'Final',items:['data/derived/fleet-positions.geojson · demo fleet point layer']},
   ]);
-  renderLineage('basemap',[{name:'Source',items:[`${data.basemap.id} · ${data.basemap.attribution}`,data.basemap.url]}]);
+  renderLineage('basemap',[{name:'Source',items:[`${data.basemap.id} · ${data.basemap.attribution}`,data.basemap.url,...(data.basemap.tilejson?[data.basemap.tilejson]:[])]}]);
   renderLineage('scores',[
     {name:'Source',items:sourceRelations(metricSources)},
     {name:'Snapshots',items:[...snapshots(metricSources),'data/source/tlc-2016-pickups.json']},
