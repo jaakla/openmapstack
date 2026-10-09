@@ -487,7 +487,15 @@ def _matches_tile_url(url: str, template: str) -> bool:
     # Match the complete template, not a shared host/path prefix that could
     # also match a style, TileJSON, sprite, or unrelated provider resource.
     parts = re.split(r"(\{[^{}]+\})", template)
-    pattern = "".join(r"[^/?&]+" if part.startswith("{") else re.escape(part) for part in parts)
+    # Standard-resolution tiles have no ratio suffix; Retina tiles use @2x.
+    # Coordinates must stay numeric: an adjacent wildcard could otherwise
+    # swallow an invalid ratio suffix or stand in for a missing coordinate.
+    placeholders = {"{ratio}": r"(?:@2x)?", "{z}": r"[0-9]+",
+                    "{x}": r"[0-9]+", "{y}": r"[0-9]+"}
+    pattern = "".join(
+        placeholders.get(part, r"[^/?&]+") if part.startswith("{") else re.escape(part)
+        for part in parts
+    )
     return re.fullmatch(pattern, url) is not None
 
 

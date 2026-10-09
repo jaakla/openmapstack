@@ -445,7 +445,7 @@
           "properties": {
             "basemap": {
               "type": "object",
-              "required": ["id", "attribution"],
+              "required": ["id", "kind", "attribution"],
               "properties": {
                 "id": {"type": "string", "minLength": 1},
                 "kind": {"enum": ["raster-xyz", "raster-wms", "vector-style"]},
@@ -456,7 +456,9 @@
                 "attribution": {"type": "string", "minLength": 1},
                 "default_visible": {"type": "boolean"}
               },
-              "anyOf": [{"required": ["tiles"]}, {"required": ["url"]}]
+              "anyOf": [{"required": ["tiles"]}, {"required": ["url"]}],
+              "if": {"properties": {"kind": {"const": "vector-style"}}, "required": ["kind"]},
+              "then": {"required": ["url"]}
             }
           }
         }

@@ -323,9 +323,11 @@ lonboard is an exploratory notebook view, not the canonical delivered dashboard.
 
 ## Style and basemap sources (open)
 
-For a dashboard basemap, honor an explicit user choice first, then prefer an appropriate local or official regional service. When neither applies, use the **preconfigured goplex.ee Protomaps vector fallback** in `templates/presentation.yaml` (also shown in `project-spec.md`). This is a hosted service, not planet tiles bundled into the deliverable; it needs no API key, registration, or configuration of another basemap service.
+For a dashboard basemap, honor an explicit user choice first, then prefer an appropriate local or official regional service. When neither applies, use the **preconfigured goplex.ee Protomaps vector fallback** in `templates/presentation.yaml`; see `project-spec.md` for the field contract. This is a hosted service, not planet tiles bundled into the deliverable; it needs no API key, registration, or configuration of another basemap service.
 
 Use the template's TileJSON snapshot and matching light (`white`) and dark MapLibre styles. Keep automatic light/dark switching and manual controls; preserve analysis sources, layers, filters and visibility after a style reload. Give basemap source and style-layer IDs a namespace separate from analysis overlays; update their references while preserving vector source-layer names. Read the manifest's configuration rather than hardcoding the fallback over an explicit or regional choice. Supply the visible credit `© OpenStreetMap contributors, Protomaps tiles by goplex.ee` even if remote metadata omits it. Verify the style, TileJSON, glyphs, sprites and actual tiles live before delivery, and pin the verified endpoints in the project. Treat dated/versioned URLs as project configuration, not permanently stable service paths.
+
+The canonical templates own the maintained fallback endpoints; narrative guidance links to them rather than duplicating dated URLs. If a configured endpoint is unavailable, inspect the provider's current catalog or service metadata, verify compatible styles and actual tiles, and record any replacement explicitly in the project manifest. Do not silently advance an existing project's pinned snapshot. If no compatible endpoint can be verified, report the basemap as unavailable rather than claim successful delivery.
 
 For global production basemaps with specific hosting or operational needs, decide whether self-hosted PMTiles/vector tiles or a managed basemap service is more appropriate. See `services-and-scale.md`.
 

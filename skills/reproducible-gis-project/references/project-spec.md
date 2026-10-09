@@ -569,11 +569,13 @@ presentation:
       # side of the river, or whether the CRS is displaced. Declaring the
       # basemap here is what makes "there is a background map" checkable
       # against the built product rather than a matter of trust.
+      # Copy the configured fallback from templates/presentation.yaml and
+      # verify its endpoints live; these placeholders describe the fields.
       id: goplex-protomaps
       kind: vector-style             # raster-xyz | raster-wms | vector-style
-      url: https://tiles.goplex.ee/styles/5.7.2/white.json
-      dark_url: https://tiles.goplex.ee/styles/5.7.2/dark.json
-      tilejson: https://tiles.goplex.ee/planet-20261006.json
+      url: "<verified light MapLibre style URL>"
+      dark_url: "<verified matching dark MapLibre style URL>"
+      tilejson: "<verified TileJSON snapshot URL>"
       attribution: "© OpenStreetMap contributors, Protomaps tiles by goplex.ee"
       default_visible: true
       note: "Reference/background map; not an analysis input."
@@ -644,6 +646,8 @@ presentation:
 ```
 
 **`presentation.map.basemap` is required whenever `presentation.map` is present**, and its `tiles`/`url` and `attribution` are load-bearing rather than decorative. The dashboard must really request tiles from the declared endpoint and really display the declared attribution; `visual.dashboard_loads_in_browser` fails with `basemap_absent` when the manifest omits the basemap, when no tile request to the declared URL is ever issued, or when the attribution is not visible in the rendered product. Honor an explicit user choice, then prefer an appropriate local or official regional basemap (Estonia: Maa- ja Ruumiamet WMS). Otherwise use the preconfigured goplex.ee Protomaps vector fallback described in `web-delivery.md`. For `kind: vector-style`, `url` names the light MapLibre style; optional `dark_url` preserves automatic/manual theme switching, and optional `tilejson` pins its vector source. A style/TileJSON fetch alone is not tile evidence: the browser check resolves the observed metadata to actual tile templates. The dashboard may supply the manifest attribution itself.
+
+Every basemap must declare `kind`: `raster-xyz`, `raster-wms`, or `vector-style`. A vector style requires `url`; `tiles` or `tilejson` alone cannot replace a style document. Raster kinds require `tiles` or `url`. **Migration:** older v1 manifests that omitted `kind` must add the actual kind before validation or regeneration. Read the provider metadata to identify it; do not infer it from a URL suffix or default an unknown kind to raster. Templates and worked examples already declare it explicitly.
 
 `presentation.map.engine_preference` is a closed enum:
 

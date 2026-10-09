@@ -15,6 +15,8 @@ It is open-first (both data and code-wise) and cloud-native by default, built on
 
 Dashboard basemaps honor user choices and appropriate local or regional services, then fall back to preconfigured goplex.ee Protomaps vector tiles with light/dark switching and visible provider credit. See [web-delivery.md](skills/open-map-stack/references/web-delivery.md#style-and-basemap-sources-open) for the configuration.
 
+Existing v1 manifests with a map must declare `presentation.map.basemap.kind` (`raster-xyz`, `raster-wms`, or `vector-style`). Vector basemaps require a style `url`; add the actual kind to older manifests before validation or regeneration. See the [basemap contract](skills/open-map-stack/references/project-spec.md#27-presentation-semantics).
+
 ## What's in this repo
 
 The skill collection has four independently installable skills:

@@ -645,6 +645,16 @@ class DashboardBrowserTests(unittest.TestCase):
 
 
 class BasemapTileTemplateTests(unittest.TestCase):
+    def test_optional_ratio_matches_standard_and_retina_tiles(self):
+        template = "https://example.org/{z}/{x}/{y}{ratio}.png"
+        for tile in ("1/2/3.png", "1/2/3@2x.png"):
+            with self.subTest(tile=tile):
+                self.assertTrue(visual._matches_tile_url("https://example.org/" + tile, template))
+        for resource in ("/2/3.png", "1//3.png", "1/2/.png", "1/2/@2x.png",
+                         "1/2/3@3x.png", "style.json", "sprite.json", "planet.json", "1/2/3.png.json"):
+            with self.subTest(resource=resource):
+                self.assertFalse(visual._matches_tile_url("https://example.org/" + resource, template))
+
     def test_dark_style_can_supply_tile_evidence_without_loading_light_style(self):
         from unittest.mock import Mock
 
@@ -754,6 +764,19 @@ class BasemapBrowserTests(unittest.TestCase):
         result = visual.dashboard_loads_in_browser(workspace)
         self.assertEqual(result.status, "passed", result.detail)
         self.assertGreater(len(self.tile_requests), 0)
+
+    def test_ratio_template_accepts_actual_standard_and_retina_tile_requests(self) -> None:
+        for ratio in ("", "@2x"):
+            with self.subTest(ratio=ratio):
+                workspace = make_workspace()
+                tiles_url = self._serve_tiles().replace("{y}.png", "{y}{ratio}.png")
+                write_project(workspace, manifest(basemap=self.basemap(tiles_url), groups=[], canonical_reset=False))
+                actual_url = tiles_url.replace("{z}/{x}/{y}{ratio}", "0/0/0" + ratio)
+                html = self.healthy_basemap_html(actual_url)
+                write_dashboard(workspace, html)
+                result = visual.dashboard_loads_in_browser(workspace)
+                self.assertEqual(result.status, "passed", result.detail)
+                self.assertIn(actual_url, result.data["evidence"]["basemap_tile_requests"])
 
     def test_basemap_without_tile_requests_fails(self) -> None:
         workspace = make_workspace()

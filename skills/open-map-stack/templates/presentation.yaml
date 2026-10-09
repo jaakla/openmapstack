@@ -89,6 +89,8 @@ presentation:
       # dashboard must really request these tiles and really show this
       # attribution. Honor user choices and prefer an appropriate local/regional basemap.
       # Otherwise use this global fallback; see references/web-delivery.md.
+      # Verify these maintained defaults live before delivery; pin any
+      # verified replacements explicitly in the project manifest.
       id: goplex-protomaps
       kind: vector-style             # raster-xyz | raster-wms | vector-style
       url: https://tiles.goplex.ee/styles/5.7.2/white.json
