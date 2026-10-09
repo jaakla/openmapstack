@@ -1,0 +1,234 @@
+{
+  "run_id": "run-20261007-182813",
+  "started_at": "2026-10-07T18:28:12.114199+00:00",
+  "completed_at": "2026-10-07T18:28:13.141947+00:00",
+  "status": "passed",
+  "inputs_hash": "sha256:c079592f4c1ecd3a76d62886648ea2b5ddafa0d908025fe8983b9b0fbde5b531",
+  "outputs_hash": "sha256:cd9d6178850c18be68560c20107a0637e01d05bfa94ce917feca9bfd20476ed6",
+  "environment": {
+    "python": "3.13.16",
+    "duckdb": "1.5.5",
+    "h3": "4.5.0",
+    "analysis_crs": "EPSG:32618"
+  },
+  "source_manifest": "data/source/live-20260928-tlc-v1/manifest.json",
+  "validation_report": "validation/latest-report.json",
+  "sources": [
+    {
+      "key": "customer_accounts",
+      "sha256": "sha256:4795ce2163d31a2a43399a450b3777ed81e31014441d5204c67256b062f4adfe"
+    },
+    {
+      "key": "fleet_positions",
+      "sha256": "sha256:d3c14e1fd1c4868a9c3c48946ec6769b02a6e0b705ab2b35edae1b3f5f9a8a5a"
+    },
+    {
+      "key": "hubs",
+      "sha256": "sha256:45bae1809d2866367c9476a585ecaa645fcb2001509d90ab64ebb149fc11b510"
+    },
+    {
+      "key": "market_pois",
+      "sha256": "sha256:e4775d03557b341a6dbfc5aff324eb6e41544a6140e4f6c5035b872dc7621a85"
+    },
+    {
+      "key": "market_reference_zones",
+      "sha256": "sha256:c7b5ea0500e58bdafdeebada8246f9e4b4e9a46b073a2f11860c74fb6a0eea9b"
+    },
+    {
+      "key": "market_scores",
+      "sha256": "sha256:7286cc561ec36209ec180335b1659ec2ba97756f66f155e17089221d0aa9be17"
+    },
+    {
+      "key": "taxi_zones",
+      "sha256": "sha256:98d0e43d69f6950570d365ddd5219dd2674ce1cb3d6ebdf202ea009f6d016fe5"
+    },
+    {
+      "key": "trip_events",
+      "sha256": "sha256:dfe1a0a571015aee62983ed5c099b7d12ae62271851141697a632a920e5f0a01"
+    }
+  ],
+  "inputs": [
+    {
+      "path": "capture_tlc_pickups.py",
+      "sha256": "sha256:f5a4a05cfc52a92519f6aa8638ae26b5b11304e2486d86df7a2f3aa9568470ea"
+    },
+    {
+      "path": "dashboard-template.html",
+      "sha256": "sha256:cec187e0b40dfedf290bbb1c6b98ed1201aa49db126909344009a4e0ffa8faea"
+    },
+    {
+      "path": "data/source/live-20260928-tlc-v1/capture-records.json",
+      "sha256": "sha256:65a9d796f8dddebe7ca3171d0a169ba7d86195af20b04a5c7e7944f4b516ff8b"
+    },
+    {
+      "path": "data/source/live-20260928-tlc-v1/fleet_positions.parquet",
+      "sha256": "sha256:d3c14e1fd1c4868a9c3c48946ec6769b02a6e0b705ab2b35edae1b3f5f9a8a5a"
+    },
+    {
+      "path": "data/source/live-20260928-tlc-v1/manifest.json",
+      "sha256": "sha256:38d19a4841d6f86a7607467bb4571d101014e8a6cefb88bbe4c4a0f8fa92753a"
+    },
+    {
+      "path": "data/source/live-20260928/capture-records.json",
+      "sha256": "sha256:5aa39742879d07dea7f367e0fad199346b3dbd4c245616d5710deb8eb6f8f02c"
+    },
+    {
+      "path": "data/source/live-20260928/customer_accounts.parquet",
+      "sha256": "sha256:4795ce2163d31a2a43399a450b3777ed81e31014441d5204c67256b062f4adfe"
+    },
+    {
+      "path": "data/source/live-20260928/fleet_positions.parquet",
+      "sha256": "sha256:2d560213f3c74cfca1c44b42556d96e66a03de365a1534d71da721192cc62fbc"
+    },
+    {
+      "path": "data/source/live-20260928/hubs.parquet",
+      "sha256": "sha256:45bae1809d2866367c9476a585ecaa645fcb2001509d90ab64ebb149fc11b510"
+    },
+    {
+      "path": "data/source/live-20260928/manifest.json",
+      "sha256": "sha256:432d1548d8909d63f6822581b65ca8b6b641dbb11f128a1fa42fe935e33f4942"
+    },
+    {
+      "path": "data/source/live-20260928/market_pois.parquet",
+      "sha256": "sha256:e4775d03557b341a6dbfc5aff324eb6e41544a6140e4f6c5035b872dc7621a85"
+    },
+    {
+      "path": "data/source/live-20260928/market_reference_zones.parquet",
+      "sha256": "sha256:c7b5ea0500e58bdafdeebada8246f9e4b4e9a46b073a2f11860c74fb6a0eea9b"
+    },
+    {
+      "path": "data/source/live-20260928/market_scores.parquet",
+      "sha256": "sha256:7286cc561ec36209ec180335b1659ec2ba97756f66f155e17089221d0aa9be17"
+    },
+    {
+      "path": "data/source/live-20260928/taxi_zones.parquet",
+      "sha256": "sha256:98d0e43d69f6950570d365ddd5219dd2674ce1cb3d6ebdf202ea009f6d016fe5"
+    },
+    {
+      "path": "data/source/live-20260928/trip_events.parquet",
+      "sha256": "sha256:dfe1a0a571015aee62983ed5c099b7d12ae62271851141697a632a920e5f0a01"
+    },
+    {
+      "path": "data/source/tlc-2016-pickups.json",
+      "sha256": "sha256:cac1a9972a063e7e66b2d075820de3086dd5fa110935f0166ebd47caa7dd8fdf"
+    },
+    {
+      "path": "pipeline.py",
+      "sha256": "sha256:85f76f1462df5181cc0754fcf5d9f21227e6cb9b688d24cbd552ec98e73ea6ce"
+    },
+    {
+      "path": "queries/bigquery-market-reference-zones.sql",
+      "sha256": "sha256:ab7c8081054c7a867de3cef4c56b220642ae29b2fd70d5ff19133118a723fd65"
+    },
+    {
+      "path": "queries/bigquery-trip-events.sql",
+      "sha256": "sha256:cc4bccf5729339b96edb30b26c33530345f744b1336c365820e3c878c3e75e03"
+    },
+    {
+      "path": "queries/motherduck-market-pois.sql",
+      "sha256": "sha256:2cb9bb67d7dcb07b57ae3f35ad7a4c58d7535cf5a0dd718e76603ca6b7b64e54"
+    },
+    {
+      "path": "queries/motherduck-market-scores.sql",
+      "sha256": "sha256:ec2aade830052053c88695bdd716888493ae7f720dbcd35ed0ca8056d5bf7064"
+    },
+    {
+      "path": "queries/postgis-customer-accounts.sql",
+      "sha256": "sha256:09d792f8c9002bac60b892bed974c71a325b5e186c32756047ddfdf0121b1da4"
+    },
+    {
+      "path": "queries/postgis-fleet.sql",
+      "sha256": "sha256:1cc29dda643ac42279d5246f60037648665d4f4f688c6a7ef065330e86d0ffde"
+    },
+    {
+      "path": "queries/postgis-hubs.sql",
+      "sha256": "sha256:d8e2b3028cfb742e343b3fbb809792c1e275f34c910ca79498e063d971fe3d92"
+    },
+    {
+      "path": "queries/postgis-taxi-zones.sql",
+      "sha256": "sha256:e6063c4d30abf33f6684d677611974448a0e29d27aad4c6943f915a925355da2"
+    },
+    {
+      "path": "setup/bigquery/column-security.sql",
+      "sha256": "sha256:7ab19e46c1a484c5c5c2a0dab9ea1a3e3b913c5864b529e850602344fc5ca031"
+    },
+    {
+      "path": "setup/bigquery/schema.sql",
+      "sha256": "sha256:8ea9683d5c61335a6efef4a34243e0d841d89d9eb270c0256b065c4fa3b8e47f"
+    },
+    {
+      "path": "setup/bigquery/security.sql",
+      "sha256": "sha256:7fe225e47a87e1fb19d49196cfc9834fd831411b5fc469f90b3ec80f3cdf4a89"
+    },
+    {
+      "path": "setup/bigquery/seed.sql",
+      "sha256": "sha256:a61fdfd16c37bf8abd6edde01d27b26742ff1d3ce81d4845479a43f4a5dcf2c1"
+    },
+    {
+      "path": "setup/bigquery/zones.sql",
+      "sha256": "sha256:6c801f5690e4f2158ef8d8d48ca75837d6b7f39ba39f5f7829409c24ef50ce7b"
+    },
+    {
+      "path": "setup/motherduck/schema.sql",
+      "sha256": "sha256:cc17863ca1d03ffcdb7bdd15f1546a7dfb5865d2fc7818e50ec3c42a5b1c2ee1"
+    },
+    {
+      "path": "setup/motherduck/security.sql",
+      "sha256": "sha256:fbe3706124486ef0b59121643ca3cb1f90b1bb21ebc08daf9f136d5af4d218df"
+    },
+    {
+      "path": "setup/motherduck/seed.sql",
+      "sha256": "sha256:bf502528c7dd59c698c2fe90983f0516c455faf0de90cae72cd61c50b9558638"
+    },
+    {
+      "path": "setup/motherduck/zones.sql",
+      "sha256": "sha256:6f10d7c85a24869903ac7762a946d77e7778d8be7a3418580740a480e4c014a6"
+    },
+    {
+      "path": "setup/postgis/schema.sql",
+      "sha256": "sha256:e491a0ea84c5b4e59e86cd1a544b56394003cf0b619c2f3eaf7eb827a45cf65d"
+    },
+    {
+      "path": "setup/postgis/security.sql",
+      "sha256": "sha256:a7a72527b48a549b4ae872a19bd68c2645c52a80129142e6efeb31ebe74d79f2"
+    },
+    {
+      "path": "setup/postgis/seed.sql",
+      "sha256": "sha256:39f3efc18b333a1a40f242631a1f0df975d73eac236f72eec70947091c850120"
+    },
+    {
+      "path": "setup/postgis/zones.sql",
+      "sha256": "sha256:bf09e182308799c634cad40eb634793b8d767c48fb99789cbc75cbf7b1163154"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "data/derived/existing-hubs.geojson",
+      "sha256": "sha256:a55781e3203581bc26c816ec5dc33e524c4246537c8eb32181a95ad7482e47ee"
+    },
+    {
+      "path": "data/derived/fleet-positions.geojson",
+      "sha256": "sha256:24870c954bb83af61eab21e422f4d9b68aa3eaad3e1063d1281dd7a027d1f558"
+    },
+    {
+      "path": "data/derived/hub-candidates.geojson",
+      "sha256": "sha256:43cb0695e2685e7eda5ece6dcf82f819d1c21c35a491c278139d759f2944108a"
+    },
+    {
+      "path": "data/derived/hub-candidates.parquet",
+      "sha256": "sha256:08e1d6683ed23d4772373525bb8a8bd8532bd1b864559d77f138d98be0ce9ea6"
+    },
+    {
+      "path": "data/derived/zone-metrics.geojson",
+      "sha256": "sha256:67b934c24c1441e61f2a18321694cdd70081ea8e72461a058072d4749f970224"
+    },
+    {
+      "path": "data/derived/zone-metrics.parquet",
+      "sha256": "sha256:0a609b70fa73c43707ef56250f714d67a65f360abf01805e1361a618f7f3585a"
+    },
+    {
+      "path": "project.qgz",
+      "sha256": "sha256:25b26433619f014803ca55f28559b2b83efbd363c5ae0e1b1445633242511e75"
+    }
+  ]
+}

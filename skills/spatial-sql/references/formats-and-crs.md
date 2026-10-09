@@ -277,6 +277,10 @@ When reading, generating, converting, geocoding, routing, or calling a map API:
 
 ### Quick diagnostic
 
+Do not wait to notice: after loading and after each reprojection, compare every
+local layer's extent with the area of interest. In a project, declare
+`project.aoi` so `openmapstack verify` does this (`geodata.layer_extent_within_aoi`).
+
 If a point appears on the wrong continent or far outside the AOI:
 
 ```text

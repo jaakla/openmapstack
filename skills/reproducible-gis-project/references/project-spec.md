@@ -28,8 +28,7 @@ my-analysis/
 │   └── run-20260825-081503.json    # per-run metadata + hashes
 │
 ├── dashboard.html        # generated web view over the project
-└── project.qgz           # QGIS project (first-class view, required for
-                          # any multi-stage analysis — see section 5)
+└── project.qgz           # optional selected QGIS view — see sections 2.0 and 5
 ```
 
 `validation.required` / `domain_checks` and the `presentation` block live **inside `project.yaml`** by default, so one file stays the canonical manifest. Split them out only when they grow unwieldy, as `validation/validation.yaml` and `styles/presentation.yaml`; a `styles/` directory is also the right home for `maplibre-style.json` and `.qml` snippets when styling is reused across projects.
@@ -53,6 +52,138 @@ provenance, label honesty, hash construction), and the cross-file invariants
 `openmapstack validate` enforces beyond the schema. The YAML below is illustrative — a
 worked example of the shape, not a second field registry to keep in sync by hand.
 
+**Project-specific extensions.** v1 allows additive metadata wherever the schema
+permits additional properties; objects marked `additionalProperties: false` are
+closed and cannot be extended. Extra keys do not become OpenMapStack features:
+the built-in tools do not execute them or validate their project-specific meaning.
+They must not replace required fields or change the meaning of standard fields.
+Prefer namespaced keys for custom metadata to avoid collisions with future fields;
+document their meaning and any consumer in the project README. If custom metadata
+affects analytical results, implement its behavior in the declared pipeline and
+provide appropriate validation evidence.
+
+### 2.0 Selectable delivery — `openmapstack-delivery/v1`
+
+New projects record delivery explicitly. The built-in dashboard is the default;
+a user's explicit selection replaces that default. QGIS-only, Observable-only,
+and combinations are supported. The analytical project remains mandatory for
+material analysis, with the same source pins, provenance, assumptions, CRS,
+overrides, validation/run records and clean reruns for every selection.
+
+```yaml
+delivery:
+  schema: openmapstack-delivery/v1
+  targets:
+    - id: dashboard
+      kind: dashboard
+      mode: local
+      output: dashboard
+      inputs: [candidate_parcels, scenario_summary]
+      evidence: dashboard_evidence
+# Both bindings above must name outputs with kind: document. The pipeline
+# generates dashboard.html plus delivery/dashboard-evidence.json.
+```
+
+`targets` is a nonempty list. IDs are unique ASCII identifiers beginning with a
+letter. Supported `kind` values are `dashboard`, `qgis`, `observable`; unknown
+kinds/schema versions are rejected. A target's `output` and `evidence` bind
+existing, distinct document outputs with distinct paths. Evidence is JSON; web
+outputs are HTML; QGIS outputs are QGZ archives. `inputs` is a nonempty, unique
+list of analytical output keys (`geodata` or `table`), including the datasets its
+shared map/table presentation uses. Format-variant layer keys and explicit
+immutable override geometry are resolved statically. Persistent map-layer
+sources must name an output/format variant or override geometry, never an
+unexported source-table name. This rule is checked without PyQGIS or a browser.
+
+Selection is separate from the compute engine, scheduler, and
+`presentation.map.engine_preference`. Unselected integrations require no
+artifacts or runtime. Selecting QGIS retains desktop static/load/render
+obligations. A selected missing artifact fails; an unavailable runtime is
+`not_testable`, never a pass. All declared analytical outputs are still checked,
+even if no selected view uses them. Incidental files do not select targets.
+
+Shared `presentation` declares analytical meaning (layers, scenarios, metrics,
+canonical values, warnings). `layout`, `provenance_ui` and browser editing are
+view implementation choices. The built-in dashboard requires its layout and
+provenance UI; external-only views do not require dashboard tabs, sliders or
+reset controls. Shared controls, when declared, still must agree with the
+pipeline. Every view exposes the source provenance and limitations appropriate
+to its surface. A report may carry map-layer metadata without a basemap;
+map-primary views retain the basemap requirement. Legacy manifests retain the
+old requirement for every declared map block.
+
+#### Evidence and target mappings
+
+The pipeline embeds one `openmapstack-view/v1` JSON record in every view:
+
+- HTML: `<script id="openmapstack-view" type="application/json">…</script>`.
+  Escape `<` in the JSON as `\u003c` to prevent script termination. Web views also
+  expose one visible `data-openmapstack-provenance` element with source providers
+  and display all declared warning statements, independently of their layout.
+- QGIS: native project variable `openmapstack_delivery`, set with
+  `QgsExpressionContextUtils.setProjectVariable`, or a serialized custom property
+  `openmapstack.delivery` retained by the integration. Use PyQGIS to save the
+  project, preserving its other properties. Native `projectMetadata` exposes
+  source providers, assumption statements and rationales, and declared warning
+  statements in the desktop interface (for example, in its abstract).
+  `delivery.evidence_matches` checks these fields without PyQGIS; hidden binding
+  metadata alone cannot pass. The verifier reads serialized property/Option or project-variable
+  representations without requiring PyQGIS.
+
+Use `openmapstack.delivery.metadata_json(root, project, target)` to build this
+record. It binds target ID/kind, analytical output byte hashes, and shared
+semantics: project ID, interpretation, sources, overrides, processing,
+presentation meaning, analytical output definitions (including table units),
+and warnings. Layout/web-engine details and transient run
+pointers are excluded. Different targets bind the same shared semantics.
+This is machine-readable evidence, not a substitute for visible provenance.
+
+After creating the views, call `openmapstack.delivery.write_evidence(root,
+project)` before computing the run's output inventory/hash. Each target's
+`evidence` output contains `openmapstack-delivery-evidence/v1`, the embedded
+metadata and the view's SHA-256. Verification reads back actual artifacts,
+compares metadata to canonical semantics and input hashes, and checks the
+receipt's view hash. Rewriting a receipt cannot certify stale embedded metadata.
+QGIS static/native checks and web smoke checks remain independent. These bindings
+prove declared identity/consistency, not arbitrary analytical truth or every
+rendered pixel. Existing dashboard visual checks also apply to a selected
+map-primary built-in dashboard; generic external web checks impose no dashboard
+DOM/tab structure.
+
+`mode` defaults to `local`. `hosted` is supported for Observable exports and
+additionally requires `url` (HTTPS), `retrieved_at` (timestamp with UTC offset),
+and `build` (a distinct document output containing inspectable build/export
+configuration). The pipeline retains an HTML export/snapshot and the receipt
+binds its bytes, configuration hash, URL and retrieval timestamp. A URL alone is
+insufficient. Checks inspect retained local evidence and do not query or certify
+current remote state. Publication and authenticated service operation are
+separate, explicitly requested actions. Tool-specific adapters/examples belong
+to integration work; a supported export contract does not imply a hosted adapter.
+
+#### Compatibility and explicit migration
+
+This is a versioned extension within `openmapstack-project/v1`. A manifest
+**without `delivery` retains legacy v1 behavior**, including its QGIS companion
+obligations. Do not treat omission as a new-project dashboard-only default.
+New templates record the default; unsupported explicit declarations fail rather
+than reverting to legacy. Inspect reports `delivery.mode` as `explicit` or
+`legacy` and lists declared targets.
+
+To migrate, choose targets, add the declaration, bind their document/evidence
+outputs and analytical inputs, then update the canonical pipeline to rebuild only
+the selected deliverables and embed/write their evidence. Keep still-required
+analytical outputs, remove obsolete target-specific generation/dependencies/check
+IDs deliberately, and regenerate validation/run inventories. Preserve old
+artifacts/evidence in an archive if needed; the CLI never deletes them or changes
+the selection implicitly. Run validate, canonical execution and verify --rerun.
+A rerun that changes delivery selection fails. Use a CLI whose check catalog
+includes `delivery.declaration_valid` and `delivery.evidence_matches`; older
+versions that ignore the extension cannot certify a migrated project.
+
+The offline [delivery profile example](../examples/delivery-profiles/README.md)
+demonstrates default, external-only, combined and hosted-export contract paths.
+The Tartu example retains its legacy combined delivery until explicitly migrated.
+
 ### 2.1 Head and interpretation
 
 ```yaml
@@ -67,6 +198,9 @@ project:
   created_at: 2026-08-25T08:15:03+03:00
   updated_at: 2026-08-25T08:42:11+03:00
   status: validated        # draft | in_progress | validated | warning | failed
+  aoi:                     # optional area of interest; local outputs must lie near it
+    bbox: [640000, 6455000, 685000, 6500000]   # minx, miny, maxx, maxy in crs x/y order
+    crs: EPSG:3301
   author:                  # who the analysis is made for and by; shown in the credits header
     name: Mari Maasikas
     email: mari.maasikas@example.org
@@ -89,16 +223,42 @@ interpretation:
       rationale: Metric area calculation is required.
 ```
 
-`interpretation` is where "what the user actually wanted" is pinned, including any rephrasing you did. Every assumption needs a `statement` and `rationale`.
+`interpretation` is where "what the user actually wanted" is pinned, including any
+rephrasing you did. Each assumption must be an object with `id`, `statement`, and
+`rationale`, all nonblank strings. The schema enforces this shape; `openmapstack
+validate` and `project.assumptions_have_rationale` also reject duplicate assumption
+IDs. An empty assumptions array is schema-valid but produces a warning. The audit
+additionally rejects unresolved placeholder text.
 
-The schema requires every `project.*` and `interpretation.*` key shown above except
-`project.author` and `project.generated_with`, and closes `project.status` to the
-five listed values. `author` and `generated_with` are delivery requirements: the
+Additional assumption fields are allowed as project-specific metadata. For example,
+`scope: accessibility` and a project-specific scope glossary can describe where an
+assumption applies, but OpenMapStack does not resolve scope references, check that
+glossary, or restrict an assumption's effect based on `scope`. Put applicability
+needed to understand the analysis in `statement` or `rationale`, so consumers of
+the standard contract can still interpret it correctly.
+
+The schema requires `project.id`, `title`, `question`, `created_at`, `updated_at`,
+and `status`, plus `interpretation.objective` and `assumptions`, and closes
+`project.status` to the five listed values. `author` and `generated_with` are delivery requirements: the
 credits header (section 3) renders them. Fill `author` from the requesting user or
 their version-control identity (`git config user.name` / `user.email`) and ask when
-neither is known; never invent an author or leave a placeholder in a delivered view. The per-assumption
-`statement`/`rationale` requirement is a semantic rule checked by `openmapstack validate`,
-not by the schema — a manifest can be schema-valid and still fail the audit.
+neither is known; never invent an author or leave a placeholder in a delivered view.
+A manifest can be schema-valid and still fail the semantic audit.
+
+Declare `project.aoi` whenever the question has a bounded place: a city, county,
+country or study area. `bbox` is `[minx, miny, maxx, maxy]` in the x/y order of
+`crs` (longitude/latitude or easting/northing), whatever a service's own bbox
+order is. Both `openmapstack validate` and `verify` reject non-finite, inverted,
+or zero-width/height bounds independently of the outputs. `openmapstack verify`
+then runs `geodata.layer_extent_within_aoi` on every local geodata output: the AOI is grown by half its width and height on each side,
+transformed into the layer's own CRS, and compared with every feature. A layer
+entirely outside fails (`axis_swap_suspected` when flipping x/y would put a strict
+majority of the outside features inside, otherwise `extent_outside_aoi`); some
+features outside is a warning. Invalid AOI CRS declarations or coordinates fail
+as `aoi_invalid`; unavailable transformation capabilities remain `not_testable`.
+These checks catch what CRS labels and coordinate ranges cannot: near Tartu, `(26.7, 58.4)` and
+`(58.4, 26.7)` are both legal lon/lat. A suspected swap is a diagnosis to explain,
+not permission to swap without source evidence (`formats-and-crs.md`).
 
 ### 2.2 Sources
 
@@ -318,6 +478,10 @@ outputs:
 
 Output dataset are defined as first-class, with generated-by traces back to a step.
 
+Geodata outputs are `extent: local` by default and must lie near `project.aoi`.
+Mark an intentionally wider layer, such as a world locator frame or a global
+reference grid, `extent: global` to exempt it from that check.
+
 An output that exists to feed a control rather than to answer the question must
 say so. Mark it `role: exploratory_companion` and name the accepted result in
 `note`, so no reader mistakes a what-if artifact for the finding.
@@ -505,6 +669,11 @@ declaration failures, not skipped checks.
 
 ### 2.7 Presentation semantics
 
+The full example below illustrates a built-in map dashboard. Its layout, tabs,
+browser editing and web-engine choices apply only to that selected surface.
+External views map the shared analytical meaning onto their own interfaces;
+see section 2.0.
+
 ```yaml
 presentation:
   intent: analytical_workspace
@@ -645,7 +814,7 @@ presentation:
             options: [ARIMAA, MAATULUNDUSMAA, TOOTMISMAA]
 ```
 
-**`presentation.map.basemap` is required whenever `presentation.map` is present**, and its `tiles`/`url` and `attribution` are load-bearing rather than decorative. The dashboard must really request tiles from the declared endpoint and really display the declared attribution; `visual.dashboard_loads_in_browser` fails with `basemap_absent` when the manifest omits the basemap, when no tile request to the declared URL is ever issued, or when the attribution is not visible in the rendered product. Honor an explicit user choice, then prefer an appropriate local or official regional basemap (Estonia: Maa- ja Ruumiamet WMS). Otherwise use the preconfigured goplex.ee Protomaps vector fallback described in `web-delivery.md`. For `kind: vector-style`, `url` names the light MapLibre style; optional `dark_url` preserves automatic/manual theme switching, and optional `tilejson` pins its vector source. A style/TileJSON fetch alone is not tile evidence: the browser check resolves the observed metadata to actual tile templates. The dashboard may supply the manifest attribution itself.
+**`presentation.map.basemap` is required for map-primary views, and for every legacy v1 map block**, and its `tiles`/`url` and `attribution` are load-bearing rather than decorative. The dashboard must really request tiles from the declared endpoint and really display the declared attribution. Every party it credits must be visible; wording and order are free, so the map engine's own attribution control is enough and needs no second copy; `visual.dashboard_loads_in_browser` fails with `basemap_absent` when the manifest omits the basemap, when no tile request to the declared URL is ever issued, or when the attribution is not visible in the rendered product. Honor an explicit user choice, then prefer an appropriate local or official regional basemap (Estonia: Maa- ja Ruumiamet WMS). Otherwise use the preconfigured goplex.ee Protomaps vector fallback described in `web-delivery.md`. For `kind: vector-style`, `url` names the light MapLibre style; optional `dark_url` preserves automatic/manual theme switching, and optional `tilejson` pins its vector source. A style/TileJSON fetch alone is not tile evidence: the browser check resolves the observed metadata to actual tile templates. The dashboard may supply the manifest attribution itself.
 
 Every basemap must declare `kind`: `raster-xyz`, `raster-wms`, or `vector-style`. A vector style requires `url`; `tiles` or `tilejson` alone cannot replace a style document. Raster kinds require `tiles` or `url`. **Migration:** older v1 manifests that omitted `kind` must add the actual kind before validation or regeneration. Read the provider metadata to identify it; do not infer it from a URL suffix or default an unknown kind to raster. Templates and worked examples already declare it explicitly.
 
@@ -657,7 +826,7 @@ Every basemap must declare `kind`: `raster-xyz`, `raster-wms`, or `vector-style`
 | `deck` | Generate a MapLibre basemap plus a deterministic deck.gl overlay for density, flows, 3D magnitude, or very large rendered feature sets. |
 | `kepler` | Generate an exploration-first kepler.gl view when UI-driven filtering, time playback, rapid aggregation, or interactive 3D is the primary need. |
 
-Use the literal values above: `deck`, not `deck.gl`; `kepler`, not `kepler.gl`. QGIS is a required companion output for multi-stage analysis and is not a value in this web-renderer enum.
+Use the literal values above: `deck`, not `deck.gl`; `kepler`, not `kepler.gl`. QGIS is an optional selected companion for explicit delivery projects (required under legacy v1 material-analysis guidance) and is not a value in this web-renderer enum.
 
 This enum is an authoring rule with no automated gate today: the JSON schema accepts
 `presentation` as any object, and `openmapstack validate` does not check the value. The
@@ -714,6 +883,45 @@ An exported bundle becomes canonical only after a trusted pipeline importer
 checks the project/run identity, verifies every source precondition, writes or
 references real override geodata, reruns affected processing steps, reports every
 override `applied`, `rejected`, or `not_testable`, and emits a new run record.
+
+#### Pages and the design language
+
+A project whose result needs more than one page — a citywide screening app and a
+report on one district, say — lists them in a top-level `views:` block. Without it
+the project has one page, its dashboard.
+
+```yaml
+views:
+  - id: screening
+    output: screening_view        # a declared output whose path is an HTML page
+    archetype: workspace          # from the declared design language
+    scope: citywide               # what this page's numbers describe
+    entry: true                   # exactly one page opens first
+  - id: detail
+    output: dashboard
+    archetype: report
+    scope: north_west
+    presentation:                 # overrides top-level presentation keys for this page
+      controls:
+        variants:
+          - id: scenario
+            options: [T, M, TM]
+            canonical: T
+            effect: published     # every option is a result the run published
+```
+
+`presentation.design_language` names the version of the design language the pages
+follow (`openmapstack-views/0.1`; see `design-language.md`). Declaring it opts the
+pages into that version's checks: every declared control is found and operated
+through the version's state protocol, on whichever tab it sits. A project that does
+not declare it keeps the checks that predate the language.
+
+Every control in `filters`, `scenarios` and `variants` has an `effect`. The default,
+`exploratory`, means that leaving the canonical position must show the exploratory
+label and offer a reset. `published` is for a control that only switches between
+results the run itself published, such as the scenarios a report compares side by
+side; it needs no exploratory label. A sensitivity variant, a re-applied rule or a
+reader's filter is never `published`.
 
 ### 2.8 Runtime, runs, warnings
 
@@ -869,6 +1077,12 @@ missing, stale, duplicate, or incomplete inventories.
 
 ## 3. Semantic presentation primitives
 
+The semantic roles and provenance apply to every selected surface. The dashboard
+layout, tabs, browser controls and table interactions below describe the built-in
+dashboard (and legacy web delivery); they are not requirements for external-only
+QGIS or Observable interfaces. Those interfaces expose the same analytical
+meaning and limitations through their own controls and metadata, as in section 2.0.
+
 Agents should **not** freely reinvent dashboard UX. The `presentation` block declares the semantics; a renderer implements them. Standard primitives: `map`, `summary`, `metric`, `filter`, `legend`, `layer_control`, `feature_details`, `table`, `chart`, `timeline`, `provenance_panel`, `warning_panel`, `validation_status`.
 
 **Stable semantic roles** (use these; avoid random hex) — eleven discrete
@@ -928,7 +1142,9 @@ Four rules keep a reconfigurable view honest:
   pipeline turns the whole view into a confident lie.
 * **Off-canonical states must say so.** The moment any control leaves its canonical
   position, label the view as exploratory and offer a one-click reset. A what-if that
-  looks identical to the accepted result is worse than no control at all.
+  looks identical to the accepted result is worse than no control at all. The one
+  exception is a control declared `effect: published`, which only switches between
+  results the run published (s. 2.7, Pages and the design language).
 * **Re-apply rules; never re-measure geometry.** The browser may re-evaluate a
   published rule against values the pipeline measured in the analysis CRS. It must not
   compute distances, areas, buffers or reprojections of its own — those belong to the
@@ -940,15 +1156,15 @@ Four rules keep a reconfigurable view honest:
   (`dist_kg_m` / `dist_kg_baseline_m`) and let the control choose. Never approximate
   the counterfactual, and never let switching an override off imply the source data
   changed.
-* **Views switch between precomputed variants.** A switch that only chooses which
+* **Variants switch between precomputed results.** A switch that only chooses which
   measured columns to show (travel mode, analysis year, a second metric) is not an
-  override. Declare it under `presentation.controls.views` with its `options`, the
+  override. Declare it under `presentation.controls.variants` with its `options`, the
   `canonical` option the view opens at, and, when it addresses a table output, the
   columns each option shows:
 
   ```yaml
   controls:
-    views:
+    variants:
       - id: travel_mode
         label: Travel mode
         options: [walk, bike]
@@ -1034,13 +1250,13 @@ if __name__ == "__main__":
     main()
 ```
 
-A clean-room run must show that every path in `outputs.*`, every QGIS datasource, and `validation/latest-report.json` were produced by that one canonical path.
+A clean-room run must show that every path in `outputs.*`, every selected QGIS datasource, and `validation/latest-report.json` were produced by that one canonical path.
 
 ---
 
 ## 5. QGIS project output (`project.qgz`)
 
-Every multi-stage GIS analysis must generate a first-class QGIS project `project.qgz` that is a **layer- and style-perfect companion** to the web dashboard.
+When QGIS is selected (or legacy v1 material-analysis obligations apply), generate a first-class QGIS project whose declared output is a **layer- and style-perfect view** of shared presentation semantics. Match the web view when it is also selected; desktop-only delivery requires no dashboard.
 
 ### 5.1 Architecture & File Relationships
 A `.qgz` file is literally a zip archive containing the `project.qgs` XML document. It must **reference the exact derived datasets and override files** produced by the pipeline — never an independent or disconnected analytical state:
@@ -1074,7 +1290,7 @@ project.yaml
    <provider encoding="UTF-8">ogr</provider>
    ```
    **Use formats every QGIS build reads:** GeoPackage, GeoJSON or FlatGeobuf. GDAL's Parquet and Arrow drivers are optional build components that Debian/Ubuntu QGIS packages omit, so a layer on GeoParquet opens invalid there and the map draws nothing while every static check passes. Keep GeoParquet for analysis and export a QGIS-facing copy. `openmapstack validate` warns as `qgis.datasource_formats`.
-3. **Tiled Raster Basemaps:** Always include an official tiled basemap matching the project region, and prefer one that answers unauthenticated requests. CARTO's raster XYZ tiles (`basemaps.cartocdn.com/rastertiles/…`) now return an *API KEY REQUIRED* watermark, so a project that ships them draws that watermark across every view. A dashboard using the global Protomaps vector fallback and its QGIS companion may legitimately carry different backgrounds; preserve the appropriate regional QGIS basemap rather than passing a MapLibre style to a raster provider. Every basemap layer must declare its own **complete** `<srs>` — see rule 4.
+3. **Tiled Raster Basemaps:** For map-primary delivery (and legacy projects), include an official tiled basemap matching the project region, and prefer one that answers unauthenticated requests. CARTO's raster XYZ tiles (`basemaps.cartocdn.com/rastertiles/…`) now return an *API KEY REQUIRED* watermark, so a project that ships them draws that watermark across every view. A dashboard using the global Protomaps vector fallback and its QGIS companion may legitimately carry different backgrounds; preserve the appropriate regional QGIS basemap rather than passing a MapLibre style to a raster provider. Every basemap layer must declare its own **complete** `<srs>` — see rule 4.
    - **Maa- ja Ruumiamet Baaskaart (WMS, EPSG:3301):**
      ```xml
      <datasource>contextualWMSLegend=0&amp;crs=EPSG:3301&amp;dpiMode=7&amp;featureCount=10&amp;format=image/png&amp;layers=BAASKAART&amp;styles=&amp;url=https://kaart.maaamet.ee/wms/alus</datasource>
@@ -1112,7 +1328,7 @@ project.yaml
    All three traps are specific to hand-written `.qgs` XML. Building through the PyQGIS API (`QgsRasterLayer("type=xyz&url=…", name, "wms")`, `QgsProject.setCrs`, `QgsProject.write`) avoids them: the providers resolve their own CRS and QGIS serialises everything it needs on save. Nothing about a project with these faults looks broken — layers are valid, datasources resolve, the render is not blank — which makes them **confidently wrong maps**, the worst failure mode in the catalogue.
 
 ### 5.3 Layer Tree Groups & Semantic Styling
-The layer tree groups in `<layer-tree-group>` and map layers in `<projectlayers>` must mirror the web dashboard's visual hierarchy:
+The layer tree groups in `<layer-tree-group>` and map layers in `<projectlayers>` must mirror the shared presentation hierarchy (and the web view when selected):
 - **Analysis Results:** Categorized symbols (`Tier 1 Prime: #2e7d32`, `Tier 2 Good: #f57f17`, `Tier 3: #455a64`) with fill opacity and distinct border colors.
 - **Constraints / Catchments:** Semi-transparent buffer fills (alpha 25–35) with dashed outline strokes.
 - **POIs:** Circle marker symbols with distinct category fills and white borders.
@@ -1263,3 +1479,13 @@ Grab a scaffold from `../templates/` and copy/adapt:
 - `templates/validation.yaml` — validation rules + report starters
 
 A worked example implementing the acceptance (Tartu) scenario in `../examples/tartu-development/` contains a complete `project.yaml`, pipeline, overrides, validation, and a QGIS project pass.
+
+## Optional established-stack bindings
+
+`integrations.schema: openmapstack-integrations/v1` binds authoritative tool
+files and the derived execution summary without replacing the processing or
+provenance contract. See [established-stack.md](established-stack.md) for the
+integration boundary and examples; the packaged project JSON schema and
+`integration.bindings_valid` / `integration.evidence_matches` own its shape and
+checks. Absent integrations preserve existing v1 behavior. A clean rerun must
+retain declared ownership and delivery selection, and rebuild selected outputs.

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import math
+from collections import Counter
 from datetime import date, datetime
 from importlib.resources import files
 from typing import Any
@@ -36,4 +38,39 @@ def validation_errors(instance: Any, schema: dict[str, Any]) -> list[str]:
 
 
 def project_schema_errors(project: Any) -> list[str]:
-    return validation_errors(project, load_packaged_schema("project-v1.schema.json"))
+    errors = validation_errors(project, load_packaged_schema("project-v1.schema.json"))
+    metadata = project.get("project") if isinstance(project, dict) else None
+    aoi = metadata.get("aoi") if isinstance(metadata, dict) else None
+    if isinstance(aoi, dict):
+        errors.extend(f"project.aoi.bbox: {error}" for error in aoi_bbox_errors(aoi.get("bbox")))
+    return errors
+
+
+def aoi_bbox_errors(bbox: Any) -> list[str]:
+    """Check finite ordered bounds, including inequalities JSON Schema cannot express."""
+    try:
+        valid = (isinstance(bbox, (list, tuple)) and len(bbox) == 4
+                 and all(type(value) in (int, float) and math.isfinite(value) for value in bbox)
+                 and bbox[0] < bbox[2] and bbox[1] < bbox[3])
+    except OverflowError:
+        valid = False
+    return [] if valid else ["must be four finite numbers [minx, miny, maxx, maxy] with min < max"]
+
+
+def assumptions_errors(assumptions: Any) -> list[str]:
+    """Check assumption shape from the schema, then the unique-ID invariant."""
+    schema = load_packaged_schema("project-v1.schema.json")
+    errors = validation_errors(
+        assumptions,
+        {
+            "$defs": schema["$defs"],
+            **schema["properties"]["interpretation"]["properties"]["assumptions"],
+        },
+    )
+    if errors:
+        return errors
+    counts = Counter(a["id"] for a in _json_value(assumptions))
+    duplicates = sorted(aid for aid, count in counts.items() if count > 1)
+    if duplicates:
+        errors.append(f"duplicate ids: {duplicates}")
+    return errors

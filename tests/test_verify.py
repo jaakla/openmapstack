@@ -23,6 +23,7 @@ from openmapstack.checks.qgis import groups_match_manifest
 from openmapstack.cli import main
 from openmapstack.verify import CheckRun, VerifyResult, verify_project
 from tests.evals.helpers import make_workspace, minimal_project, write_project
+from tests.evals.test_visual_assertions import _chromium_available, protocol_manifest, protocol_page
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = REPO_ROOT / "examples" / "tartu-development"
@@ -107,6 +108,62 @@ class VerifyPlanTests(unittest.TestCase):
         self.assertEqual(geo[0].result.status, "not_testable")
         self.assertEqual(geo[0].result.data.get("code"), "unsupported_format")
 
+    def test_declared_aoi_places_local_outputs_and_exempts_global_ones(self) -> None:
+        workspace = make_workspace()
+        project = minimal_project()
+        project["project"]["aoi"] = {"bbox": [26.65, 58.32, 26.80, 58.42], "crs": "EPSG:4326"}
+        project["outputs"] = {
+            "result": {"path": "data/derived/result.geojson", "format": "GeoJSON (EPSG:4326)"},
+            "world": {"path": "data/derived/world.geojson", "format": "GeoJSON (EPSG:4326)", "extent": "global"},
+        }
+        write_project(workspace, project)
+        result = verify_project(workspace / "project.yaml")
+        placed = [r.args.get("path") for r in result.checks if r.name == "geodata.layer_extent_within_aoi"]
+        self.assertEqual(placed, ["data/derived/result.geojson"])
+
+    def test_no_aoi_adds_no_extent_check(self) -> None:
+        workspace = make_workspace()
+        project = minimal_project()
+        project["outputs"] = {"result": {"path": "data/derived/result.geojson", "format": "GeoJSON (EPSG:4326)"}}
+        write_project(workspace, project)
+        result = verify_project(workspace / "project.yaml")
+        self.assertIsNone(_status_of(result, "geodata.layer_extent_within_aoi"))
+
+    def test_aoi_bounds_are_validated_without_local_outputs(self) -> None:
+        from tests.test_cli import valid_manifest
+
+        for outputs in ({"report": {"path": "report.csv", "format": "CSV", "kind": "table"}},
+                        {"world": {"path": "world.geojson", "format": "GeoJSON", "extent": "global"}}):
+            for bbox, expected in (([26.65, 58.32, 26.80, 58.42], "passed"),
+                                   ([26.80, 58.32, 26.65, 58.42], "failed"),
+                                   ([26.65, 58.42, 26.80, 58.32], "failed"),
+                                   ([26.65, 58.32, 26.80, 58.32], "failed")):
+                with self.subTest(outputs=outputs, bbox=bbox):
+                    workspace = make_workspace()
+                    project = valid_manifest()
+                    project["outputs"] = outputs
+                    project["project"]["aoi"] = {"bbox": bbox, "crs": "EPSG:4326"}
+                    write_project(workspace, project)
+                    result = verify_project(workspace / "project.yaml")
+                    self.assertEqual(_status_of(result, "project.conforms_to_schema"), expected)
+                    self.assertIsNone(_status_of(result, "geodata.layer_extent_within_aoi"))
+                    if expected == "failed":
+                        self.assertFalse(result.ok())
+
+    def test_invalid_aoi_crs_is_a_blocking_extent_failure(self) -> None:
+        workspace = make_workspace()
+        project = minimal_project()
+        project["project"]["aoi"] = {"bbox": [26.65, 58.32, 26.80, 58.42], "crs": "EPSG:bogus"}
+        project["outputs"] = {"result": {"path": "result.geojson", "format": "GeoJSON (EPSG:4326)"}}
+        (workspace / "result.geojson").write_text(json.dumps({
+            "type": "FeatureCollection", "features": [{"type": "Feature", "properties": {},
+                "geometry": {"type": "Point", "coordinates": [26.72, 58.38]}}]}), encoding="utf-8")
+        write_project(workspace, project)
+        result = verify_project(workspace / "project.yaml")
+        extent = next(run.result for run in result.checks if run.name == "geodata.layer_extent_within_aoi")
+        self.assertEqual((extent.status, extent.data["code"]), ("failed", "aoi_invalid"))
+        self.assertFalse(result.ok())
+
     def test_a_raising_check_is_not_testable_not_a_crash(self) -> None:
         # One broken check must not take down a report the user is relying on
         # for everything else -- but it must never read as a pass either.
@@ -121,6 +178,64 @@ class VerifyPlanTests(unittest.TestCase):
         self.assertEqual(run.result.status, "not_testable")
         self.assertEqual(run.result.data.get("code"), "check_error")
         self.assertNotEqual(result.status, "passed")
+
+
+class VerifyBrowserPlanTests(unittest.TestCase):
+    """verify runs the browser check only for projects that declare a
+    design-language version (ADR 0007)."""
+
+    def project(self, language: str | None) -> Path:
+        workspace = make_workspace()
+        project = protocol_manifest()
+        if language is None:
+            del project["presentation"]["design_language"]
+        else:
+            project["presentation"]["design_language"] = language
+        write_project(workspace, project)
+        (workspace / "dashboard.html").write_text(protocol_page(), encoding="utf-8")
+        return workspace / "project.yaml"
+
+    def test_projects_without_a_language_version_keep_their_plan(self) -> None:
+        result = verify_project(self.project(None))
+        self.assertIsNone(_status_of(result, "visual.dashboard_loads_in_browser"))
+
+    def test_without_playwright_the_check_is_not_testable_with_a_hint(self) -> None:
+        with patch("openmapstack.checks.visual._playwright", side_effect=ImportError("no playwright")):
+            result = verify_project(self.project("openmapstack-views/0.1"))
+        run = next(r for r in result.checks if r.name == "visual.dashboard_loads_in_browser")
+        self.assertEqual((run.result.status, run.result.data["code"]), ("not_testable", "playwright_unavailable"))
+        self.assertIn("openmapstack[visual]", run.result.detail)
+        self.assertNotEqual(result.status, "passed")
+
+    def test_an_unknown_language_version_fails(self) -> None:
+        result = verify_project(self.project("openmapstack-views/9"))
+        run = next(r for r in result.checks if r.name == "visual.dashboard_loads_in_browser")
+        self.assertEqual((run.result.status, run.result.data["code"]), ("failed", "design_language_unknown"))
+
+    @unittest.skipUnless(_chromium_available(), "Playwright Chromium is not installed")
+    def test_language_check_uses_selected_web_output_once(self) -> None:
+        project_file = self.project("openmapstack-views/0.1")
+        project = protocol_manifest()
+        project["outputs"] = {"web": {"path": "screening.html", "format": "HTML", "kind": "document"}}
+        project["delivery"] = {"schema": "openmapstack-delivery/v1", "targets": [{
+            "id": "screening", "kind": "dashboard", "output": "web", "inputs": ["results"],
+            "evidence": "delivery/screening.json"}]}
+        write_project(project_file.parent, project)
+        (project_file.parent / "dashboard.html").rename(project_file.parent / "screening.html")
+        result = verify_project(project_file)
+        run = next(r for r in result.checks if r.name == "visual.dashboard_loads_in_browser")
+        self.assertEqual(run.result.status, "passed", run.result.detail)
+        self.assertFalse(any(r.name == "delivery.screening.dashboard_loads_in_browser" for r in result.checks))
+
+    @unittest.skipUnless(_chromium_available(), "Playwright Chromium is not installed")
+    def test_a_declared_page_is_checked_in_a_real_browser(self) -> None:
+        project_file = self.project("openmapstack-views/0.1")
+        self.assertEqual(_status_of(verify_project(project_file), "visual.dashboard_loads_in_browser"), "passed")
+        (project_file.parent / "dashboard.html").write_text(
+            protocol_page(HALF_LIFE_HOOK=""), encoding="utf-8")
+        run = next(r for r in verify_project(project_file).checks if r.name == "visual.dashboard_loads_in_browser")
+        self.assertEqual(run.result.status, "failed")
+        self.assertIn("control_absent", run.result.data["problem_codes"])
 
 
 class VerifyStatusTests(unittest.TestCase):
@@ -235,6 +350,19 @@ class CommittedWorkedExampleContractTests(unittest.TestCase):
         pipeline = next(item for item in record["inputs"] if item["path"] == "pipeline.py")
         actual = "sha256:" + hashlib.sha256((EXAMPLE / "pipeline.py").read_bytes()).hexdigest()
         self.assertEqual(pipeline["sha256"], actual)
+
+    def test_latest_run_attests_the_declared_implementation_dependencies(self) -> None:
+        manifest = yaml.safe_load((EXAMPLE / "project.yaml").read_text(encoding="utf-8"))
+        record = json.loads((EXAMPLE / manifest["runs"]["latest"]["record"]["path"]).read_text())
+        inputs = {item["path"]: item["sha256"] for item in record["inputs"]}
+        for dependency in manifest["runtime"]["implementation"].get("dependencies", []):
+            path = EXAMPLE / dependency
+            for item in path.rglob("*") if path.is_dir() else [path]:
+                if item.is_file():
+                    relative = item.relative_to(EXAMPLE).as_posix()
+                    with self.subTest(path=relative):
+                        self.assertIn(relative, inputs)
+                        self.assertEqual(inputs[relative], "sha256:" + hashlib.sha256(item.read_bytes()).hexdigest())
 
     def test_qgis_layer_tree_matches_the_manifest(self) -> None:
         result = groups_match_manifest(EXAMPLE)

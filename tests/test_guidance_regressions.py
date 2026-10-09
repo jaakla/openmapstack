@@ -391,14 +391,15 @@ class TableOutputGuidanceTests(GuidanceCase):
                 self.assertShips(text, "Tables are outputs too.", path)
                 self.assertShips(text, "`downloads: [csv, xlsx]`", path)
 
-    def test_the_contract_defines_tables_downloads_and_views(self) -> None:
+    def test_the_contract_defines_tables_downloads_and_variants(self) -> None:
         for path, text in _shipped_copies("project-spec.md").items():
             with self.subTest(path=path):
                 self.assertShips(text, "#### Non-spatial table outputs", path)
                 self.assertShips(text, "### Tabular results", path)
                 self.assertShips(text, "Only a declared `kind` changes how an output is checked.", path)
                 self.assertShips(text, "Never generate a\n  download in the browser", path)
-                self.assertShips(text, "**Views switch between precomputed variants.**", path)
+                self.assertShips(text, "**Variants switch between precomputed results.**", path)
+                self.assertShips(text, "`presentation.controls.variants`", path)
 
     def test_every_template_copy_scaffolds_tables(self) -> None:
         for path in [REPO_ROOT / "templates", *sorted(SKILLS_ROOT.glob("*/templates"))]:
@@ -406,6 +407,15 @@ class TableOutputGuidanceTests(GuidanceCase):
                 self.assertIn("kind: table", (path / "project.yaml").read_text(encoding="utf-8"))
                 self.assertIn("tables:", (path / "presentation.yaml").read_text(encoding="utf-8"))
                 self.assertIn("def write_table(", (path / "pipeline.py").read_text(encoding="utf-8"))
+
+    def test_project_templates_use_the_valid_variant_key(self) -> None:
+        import yaml
+
+        for path in [REPO_ROOT / "templates/project.yaml", *sorted(SKILLS_ROOT.glob("*/templates/project.yaml"))]:
+            with self.subTest(path=str(path.relative_to(REPO_ROOT))):
+                controls = yaml.safe_load(path.read_text())["presentation"]["controls"]
+                self.assertIn("variants", controls)
+                self.assertNotIn("views", controls)
 
 
 if __name__ == "__main__":  # pragma: no cover

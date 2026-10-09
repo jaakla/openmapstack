@@ -121,6 +121,10 @@ Scenario input files are checked in under
 `evals/fixtures/spatial-scenarios/<scenario>/`, and the runner's automatic
 byte-identity check verifies the generator copies them unmodified.
 
+Case `933-invalid-assumption` replaces the required rationale text with a mapping
+and requires `project.conforms_to_schema` to reject it. Its healthy control twin
+proves that the normal assumption record still passes.
+
 ## Coordinate-order boundary regression
 
 Case `018-coordinate-order-boundaries` is a focused fixture/live task for the
@@ -143,6 +147,55 @@ Run the offline controls without a model account or GIS runtime:
 python3 evals/run.py --mode fixture --case 018-coordinate-order-boundaries \
   --case 929-geojson-coordinate-swapped --case 930-maplibre-coordinate-swapped \
   --case 931-leaflet-latlng-coordinate-swapped --case 932-leaflet-geojson-coordinate-swapped
+```
+
+## Layer placement against the area of interest
+
+Case `025-layers-within-aoi` declares a hand-placed Tartu `project.aoi` and
+requires every local output, stored in EPSG:3301 or EPSG:4326, to lie inside it
+(`geodata.layer_extent_within_aoi`). The check is oracle-free once the manifest
+declares the AOI: it transforms the grown AOI into each layer's CRS and never
+pushes suspect coordinates through a projection. Mutation `945` writes the
+WGS84 road as lat/lon and pins `axis_swap_suspected`; `946` labels EPSG:3301
+metres as EPSG:4326 in both file and manifest, so every CRS-label check agrees
+with the lie, and pins `extent_outside_aoi`. Both keep the other layers healthy
+and require a healthy control twin. These prove the check, not that a live
+agent declares an AOI or acts on the finding.
+
+## Selectable delivery contract
+
+Cases `019`–`023` cover the explicit new-project dashboard default, QGIS-only,
+Observable-only, combined delivery and hosted-export evidence. Each uses two
+explicitly synthetic rectangles in EPSG:3301: only `large` qualifies at 15000 m²,
+and its independently known area is 20000 m². The canonical pipeline rebuilds
+every selected view/receipt from the staged immutable fixture in a clean workspace.
+`delivery.selection_is` is a known-answer check for the requested target set;
+`delivery.evidence_matches` reads actual embedded metadata and binds the view
+bytes to shared semantics and analytical output hashes.
+
+Mutations `934`–`940` reject unknown targets, missing selected artifacts, stale
+embedded metadata even with a rewritten receipt, unpinned sources, geographic
+metric CRS, unresolved presentation lineage, and missing desktop-visible QGIS
+provenance despite correct hidden metadata and a rewritten receipt. Every
+mutation has a healthy control twin. Legacy v1 compatibility is covered by the existing contract cases
+and `tests/test_delivery.py`; fixture/example source identity is also tested.
+
+The five positives also declare live tasks to evaluate shipped skill behavior.
+They do not authorize a paid run. Fixture passes establish the contract/checker
+behavior, not agent adherence. Browser/native checks in fixture mode are soft
+gates and unavailable runtimes remain `not_testable` in capability reporting.
+The export fixture demonstrates hosted evidence requirements; it neither calls
+Observable nor proves publication/current remote state. Real adapters belong to
+[#80](https://github.com/jaakla/openmapstack-skills/issues/80).
+
+```bash
+python3 evals/run.py --mode fixture --case 019-dashboard-delivery \
+  --case 020-qgis-only-delivery --case 021-observable-only-delivery \
+  --case 022-combined-delivery --case 023-hosted-delivery-evidence \
+  --case 934-unknown-delivery-target --case 935-selected-delivery-missing \
+  --case 936-stale-delivery-metadata --case 937-delivery-unpinned-source \
+  --case 938-delivery-wrong-metric-crs --case 939-delivery-unresolved-layer \
+  --case 940-qgis-visible-provenance
 ```
 
 ## Visual integration (PyQGIS + browser)
@@ -776,8 +829,11 @@ geometry-validity, duplicate-ID, and null-ID counters from actual geodata.
 Live cases that name a semantic result use `$OUTPUT:candidate_parcels` to read its
 path from `outputs.candidate_parcels` in project.yaml. This also resolves nested
 validation evidence and clean-rerun paths; it never guesses another file when
-the declared output is missing. Supported spatial formats remain readable by
-the existing geodata checks. Storage CRS must match the actual dataset metadata,
+the declared output is missing. `$DELIVERY:qgis` resolves the output bound by
+the selected target with ID `qgis`, allowing its output key and path to vary.
+Missing, ambiguous or unsafe bindings fail grading without a filename fallback.
+Supported spatial formats remain readable by the existing geodata checks.
+Storage CRS must match the actual dataset metadata,
 while metric analysis still requires a suitable CRS.
 
 Live benchmark CI uses Ubuntu 24.04's `python3-qgis` system package and a
@@ -798,3 +854,19 @@ the manifest. `geodata.dataset_crs_matches_storage_crs` compares that metadata
 with the project's declared `processing.storage_crs`, for tasks that leave the
 output CRS to the agent; it treats EPSG:4326 and GeoParquet's default
 OGC:CRS84 as the same.
+
+Established-stack contract case `024` and mutations `940`–`944` check bound
+owner definitions/summaries, frozen inputs and missing artifacts using the shared
+spatial SQL fixture. They do not claim that dlt, Dagster, Framework or native
+QGIS executed. Optional real runtime QA is documented in
+[the executable example](../examples/established-stack/README.md#maintainer-evidence)
+and uses `tests/test_established_stack_tools.py`; it needs only explicitly
+selected local runtimes, no paid accounts. Live mode remains subject to the
+repository's explicit model/budget policy.
+
+Mutations `945`–`946` use a synthetic complete HTML/JavaScript/data bundle and
+healthy control twins to reject missing Observable bundle declarations and
+receipts inside bundle directories. The controls execute and validate their
+canonical pipeline without claiming a Framework runtime. Unit tests also cover
+multiple selected targets, changed/deleted JS/CSS/data, and receipt placement
+before files exist.

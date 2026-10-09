@@ -1,0 +1,91 @@
+schema: openmapstack-project/v1
+delivery:
+  schema: openmapstack-delivery/v1
+  targets:
+    - id: dashboard
+      kind: dashboard
+      mode: local
+      output: dashboard
+      inputs: [candidates, areas]
+      evidence: dashboard_evidence
+project:
+  id: synthetic-delivery-profiles
+  title: Selectable delivery contract demonstration
+  question: Which of two synthetic rectangles exceeds 15000 square metres?
+  created_at: '2026-10-07T00:00:00Z'
+  updated_at: '2026-10-07T00:00:00Z'
+  status: draft
+  author: {name: OpenMapStack example maintainers, email: examples@example.invalid}
+  generated_with: {tool: OpenMapStack, url: 'https://github.com/jaakla/openmapstack-skills'}
+interpretation:
+  objective: Demonstrate delivery selection on a deterministic synthetic analysis.
+  assumptions:
+    - id: synthetic
+      statement: The source contains synthetic simple rectangles in EPSG:3301.
+      rationale: This offline contract example is not a factual parcel study.
+sources:
+  parcels:
+    role: authoritative_input
+    provider: OpenMapStack synthetic fixture
+    dataset: Two synthetic rectangles
+    source_url: https://example.invalid/synthetic-parcels
+    access: {method: local, retrieved_at: '2026-10-07T00:00:00Z'}
+    version: {identifier: synthetic-v1, published_at: '2026-10-07'}
+    pin:
+      class: local_snapshot
+      path: data/source/parcels.geojson
+      sha256: sha256:f54b136b53620861a72fc59e6a467e3500d94cf86372c1209e80ec632bbc8461
+      captured_at: '2026-10-07T00:00:00Z'
+    selection: {filter: All two fixture rectangles; no API pagination}
+    schema: {crs: 'EPSG:3301', key: id, columns: [id, geometry]}
+    license: {name: CC0-1.0, url: 'https://creativecommons.org/publicdomain/zero/1.0/'}
+    rationale: Explicitly synthetic input permits an offline hand-derivable correctness oracle.
+overrides: []
+processing:
+  analysis_crs: EPSG:3301
+  storage_crs: EPSG:3301
+  steps:
+    - {id: load, operation: read, source: parcels, output: raw}
+    - {id: select, operation: area_filter, input: raw, output: selected, minimum_area_m2: 15000}
+    - {id: export, operation: export, input: selected, output: analytical_outputs}
+    - {id: render, operation: render, input: analytical_outputs, output: views}
+outputs:
+  candidates:
+    path: data/derived/candidates.geojson
+    format: GeoJSON EPSG:3301
+    generated_by: export
+  areas:
+    path: data/derived/areas.csv
+    format: CSV
+    kind: table
+    generated_by: export
+    table:
+      key: [id]
+      columns:
+        - {name: id, type: string}
+        - {name: area_m2, type: number, unit: m²}
+    downloads: [csv]
+  dashboard: {path: dashboard.html, format: HTML, kind: document, generated_by: render}
+  dashboard_evidence: {path: delivery/dashboard-evidence.json, format: JSON, kind: document, generated_by: render}
+validation:
+  required: [selected_area, delivery_dashboard]
+  domain_checks: []
+presentation:
+  intent: report
+  primary_view: report
+  layout: {type: report}
+  provenance_ui: {show_assumptions: true}
+  tables: [{output: areas, downloads: [csv]}]
+warnings: []
+runtime:
+  implementation: {preferred_engine: python, pipeline: pipeline.py}
+  environment: {python: '3.12'}
+runs:
+  latest:
+    id: run-20261007-000000
+    started_at: '2026-10-07T00:00:00Z'
+    completed_at: '2026-10-07T00:00:00Z'
+    status: passed
+    inputs_hash: ''
+    outputs_hash: ''
+    validation_report: {path: validation/latest-report.json}

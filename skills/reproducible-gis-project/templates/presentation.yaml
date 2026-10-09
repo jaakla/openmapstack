@@ -10,6 +10,8 @@
 presentation:
   intent: analytical_workspace      # analytical_workspace | discovery | report
   primary_view: map
+  # design_language: openmapstack-views/0.1   # opts the view into that version's
+  #                                            # checks; see design-language.md
 
   layout:
     type: map_with_sidebar         # map | map_with_sidebar | full_map | report
@@ -58,8 +60,10 @@ presentation:
       # - id: scenario_outage
       #   override: OVERRIDE-001   # the override this switch turns on and off
       #   canonical: true
+      #   effect: exploratory      # default; `published` only when every state
+      #                            # is a result the run published
       #   baseline_fields: [dist_b_baseline_m]   # measured without the override
-    views:
+    variants:
       # A switch between precomputed variants that is not an override
       # (travel mode, analysis year). See project-spec.md s.3.
       # - id: travel_mode

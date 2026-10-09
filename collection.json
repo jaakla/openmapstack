@@ -15,6 +15,7 @@
       "shared_references": [
         "project-workflow.md",
         "project-spec.md",
+        "design-language.md",
         "formats-and-crs.md",
         "user-data-sources.md",
         "data-sources.md",
@@ -23,7 +24,8 @@
         "installation.md",
         "companion-skills.md",
         "web-delivery.md",
-        "services-and-scale.md"
+        "services-and-scale.md",
+        "established-stack.md"
       ]
     },
     {
@@ -33,7 +35,8 @@
         "data-sources.md",
         "user-data-sources.md",
         "formats-and-crs.md",
-        "companion-skills.md"
+        "companion-skills.md",
+        "established-stack.md"
       ]
     },
     {
@@ -42,7 +45,8 @@
       "shared_references": [
         "spatial-sql.md",
         "formats-and-crs.md",
-        "companion-skills.md"
+        "companion-skills.md",
+        "established-stack.md"
       ]
     }
   ]

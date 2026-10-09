@@ -1,0 +1,19 @@
+id: 945-observable-bundle-missing
+case_type: mutation
+modes:
+- fixture
+score_types:
+  fixture: mutation_tests
+project_dir: project
+hard_gate: true
+mutation:
+  control_generator: '{python} {evals_dir}/fixtures/integration-bundle/gen.py {project_dir}'
+fixture:
+  generator: '{python} {evals_dir}/fixtures/integration-bundle/gen.py {project_dir} --break missing'
+assertions:
+- assert: integration.evidence_matches
+  expect: failed
+  expect_code: integration_binding_invalid
+- assert: delivery.evidence_matches
+  args:
+    target_id: observable

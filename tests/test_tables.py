@@ -404,20 +404,31 @@ class PresentationTableTests(unittest.TestCase):
         result = presentation_checks.tables_reference_table_outputs(workspace)
         self.assertEqual((result.status, result.data["code"]), ("failed", "table_view_drift"))
 
-    def test_view_switches_open_at_an_option_and_show_declared_columns(self) -> None:
+    def test_variant_switches_open_at_an_option_and_show_declared_columns(self) -> None:
         workspace = make_workspace()
         project = _table_project()
-        project["presentation"]["controls"] = {"views": [{
+        project["presentation"]["controls"] = {"variants": [{
             "id": "mode", "options": ["walk", "bike"], "canonical": "walk", "output": "summary",
             "fields": {"walk": ["time_saved_h_year"], "bike": ["daily_crossings"]}}]}
         write_project(workspace, project)
         self.assertEqual(presentation_checks.controls_match_pipeline(workspace).status, "passed")
-        project["presentation"]["controls"]["views"][0]["canonical"] = "car"
-        project["presentation"]["controls"]["views"][0]["fields"]["bike"] = ["bike_time_saved"]
+        project["presentation"]["controls"]["variants"][0]["canonical"] = "car"
+        project["presentation"]["controls"]["variants"][0]["fields"]["bike"] = ["bike_time_saved"]
         write_project(workspace, project)
         result = presentation_checks.controls_match_pipeline(workspace)
         self.assertEqual(result.status, "failed")
         self.assertEqual(len(result.data["errors"]), 2)
+
+    def test_the_unreleased_views_key_is_rejected_not_ignored(self) -> None:
+        # Ignoring it would silently stop checking the project's variants.
+        workspace = make_workspace()
+        project = _table_project()
+        project["presentation"]["controls"] = {"views": [{
+            "id": "mode", "options": ["walk", "bike"], "canonical": "walk"}]}
+        write_project(workspace, project)
+        result = presentation_checks.controls_match_pipeline(workspace)
+        self.assertEqual(result.status, "failed")
+        self.assertIn("renamed to presentation.controls.variants", result.detail)
 
 
 

@@ -19,6 +19,7 @@ from typing import Any
 from . import __version__
 from .environment import plan_python_environment, runtime_warnings
 from .project import ProjectError, get_in, load_json, load_project, project_path, step_outputs
+from . import delivery
 from .sampling import Sample, SamplingError, declared_sample, resolve_sample, run_mode, run_record_errors
 from .validation import ValidationResult, validate_project
 from .verify import VerifyResult, verify_project
@@ -265,7 +266,8 @@ def _print_verify(result: VerifyResult, *, verbose: bool, stream: Any = None) ->
     if counts["not_testable"]:
         print(
             "  NOTE  some checks could not run here; install openmapstack[geo] "
-            "for geodata checks, QGIS for the .qgz checks",
+            "for geodata checks, openmapstack[visual] plus `python -m playwright install chromium` "
+            "for browser checks, QGIS for the .qgz checks",
             file=out,
         )
 
@@ -987,6 +989,8 @@ def _inspection(project_file: Path, project: dict[str, Any], validation: Validat
         "overrides": override_items,
         "steps": step_items,
         "outputs": output_items,
+        "delivery": delivery.inspection(project),
+        "integrations": project.get("integrations"),
         "warnings": warnings,
         "latest_run": get_in(project, "runs", "latest"),
         "validation": validation.to_dict(),
@@ -1016,6 +1020,9 @@ def _print_inspection(summary: dict[str, Any], validation: ValidationResult, *, 
     print(f"  manifest: {summary['project_file']}")
     print(f"  CRS: analysis={summary['crs']['analysis']}  storage={summary['crs']['storage']}")
     print(f"  sources: {len(summary['sources'])}  overrides: {len(summary['overrides'])}  steps: {len(summary['steps'])}  outputs: {len(summary['outputs'])}")
+    selection = summary["delivery"]
+    print(f"  delivery: {selection['mode']} " + ", ".join(
+        f"{target.get('id')} ({target.get('kind')})" for target in selection["targets"]))
     for source in summary["sources"]:
         print(f"    source {source['key']}: {source.get('provider')} / {source.get('dataset')} ({source.get('version')})")
     for override in summary["overrides"]:

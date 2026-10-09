@@ -7,7 +7,167 @@
     "schema", "project", "interpretation", "sources", "overrides",
     "processing", "outputs", "validation", "presentation", "runtime", "runs"
   ],
+  "allOf": [{
+    "if": {"required": ["delivery"], "properties": {
+      "presentation": {"required": ["primary_view"], "properties": {"primary_view": {"const": "report"}}}
+    }},
+    "then": {},
+    "else": {"properties": {"presentation": {"properties": {"map": {"required": ["basemap"]}}}}}
+  }],
   "$defs": {
+    "control_effect": {"enum": ["exploratory", "published"]},
+    "control": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "effect": {"$ref": "#/$defs/control_effect"}
+      }
+    },
+
+    "assumption": {
+      "type": "object",
+      "required": ["id", "statement", "rationale"],
+      "additionalProperties": true,
+      "description": "An explicit analytical assumption. Additional fields are project-specific metadata with no built-in execution or validation semantics.",
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "pattern": "\\S"},
+        "statement": {"type": "string", "minLength": 1, "pattern": "\\S"},
+        "rationale": {"type": "string", "minLength": 1, "pattern": "\\S"}
+      }
+    },
+
+    "integrations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "bindings",
+        "evidence"
+      ],
+      "properties": {
+        "schema": {
+          "const": "openmapstack-integrations/v1"
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_evidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bindings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "owner",
+              "role",
+              "definition",
+              "sha256",
+              "steps",
+              "steps_sha256"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "owner": {
+                "type": "string",
+                "minLength": 1
+              },
+              "role": {
+                "type": "string",
+                "minLength": 1
+              },
+              "definition": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "steps": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "steps_sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "bundles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "target",
+              "path"
+            ],
+            "properties": {
+              "target": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "delivery": {
+      "type": "object",
+      "required": ["schema", "targets"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": {"const": "openmapstack-delivery/v1"},
+        "targets": {
+          "type": "array", "minItems": 1,
+          "items": {"$ref": "#/$defs/deliveryTarget"}
+        }
+      }
+    },
+    "deliveryTarget": {
+      "type": "object",
+      "required": ["id", "kind", "output", "inputs", "evidence"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"},
+        "kind": {"enum": ["dashboard", "qgis", "observable"]},
+        "output": {"type": "string", "minLength": 1, "pattern": "\\S"},
+        "inputs": {"type": "array", "minItems": 1, "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "pattern": "\\S"}},
+        "evidence": {"type": "string", "minLength": 1, "pattern": "\\S"},
+        "mode": {"enum": ["local", "hosted"], "default": "local"},
+        "url": {"type": "string", "pattern": "^https://[^\\s]+$"},
+        "retrieved_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"},
+        "build": {"type": "string", "minLength": 1}
+      },
+      "allOf": [
+        {"if": {"properties": {"mode": {"const": "hosted"}}, "required": ["mode"]},
+         "then": {"required": ["url", "retrieved_at", "build"],
+                  "properties": {"kind": {"const": "observable"}}},
+         "else": {"not": {"anyOf": [
+           {"required": ["url"]}, {"required": ["retrieved_at"]}, {"required": ["build"]}
+         ]}}}
+      ]
+    },
     "table_column": {
       "oneOf": [
         {"type": "string", "minLength": 1},
@@ -318,6 +478,8 @@
     }
   },
   "properties": {
+    "integrations": {"$ref": "#/$defs/integrations"},
+    "delivery": {"$ref": "#/$defs/delivery"},
     "schema": {"const": "openmapstack-project/v1"},
     "project": {
       "type": "object",
@@ -328,7 +490,16 @@
         "question": {"type": "string", "minLength": 1},
         "created_at": {"type": "string", "minLength": 1},
         "updated_at": {"type": "string", "minLength": 1},
-        "status": {"enum": ["draft", "in_progress", "validated", "warning", "failed"]}
+        "status": {"enum": ["draft", "in_progress", "validated", "warning", "failed"]},
+        "aoi": {
+          "type": "object",
+          "description": "Area of interest. bbox is [minx, miny, maxx, maxy] in the crs's x/y order (lon/lat or easting/northing); min < max is checked beyond JSON Schema. Local geodata outputs are compared against it.",
+          "required": ["bbox", "crs"],
+          "properties": {
+            "bbox": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"}},
+            "crs": {"type": "string", "minLength": 1}
+          }
+        }
       }
     },
     "interpretation": {
@@ -336,7 +507,11 @@
       "required": ["objective", "assumptions"],
       "properties": {
         "objective": {"type": "string", "minLength": 1},
-        "assumptions": {"type": "array"}
+        "assumptions": {
+          "type": "array",
+          "description": "Assumption IDs must be unique within the project (checked beyond JSON Schema). An empty array is valid but produces a no-assumptions warning.",
+          "items": {"$ref": "#/$defs/assumption"}
+        }
       }
     },
     "sources": {
@@ -371,6 +546,10 @@
         "type": "object",
         "properties": {
           "kind": {"enum": ["geodata", "table", "document"]},
+          "extent": {
+            "enum": ["local", "global"],
+            "description": "local (default) geodata must lie near project.aoi; global layers are exempt from that check."
+          },
           "table": {
             "type": "object",
             "properties": {
@@ -406,6 +585,7 @@
     "presentation": {
       "type": "object",
       "properties": {
+        "design_language": {"enum": ["openmapstack-views/0.1"]},
         "tables": {
           "type": "array",
           "items": {
@@ -423,7 +603,9 @@
         "controls": {
           "type": "object",
           "properties": {
-            "views": {
+            "filters": {"type": "array", "items": {"$ref": "#/$defs/control"}},
+            "scenarios": {"type": "array", "items": {"$ref": "#/$defs/control"}},
+            "variants": {
               "type": "array",
               "items": {
                 "type": "object",
@@ -433,7 +615,8 @@
                   "label": {"type": "string"},
                   "options": {"type": "array", "minItems": 1},
                   "output": {"type": "string", "minLength": 1},
-                  "fields": {"type": "object"}
+                  "fields": {"type": "object"},
+                  "effect": {"$ref": "#/$defs/control_effect"}
                 }
               }
             }
@@ -441,7 +624,6 @@
         },
         "map": {
           "type": "object",
-          "required": ["basemap"],
           "properties": {
             "basemap": {
               "type": "object",
@@ -461,6 +643,22 @@
               "then": {"required": ["url"]}
             }
           }
+        }
+      }
+    },
+    "views": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "output"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "output": {"type": "string", "minLength": 1},
+          "archetype": {"type": "string", "minLength": 1},
+          "scope": {"type": "string", "minLength": 1},
+          "entry": {"type": "boolean"},
+          "presentation": {"$ref": "#/properties/presentation"}
         }
       }
     },

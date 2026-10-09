@@ -53,16 +53,26 @@ canonical `openmapstack run` path, then `openmapstack verify project.yaml --reru
 which rebuilds the project from its declared inputs in an empty workspace.
 Make that `verify --rerun` your last step and do not deliver until it passes;
 a passing `validate` alone is not enough. The canonical pipeline must produce
-every file under `data/derived`, `project.qgz`, the run record, and the
+every file under `data/derived`, every selected deliverable, the run record, and the
 manifest's `runs.latest` and `project.status`, never a one-off script or a
 hand edit: a rerun writes a new run record, so a hand-patched pointer breaks it. Missing
 validation capability is `not_testable`, never an implicit pass. Follow the
-referenced workflow's complete QGIS and presentation obligations.
+referenced workflow's presentation obligations for the selected targets.
+Record `delivery.schema: openmapstack-delivery/v1` for new projects, defaulting
+to the built-in dashboard. Respect explicit external-only or combined delivery;
+QGIS and Observable are optional targets. Existing manifests without `delivery`
+retain legacy v1 behavior until explicitly migrated. Source provenance, GIS
+correctness and clean reruns are required for every selection.
 
 For dashboard basemaps, honor user choices and appropriate local/regional services; otherwise use the preconfigured goplex.ee Protomaps fallback in `references/web-delivery.md`, with light/dark switching and visible provider attribution.
 
 For a bounded one-shot SQL, CRS or conversion question, the relevant domain
 reference is sufficient; a full project artifact and its methodology are not needed.
+
+When the user has dlt, Dagster, dbt, QGIS or Observable in their stack, read
+`references/established-stack.md` for ownership and integration boundaries.
+Preserve their chosen tools; retain source pins, GIS correctness and reproducible
+evidence. Do not duplicate their SQL, ingestion or scheduler definitions.
 
 ## Modules — read the relevant reference(s) before starting work
 
@@ -77,6 +87,7 @@ reference is sufficient; a full project artifact and its methodology are not nee
 | Writing or reviewing spatial SQL / GeoSQL in DuckDB Spatial, PostGIS, BigQuery GIS, Snowflake, or Sedona | `references/spatial-sql.md` |
 | Vector analytics, raster analytics, terrain/hydrology, network analysis, point cloud workflows | `references/analytics.md` |
 | Tile generation (PMTiles, MVT), tile servers (Martin, TiTiler), delivered rendering (MapLibre, deck.gl), or exploration rendering (kepler.gl, lonboard) | `references/web-delivery.md` |
+| Designing a project's dashboard or report pages: archetypes, components, tokens and the state hooks the checks use | `references/design-language.md` |
 | QGIS desktop, QGIS plugin ecosystem, QGIS MCP, PyQGIS scripting, Processing toolbox | `references/qgis.md` |
 | Reproducibility, validation, license attribution, tile smoke tests, deployment checks | `references/validation-and-ops.md` |
 
@@ -88,6 +99,7 @@ For simple one-shot questions (single CRS conversion, one `ogr2ogr` invocation),
 * **CRS:** WGS84 (EPSG:4326) for storage; Web Mercator (EPSG:3857) for web rendering; local projected CRS for any metric computation (distance, area, buffer). For Estonia, EPSG:3301 (L-EST97).
   For DuckDB `ST_Transform` on GIS x/y coordinates, specify `always_xy := true`. Before delivery, check a transformed feature against its source and a known location; a correct CRS label does not prove correct coordinates. See `references/formats-and-crs.md`.
 * **Coordinate order:** treat it as an interface contract, not a CRS guess. Internally prefer GIS `x,y` (`lon,lat` for geographic coordinates), but obey each external format/API contract; GeoJSON, MapLibre `LngLatLike`, and OpenLayers geographic arrays use `lon,lat`, while Leaflet `LatLng` and Google Maps `LatLng` use `lat,lng`. Never infer tuple order from `EPSG:4326` alone. See `references/formats-and-crs.md`.
+* **Layer placement:** declare the area of interest (`project.aoi`) and, after loading and after each reprojection, check that every local layer lies inside it. A layer far outside a city or country AOI signals an axis swap, a wrong CRS label or a wrong-area filter; report it, and fix it only with source evidence.
 * **Compute placement:** push spatial joins and aggregations to DuckDB or PostGIS — not Python loops. R-tree / GIST / spatial indexing is mandatory at scale.
 * **Discovery first:** check STAC catalogs (Microsoft Planetary Computer, Earth Search, Overture STAC) before downloading anything. Lazy load with `odc-stac` or `stackstac` and only materialize what's needed.
 * **Cloud-native access:** prefer querying remote GeoParquet/COG over downloading. DuckDB with `httpfs` extension is the default pattern for Overture and similar S3-hosted datasets.
@@ -127,7 +139,7 @@ For simple one-shot questions (single CRS conversion, one `ogr2ogr` invocation),
 ## Universal anti-patterns — flag and correct
 
 * Hallucinating or fabricating mock coordinates and geometries instead of retrieving real source data (unless the user gave explicit, informed consent for a synthetic mock test)
-* Generating a QGIS project that lacks the web dashboard's layers, omits basemaps, or uses broken OGR datasource syntax (`path.gpkg|layer` without `layername=`), causing layers to load as non-spatial attribute tables
+* Generating a selected QGIS project that disagrees with the shared presentation layers, omits basemaps, or uses broken OGR datasource syntax (`path.gpkg|layer` without `layername=`), causing layers to load as non-spatial attribute tables
 * Writing `.qgs` XML by hand with no `<srs>`, an auth-id-only CRS block, or no `ProjectionsEnabled`, or copying the manifest's layer order straight into the layer tree — these produce a project where every layer is valid and every datasource resolves, yet the map shows the wrong place or silently hides a layer
 * Producing Shapefile as new output (column truncation, 2GB limit, no UTF-8, multi-file)
 * Calling `.distance()`, `.buffer()`, or `.area` on geographic CRS (EPSG:4326) — degrees are not meters; unless specific tool explicitly supports wgs84 based geodesic calculations

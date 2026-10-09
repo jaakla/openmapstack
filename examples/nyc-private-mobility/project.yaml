@@ -6,7 +6,7 @@ project:
     fleet and hub coverage and account demand, and show ranked candidate zones on an interactive map while
     respecting all database access restrictions.
   created_at: '2026-09-17T00:00:00Z'
-  updated_at: '2026-10-07T21:30:39.607552+00:00'
+  updated_at: '2026-10-09T09:00:17.286174+00:00'
   status: validated
 interpretation:
   objective: Rank NYC H3 resolution-8 cells for tenant alpha using pinned read-only captures of the provisioned
@@ -554,14 +554,14 @@ validation:
     expression: trips_total >= 30 AND hub_distance_m >= 1500 AND fleet_present <= 6
 runs:
   latest:
-    id: run-20261007-213039
-    started_at: '2026-10-07T21:30:39.057949+00:00'
-    completed_at: '2026-10-07T21:30:39.607552+00:00'
+    id: run-20261009-090017
+    started_at: '2026-10-09T09:00:16.733493+00:00'
+    completed_at: '2026-10-09T09:00:17.286174+00:00'
     status: passed
-    inputs_hash: sha256:a43967d81b80612ae657e866ea3fad0f90e4c8c3dceb54970260bdcdc8a665cb
-    outputs_hash: sha256:cd9d6178850c18be68560c20107a0637e01d05bfa94ce917feca9bfd20476ed6
+    inputs_hash: sha256:454236128f75068bc06bd78f659eae400499a98d49f25574dfd8be87e531a794
+    outputs_hash: sha256:0e00f59245f23b07bf42a4565dbc9b6556b542ebe56a4fd85a22c895747338ea
     record:
-      path: runs/run-20261007-213039.json
+      path: runs/run-20261009-090017.json
     validation_report:
       path: validation/latest-report.json
 runtime:
@@ -605,6 +605,7 @@ runtime:
     h3_resolution: 8
     source_manifest: data/source/live-20260928-tlc-v1/manifest.json
 presentation:
+  design_language: openmapstack-views/0.1
   layout:
     type: map_with_sidebar
     sidebar:
@@ -620,15 +621,35 @@ presentation:
   dashboard:
     template: dashboard-template.html
     context: existing_hubs_geojson
-    filters:
-    - zone_search
-    - borough
-    - eligibility
-    - minimum_score
+    find: Zone search narrows the list by name or cell id. It has no enumerable states, so it is not a
+      declared control, but a non-empty search marks the view exploratory like a filter.
     selection: Linked grid-cell map, ranked list and score explanation
     state: URL fragment; filters only narrow fixed run scores, never recalculate them
     caveat: Live captures of synthetic business data over real H3 cells. Some synthetic fleet locations
       reuse historical 2016 TLC taxi pickup coordinates; the point layer is not live tracking.
+  controls:
+    reconfigurable: true
+    canonical_reset: true
+    off_canonical_labelling: required
+    filters:
+    - id: borough
+      label: Borough
+      type: choice
+      canonical: all
+    - id: eligibility
+      label: Show
+      type: choice
+      options:
+      - eligible
+      - all
+      canonical: eligible
+    - id: minimum_score
+      label: Minimum candidate score
+      type: range
+      field: final_score
+      unit: score (0-100)
+      canonical: 0
+      step: 1
   map:
     basemap:
       id: goplex-protomaps

@@ -44,7 +44,7 @@ Project-level checks to run before declaring an analysis complete:
 * **Licensing** — each source has a license; attribution chain is preserved.
 * **Reproducibility** — a fresh environment can rerun it without the chat transcript.
 * **Manifest/report parity** — every required and domain check is present exactly once; warnings or `not_testable` checks propagate to overall status; run IDs and hashes resolve to an actual run record.
-* **QGIS validity** — all tree IDs resolve to project layers, local sources exist, categorized styles cover the data domain, and PyQGIS loads every layer as valid when that runtime is available. Otherwise record runtime validation as `not_testable`.
+* **QGIS validity, when selected** — all tree IDs resolve to project layers, local sources exist, categorized styles cover the data domain, and PyQGIS loads every layer as valid when that runtime is available. Otherwise record runtime validation as `not_testable`.
 
 See `references/project-spec.md` for the full schema and `templates/validation.yaml` for a starter.
 

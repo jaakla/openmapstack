@@ -6,8 +6,15 @@ project:
     walking distance to city-owned kindergarten and school), and land-use criteria in Tartu, and show
     them on an interactive map with education POIs and catchment areas.
   created_at: 2026-08-25 08:15:03+03:00
-  updated_at: '2026-10-07T21:30:48.681033+00:00'
+  updated_at: '2026-10-09T09:04:23.901780+00:00'
   status: warning
+  aoi:
+    bbox:
+    - 640000
+    - 6455000
+    - 685000
+    - 6500000
+    crs: EPSG:3301
 interpretation:
   objective: Find cadastral parcels in Tartu satisfying stated land-use, minimum size (>= 2 ha), primary
     road accessibility (<= 2000 m), and overlap with 25-minute pedestrian-network catchments of verified
@@ -41,23 +48,23 @@ sources:
     portal_page: https://geoportaal.maaruum.ee/eng/spatial-data/cadastral-data-p310.html
     access:
       method: http(s) bulk download
-      downloaded_at: '2026-09-28T20:55:21.976024+00:00'
-      retrieved_at: '2026-09-28T20:55:21.976024+00:00'
+      downloaded_at: '2026-10-08T21:08:17.831470+00:00'
+      retrieved_at: '2026-10-08T21:08:17.831470+00:00'
       file:
         archive_name: Tartu_maakond_KATASTER_GPKG.zip
         extracted_file: Tartu_maakond_KATASTER_GPKG.gpkg
         table_name: Tartu maakond
         format: GeoPackage (GPKG/SQLite)
-        size_bytes: 55791616
+        size_bytes: 55799808
         row_count: 79182
         column_count: 32
       request_spec: 'Direct county GPKG zip download from Maa- ja Ruumiamet S3 storage: https://s3.pilw.io/rp-kemit-kataster/ANDMED/Tartu_maakond_KATASTER_GPKG.zip
         extracted to data/source/Tartu_maakond_KATASTER_GPKG.gpkg containing layer ''Tartu maakond'' (79,082
         parcels in EPSG:3301).'
     version:
-      published_at: '2026-09-28'
-      identifier: Tartu_maakond_KATASTER_GPKG (daily snapshot 2026-09-28)
-      etag: 2e36bb4d8b2a94996ee668c378f475ed-4
+      published_at: '2026-10-07'
+      identifier: Tartu_maakond_KATASTER_GPKG (daily snapshot 2026-10-07)
+      etag: 6c24f01dc29413e35b347866bec4ecac-4
     selection:
       municipality: Tartu linn
       filter: pindala >= 20000 AND siht1 IN ('MAATULUNDUSMAA', 'TOOTMISMAA', 'ARIMAA')
@@ -114,8 +121,8 @@ sources:
     portal_page: https://geoportaal.maaruum.ee/est/ruumiandmed/eesti-topograafia-andmekogu/laadi-etak-andmed-alla-p609.html
     access:
       method: WFS 2.0.0 (GetFeature)
-      downloaded_at: '2026-09-28T20:55:37.511054+00:00'
-      retrieved_at: '2026-09-28T20:55:37.511054+00:00'
+      downloaded_at: '2026-10-08T21:08:21.500682+00:00'
+      retrieved_at: '2026-10-08T21:08:21.500682+00:00'
       file:
         name: etak_main_roads.geojson
         layer_name: etak:e_501_tee_j
@@ -169,8 +176,8 @@ sources:
     portal_page: https://geohub.tartulv.ee/
     access:
       method: ArcGIS REST FeatureServer / GeoJSON
-      downloaded_at: '2026-09-28T20:55:42.406623+00:00'
-      retrieved_at: '2026-09-28T20:55:42.406623+00:00'
+      downloaded_at: '2026-10-08T21:08:36.773474+00:00'
+      retrieved_at: '2026-10-08T21:08:36.773474+00:00'
       file:
         name: tartu_municipal_education.geojson
         table_name: education_pois
@@ -221,8 +228,8 @@ sources:
     portal_page: https://download.geofabrik.de/europe/estonia.html
     access:
       method: http(s) bulk download
-      retrieved_at: '2026-09-28T20:56:04.044855+00:00'
-      downloaded_at: '2026-09-28T20:56:04.044855+00:00'
+      retrieved_at: '2026-10-08T21:08:45.485245+00:00'
+      downloaded_at: '2026-10-08T21:08:45.485245+00:00'
     version:
       identifier: estonia-260901.osm.pbf
       published_at: '2026-09-04'
@@ -436,6 +443,7 @@ validation:
 presentation:
   dashboard:
     template: dashboard-template.html
+  design_language: openmapstack-views/0.1
   intent: analytical_workspace
   primary_view: map
   layout:
@@ -748,6 +756,7 @@ runtime:
     dependencies:
     - dashboard-template.html
     - routing.py
+    - qgis_delivery.py
     - requirements.txt
   environment:
     python: '3.12'
@@ -759,13 +768,13 @@ runtime:
     osmium: 4.3.1
 runs:
   latest:
-    id: run-20261007-213001
-    started_at: '2026-10-07T21:30:01.637687+00:00'
-    completed_at: '2026-10-07T21:30:48.681033+00:00'
+    id: run-20261009-090336
+    started_at: '2026-10-09T09:03:36.518904+00:00'
+    completed_at: '2026-10-09T09:04:23.901780+00:00'
     status: warning
-    inputs_hash: sha256:31afbadea684dbfdd4d0f5cf3c59709fb0220c3f59bdc0e861058d993998096a
-    outputs_hash: sha256:9a7dc21e8e6ab6efb2d739cdc0f73e25aeca0a6e07db6c60dc22dc1197c3ba22
+    inputs_hash: sha256:b3661890364f321d9cf0e5b18700fe9c5f99ee9da0d5a45564ed44e29767ee05
+    outputs_hash: sha256:282abf6cf522e94a1bb9518201dcfae0f8d3f28835115bb4e91ec87eb1402913
     record:
-      path: runs/run-20261007-213001.json
+      path: runs/run-20261009-090336.json
     validation_report:
       path: validation/latest-report.json
